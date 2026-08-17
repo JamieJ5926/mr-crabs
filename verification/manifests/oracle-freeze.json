@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "source_worktree": "/Users/jamie/Documents/Projects/active/mr-crabs",
+  "head": "d2c70a8c7b9b6893c13640c02d7b6f9a1624f3f0",
+  "files": [
+    {
+      "status": " M",
+      "path": "macos/Ghostty-Info.plist",
+      "sha256": "e2e71d61f741ae5de0569f8e14e3238b44139dce88a4e186eb86b7762da94497",
+      "bytes": 3050,
+      "mode": "0o644"
+    },
+    {
+      "status": " M",
+      "path": "macos/Ghostty.xcodeproj/project.pbxproj",
+      "sha256": "467453e133b30137b75dbc7d5b309867c6397fce4a00e75a0b13073e3eeca12c",
+      "bytes": 49256,
+      "mode": "0o644"
+    },
+    {
+      "status": " M",
+      "path": "macos/Ghostty.xcodeproj/xcshareddata/xcschemes/Ghostty.xcscheme",
+      "sha256": "0de57eb83993cb16242b1f98130015ff6c0dbf4c3a076bfad6f5ac14ca49d620",
+      "bytes": 4357,
+      "mode": "0o644"
+    },
+    {
+      "status": " M",
+      "path": "macos/Sources/Features/App Intents/IntentPermission.swift",
+      "sha256": "b387322a9ad68a5c09025ccdbac520fe26ab4d9ba9ad55a164744486986ebbf9",
+      "bytes": 2017,
+      "mode": "0o644"
+    },
+    {
+      "status": " M",
+      "path": "macos/Sources/Features/Custom App Icon/DockTilePlugin.swift",
+      "sha256": "d6ea758ba11ab9be95020e0461bdd05a8d5ed81bb71449d2bb9c1a0ed336ed1f",
+      "bytes": 3498,
+      "mode": "0o644"
+    },
+    {
+      "status": " M",
+      "path": "macos/Sources/Features/Terminal/Window Styles/TerminalWindow.swift",
+      "sha256": "84343b7e30d6b3b4d0ae76bc65ef4cf429edaf5d3690dcbf669462b73d48734b",
+      "bytes": 34790,
+      "mode": "0o644"
+    },
+    {
+      "status": " M",
+      "path": "macos/Sources/Features/Update/UpdateDelegate.swift",
+      "sha256": "fab497c63d991f52c2779f648e3da7a35f08da84a20023fab0d5332c308a2546",
+      "bytes": 1469,
+      "mode": "0o644"
+    },
+    {
+      "status": " M",
+      "path": "src/build/GhosttyXcodebuild.zig",
+      "sha256": "83ebb8a68f6c958667720cd49d2abf10fb532387592a6496331f6cf0d9cfacbd",
+      "bytes": 6500,
+      "mode": "0o644"
+    },
+    {
+      "status": " M",
+      "path": "src/build_config.zig",
+      "sha256": "0fc73edbb471f0b89c906dd0c13fc4e0a3b7a445230a8b9c84b7ca08999dd58a",
+      "bytes": 4117,
+      "mode": "0o644"
+    },
+    {
+      "status": " M",
+      "path": "src/cli/Pager.zig",
+      "sha256": "b87d32467b0c7c618b5eb10347bf3955c40ef5235ca2b34b87096ff7e0398237",
+      "bytes": 4178,
+      "mode": "0o644"
+    },
+    {
+      "status": " M",
+      "path": "src/config/Config.zig",
+      "sha256": "fe8aebb87ac89839e2f638dab9f13a86fed360cdab917c1aa93dba008598d62e",
+      "bytes": 432148,
+      "mode": "0o644"
+    },
+    {
+      "status": " M",
+      "path": "src/renderer/Metal.zig",
+      "sha256": "6575639d885a663a2f9f90a182304c25d1f5db979186e1584ac243119bd429ce",
+      "bytes": 18073,
+      "mode": "0o644"
+    },
+    {
+      "status": " M",
+      "path": "src/renderer/OpenGL.zig",
+      "sha256": "e8840aa80106bf150c689b63a7635574f1e805e3f8143c61f2afa340e100c7d3",
+      "bytes": 15525,
+      "mode": "0o644"
+    },
+    {
+      "status": " M",
+      "path": "src/renderer/generic.zig",
+      "sha256": "a8e3611a463bb6b660a4c6661c5d98cb95892bbd20cf0fc1a6ad5df049428d7c",
+      "bytes": 171113,
+      "mode": "0o644"
+    },
+    {
+      "status": " M",
+      "path": "src/renderer/shaders/shadertoy_prefix.glsl",
+      "sha256": "7ee84b041e60d942b1e228d6db936407b83d1f3ba4a60ffb4a65b3c35252eb0f",
+      "bytes": 1949,
+      "mode": "0o644"
+    },
+    {
+      "status": " M",
+      "path": "src/renderer/shadertoy.zig",
+      "sha256": "d2b60d307c3d362b8ee831778ebcb92cb1cc6bb1c70b17d8c1ba410e9833859b",
+      "bytes": 26848,
+      "mode": "0o644"
+    },
+    {
+      "status": "??",
+      "path": "src/renderer/shaders/cursor-trail.glsl",
+      "sha256": "6d29f87d21e8595f91729d22106f2858da8c3d4375f8022625e3935400b977b4",
+      "bytes": 3908,
+      "mode": "0o644"
+    },
+    {
+      "status": "??",
+      "path": "src/renderer/shaders/streaming-text.glsl",
+      "sha256": "00f68513edf5cfade187374ac2c21f56ee651bba68a07b3b9ee2e84e99d454ac",
+      "bytes": 4068,
+      "mode": "0o644"
+    },
+    {
+      "status": "??",
+      "path": "src/renderer/shaders/typewriter-text.glsl",
+      "sha256": "3446994115edc9161bcfcf78e6eadd1eacfca51f4c9f042afa20caf37dcb28a4",
+      "bytes": 5122,
+      "mode": "0o644"
+    }
+  ],
+  "patch_sha256": "6260fcd96857a6c0e6aca96da68d9694927f7dbb826d71db50e3d85dfe8274fa",
+  "patch_bytes": 103542
+}

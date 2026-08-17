@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "slice": "S9",
+  "title": "Mr Crabs animation effects (streaming/typewriter text reveal, cursor trail)",
+  "base_commit": "a56687bfa",
+  "scope": [
+    "rust/Cargo.toml",
+    "rust/Cargo.lock",
+    "rust/crates/mr-crabs-effects/**",
+    "rust/crates/mr-crabs-element/src/cursor.rs",
+    "rust/crates/mr-crabs-element/src/element.rs",
+    "rust/crates/mr-crabs-terminal/src/delta.rs",
+    "rust/verification/effects-corpus/s9-effects.json",
+    "rust/verification/manifests/s9-*.json"
+  ],
+  "required_api": {
+    "config": [
+      "EffectsConfig with oracle-exact clamps (text duration [1ms,5s], trail duration [1ms,60s], intensity/opacity [0,1], max_tracked_cells >= 1)",
+      "Default/From<AnimationDefaults> reproduce exact Mr Crabs defaults: streaming 120ms intensity 1.0; cursor trail enabled, 250ms, opacity 0.35"
+    ],
+    "schedule": [
+      "TypewriterSchedule with NEVER_MS=-1000 sentinel, MAX_AHEAD_MS=1000, stagger = duration/8",
+      "begin_build continues a burst only while now < last + duration and next <= now + max_ahead, else starts a fresh burst at now",
+      "next_timestamp hands out monotonically increasing timestamps across rebuilds"
+    ],
+    "tracker": [
+      "ChangeTracker: dense per-cell render keys (u64 from Cell content/style/flags) and change times (f32 bit patterns of shader-time seconds), sentinel for never-changed cells",
+      "row-generation fast path (unchanged rows are not diffed), resize preserves prefix and stamps new cells, max_tracked_cells bounds the store, rgba8 packed texture"
+    ],
+    "reveal": [
+      "RevealMath with the exact shader formulas: streaming reveal = elapsed/duration, conceal = intensity * (1-reveal) * smoothstep(0,2,dist); typewriter strike = duration/4, future cells fully concealed",
+      "RevealPhase Pending/Animating/Revealed; CellReveal carries pos/change_ms/elapsed_ms deterministically"
+    ],
+    "trail": [
+      "CursorTrail: shape-aware cursor rects (block/bar/underline/hollow), previous/current rect capture on movement, linear fade (1 - elapsed/duration) * opacity, radius = 0.5*max(w,h), segment between centers, focus/visibility/degenerate guards",
+      "GradientCache: bounded LRU gradient resource descriptors (MAX_GRADIENTS=16) keyed by quantized radius"
+    ],
+    "coords": [
+      "CellMetricsUniform port of iCellMetrics: (cell width, signed row step, row-zero origin x/y); bottom-up orientation uses negative row step and flipped origin",
+      "cell_coord maps fragments to change-texture rows (row 0 = top grid row) on both orientations"
+    ],
+    "model": [
+      "EffectsModel::new(config, size, cell), apply_frame(frame, now_ms, focus) -> &EffectsFrame, set_config, needs_frame, change_texture/change_texture_dirty/clear_change_texture_dirty, last_change_ms, retained_capacity",
+      "needs_frame matches oracle textAnimationAnimating/cursorTrailAnimating: frames while a reveal or fade is in progress; future typewriter timestamps keep frames scheduled; expiry yields zero frames",
+      "disabled path (text none + trail off) retains exactly 0 bytes and schedules nothing",
+      "monotonic clock clamp; text integrity (model never mutates frame content)"
+    ],
+    "element": [
+      "should_request_animation_with(frame, transitioning, effects_active) additive scheduling helper",
+      "TerminalElement::with_effects_active builder and paint wiring: animation frames while effects demand, zero frames at expiry"
+    ],
+    "terminal": [
+      "FrameDelta::empty(size) additive constructor for synthetic corpus frames"
+    ]
+  },
+  "acceptance": [
+    "Every S9 manifest item maps to production code in mr-crabs-effects plus the two additive element/terminal APIs",
+    "s9-effects.json contains provenance-cited oracle cases; deterministic frame sequences match fixtures exactly (1e-9 float tolerance)",
+    "Zero frames after expiry: needs_frame false once the last change timestamp + duration elapses (streaming and typewriter cases)",
+    "Disabled path has zero retained allocations and schedules no frames (expected_retained_capacity = 0 case)",
+    "Typewriter future timestamps stay hidden (pending list) and keep animation frames scheduled",
+    "All payloads and caches have explicit bounds: max_tracked_cells, MAX_GRADIENTS, texture length asserted in corpus",
+    "No change to underlying terminal text: model retains only numeric change state",
+    "No GUI launch; lead owns all builds, tests, lint, corpus validation, integration, and evidence"
+  ],
+  "constraints": [
+    "Read the source Ghostty worktree and the frozen dirty-oracle-v2.patch only; do not modify them",
+    "Do not run formatting, builds, tests, lint, benchmarks, or the oracle",
+    "Do not weaken or alter existing S0-S5 public APIs; all additions are additive",
+    "Do not touch other slice crates (mr-crabs-protocols, mr-crabs-graphics, mr-crabs-history, mr-crabs-input, mr-crabs-pty, mr-crabs-config, mr-crabs-oracle, mr-crabs-bench, mr-crabs-app)"
+  ]
+}

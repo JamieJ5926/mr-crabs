@@ -1,0 +1,15 @@
+[package]
+name = "mr-crabs-effects"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+mr-crabs-config.workspace = true
+mr-crabs-terminal.workspace = true
+
+[dev-dependencies]
+serde.workspace = true
+serde_json.workspace = true

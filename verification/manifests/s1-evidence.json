@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "slice": "S1",
+  "base_commit": "b119af0cd1490a226b7f31f35c4b7511b9ed7f00",
+  "candidates": [
+    {
+      "model": "openai-codex/gpt-5.6-sol",
+      "status": "rejected",
+      "reason": "timed out without required commit"
+    },
+    {
+      "model": "cli-proxy/grok-4.6",
+      "commit": "4b5bb8e0f01484ac6fcee8998896053bb98dbaab",
+      "status": "rejected",
+      "reason": "compile failure and no independent Ghostty expected snapshots"
+    },
+    {
+      "model": "cli-proxy/muse-spark-1.2-contributor",
+      "commit": "600a72d49b01000bbdc1952691fb335597258a41",
+      "status": "rejected",
+      "reason": "copied sibling candidate and compile failure"
+    },
+    {
+      "model": "cli-proxy/deepseek-v4-pro",
+      "commit": "c12342a8c175e93d815678d263e3a4e6fc266591",
+      "status": "selected-for-synthesis",
+      "reason": "most complete independent candidate"
+    }
+  ],
+  "synthesis_model": "cli-proxy/grok-4.6",
+  "synthesis_commit": "c2fab7f6ed363817b7dc7e26548e3851dcf0a26b",
+  "lead_fixes": [
+    "Stable rustfmt exclusion for byte-frozen path dependency",
+    "usize chunk offset",
+    "tab marker normalization to Ghostty empty cells",
+    "actual libghostty-vt ctypes oracle and regenerated fixtures"
+  ],
+  "commands": [
+    {
+      "command": "cargo fmt --all -- --check",
+      "result": "passed"
+    },
+    {
+      "command": "cargo check --workspace --all-targets",
+      "result": "passed"
+    },
+    {
+      "command": "cargo test -p mr-crabs-terminal",
+      "result": "3 passed"
+    },
+    {
+      "command": "cargo test -p mr-crabs-oracle",
+      "result": "3 passed"
+    },
+    {
+      "command": "cargo test --workspace",
+      "result": "6 passed across 15 suites"
+    },
+    {
+      "command": "cargo clippy --workspace --all-targets -- -D warnings",
+      "result": "passed"
+    },
+    {
+      "command": "cargo run -p mr-crabs-oracle -- corpus verification/corpus",
+      "result": "21 immutable actual-Ghostty cases passed"
+    },
+    {
+      "command": "cargo tree -p mr-crabs-app",
+      "result": "no forbidden dependency"
+    }
+  ],
+  "oracle_runner": {
+    "path": "verification/oracle/ghostty_oracle.py",
+    "sha256": "7a8c734efba994100fb1dfaa88eaf6ffe1d17e1a5bff470c45f938fe09bd60be",
+    "source_library": "/Users/jamie/Documents/Projects/active/mr-crabs/zig-out/lib/libghostty-vt.0.1.0.dylib",
+    "dev_only": true
+  },
+  "corpus_sha256": "656237195c5f4c46b87f111c90e80c6404a6d01931eb0a3812445f0c22a0f954",
+  "vendor_files_verified": 207,
+  "selected_commit_after_lead_fixes": "c2fab7f6ed363817b7dc7e26548e3851dcf0a26b",
+  "rollback_point": "b119af0cd1490a226b7f31f35c4b7511b9ed7f00"
+}

@@ -1,0 +1,30 @@
+[package]
+name = "mr-crabs-bench"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+# Counting global allocator for the bench binary/tests (S12). The counting
+# allocator is process-local, allocation-safe, and only ever installed by the
+# bench crate's own binaries, so no other workspace crate is affected.
+default = ["count-alloc"]
+count-alloc = []
+
+[dependencies]
+libc.workspace = true
+mach2.workspace = true
+mr-crabs-config = { path = "../mr-crabs-config" }
+mr-crabs-effects = { path = "../mr-crabs-effects" }
+mr-crabs-element = { path = "../mr-crabs-element" }
+mr-crabs-graphics = { path = "../mr-crabs-graphics" }
+mr-crabs-history = { path = "../mr-crabs-history" }
+mr-crabs-pty = { path = "../mr-crabs-pty" }
+mr-crabs-terminal.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

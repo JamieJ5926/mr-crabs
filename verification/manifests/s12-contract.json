@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "slice": "S12",
+  "title": "Release resource gate and headless benchmark suite",
+  "owned_paths": [
+    "crates/mr-crabs-bench/**",
+    "verification/manifests/s12-*.json",
+    "verification/tools/**",
+    "verification/corpus/replay/**"
+  ],
+  "cli_contract": [
+    "mr-crabs-bench --suite release --workload <name> --json <path>  (exactly one run, fresh process)",
+    "mr-crabs-bench --suite release --json <path>                    (aggregate: every workload once)"
+  ],
+  "results_schema": "s12-schema.json",
+  "status_vocabulary": {
+    "measured": "real numbers captured; may satisfy gates",
+    "failed": "workload errored; gate fails",
+    "blocked": "not_measured with exact reason; can never satisfy a gate"
+  },
+  "workloads": {
+    "measured_headless": [
+      "ascii_10mb: 10 MiB deterministic ASCII feed throughput (payload pinned in corpus/replay/payloads.json)",
+      "unicode_10mb: 10 MiB deterministic mixed-Unicode (valid UTF-8) feed throughput",
+      "scrollback_1m: 1,000,000 x 'line\\n' feed with paged/compressed storage; logical_lines must not lose a line",
+      "resize_storm: 256 resizes across 5 sizes with seeded 4 KiB feeds between",
+      "redraw_replay: 512-step deterministic replay with per-step frame-delta builds; p50/p95/p99 frame build ns",
+      "engines_1 / engines_10 / engines_50: N live terminal engines with settled compression",
+      "headless_idle: strict idle after a burst: zero redraw/animation requests, zero retained-capacity growth",
+      "headless_cache: retained render cache warm + identical-frame fast path without growth",
+      "pty_launch_to_prompt: real PTY shell (-i, cleared env, PS1 marker) to first prompt; child reaped, no leak",
+      "pty_echo: bounded 4 MiB PTY round-trip through /bin/stty raw -echo; /bin/cat; byte-verified",
+      "image_decode_stress: S7 kitty PNG decode + zlib inflate on pinned graphics-corpus fixtures",
+      "effects: S9 mr-crabs-effects EffectsModel over damaged frames under an explicit clock; frames_until_idle, frames_after_expiry == 0, retained_capacity with default config, disabled config must retain 0 bytes",
+      "search: S8 mr-crabs-history search_sync + SearchWorker over a 200,000-line deterministic history; matches == 201, lines_searched == 200,000, worker round trip"
+    ],
+    "blocked_never_pass": [
+      "gui_frame_time: not_measured - requires an authorized GUI render surface; headless bench never launches a GUI instance",
+      "window_redraw: not_measured - requires an authorized GUI render surface",
+      "strict_gui_idle: not_measured - requires an authorized GUI render surface",
+      "energy: not_measured - powermetrics requires root authorization and is not invoked"
+    ]
+  },
+  "execution": {
+    "runs_per_workload": "1 warmup + 5 isolated measured runs, each a fresh process invocation",
+    "aggregation": "median per numeric metric across the 5 runs; p50/p95/p99 with nearest-rank for latency metrics (wall_ns, launch_to_prompt_ns, frame build percentiles)",
+    "oracle_comparison": "only ascii_10mb, unicode_10mb, scrollback_1m; only when payload spec AND FNV-1a 64 equal the pinned corpus values; only against verification/baselines/oracle-baseline.json measured entries; otherwise comparison-ineligible and the gate fails closed",
+    "no_weak_gates": "oracle gates are unchanged: throughput >= baseline throughput_mib_s; max_rss <= baseline median_max_rss_bytes; peak footprint <= baseline median_peak_footprint_bytes"
+  },
+  "hard_gates": [
+    "scrollback_1m: logical_lines == 1000000 (line loss fails)",
+    "pty_launch_to_prompt / pty_echo: child_reaped == true and child_alive_after_reap == false (process leak fails)",
+    "headless_idle / headless_cache: idle_redraw_requests == 0, idle_animation_requests == 0, capacity_growth_bytes == 0 (cache growth fails)",
+    "blocked metrics stay visibly blocked in the gate output and can never satisfy a gate",
+    "effects: frames_after_expiry == 0 and effects_disabled_retained_capacity == 0",
+    "search: search_matches == 201 and search_lines_scanned == 200000"
+  ],
+  "test_defense": [
+    "stats.rs: median odd/even and nearest-rank percentile tests mirror verification/corpus/replay/aggregate-math-fixture.json",
+    "payloads.rs: determinism (regenerate == identical), exact lengths, FNV-1a 64 pins, 96-byte prefix vectors, valid-UTF-8 invariant",
+    "release_gate.py --self-test: arithmetic fixture and payload pin regeneration (Python mirror of the generators)",
+    "payloads.rs: search_history_payload determinism and pinned match count (SEARCH_EXPECTED_MATCHES)"
+  ],
+  "gui_launch": false,
+  "powermetrics": false
+}

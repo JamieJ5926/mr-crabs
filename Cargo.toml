@@ -1,0 +1,53 @@
+[workspace]
+members = [
+    "crates/mr-crabs-input",
+    "crates/mr-crabs-app",
+    "crates/mr-crabs-bench",
+    "crates/mr-crabs-config",
+    "crates/mr-crabs-effects",
+    "crates/mr-crabs-element",
+    "crates/mr-crabs-graphics",
+    "crates/mr-crabs-history",
+    "crates/mr-crabs-oracle",
+    "crates/mr-crabs-protocols",
+    "crates/mr-crabs-pty",
+    "crates/mr-crabs-terminal",
+]
+exclude = ["vendor/alacritty-terminal", "vendor/vte"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+publish = false
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+
+[workspace.dependencies]
+futures = "=0.3.34"
+gpui = { package = "gpui", version = "=0.2.2", git = "https://github.com/zed-industries/zed", rev = "03e5ad8a630c84c3990055905d0444ea0a519b7f" }
+gpui_platform = { package = "gpui_platform", version = "=0.1.0", git = "https://github.com/zed-industries/zed", rev = "03e5ad8a630c84c3990055905d0444ea0a519b7f", features = ["font-kit"] }
+base64 = "=0.22.1"
+flate2 = { version = "=1.1.9", default-features = false, features = ["rust_backend"] }
+libc = "=0.2.189"
+mach2 = "=0.5.0"
+lz4_flex = "=0.14.0"
+mr-crabs-config = { path = "crates/mr-crabs-config" }
+mr-crabs-effects = { path = "crates/mr-crabs-effects" }
+mr-crabs-graphics = { path = "crates/mr-crabs-graphics" }
+mr-crabs-history = { path = "crates/mr-crabs-history" }
+mr-crabs-protocols = { path = "crates/mr-crabs-protocols" }
+mr-crabs-terminal = { path = "crates/mr-crabs-terminal" }
+png = "=0.17.16"
+parking_lot = "=0.12.5"
+# NOTE(S4): serde/serde_json are exact-pinned at the minimums required by the
+serde = { version = "=1.0.221", features = ["derive"] }
+serde_json = "=1.0.144"
+vte = { version = "=0.15.0", default-features = false, features = ["std", "ansi"] }
+
+[patch.crates-io]
+vte = { path = "vendor/vte" }

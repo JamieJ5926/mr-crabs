@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "slice": "S4",
+  "title": "Custom GPUI terminal element",
+  "contract_commit": "10a93fc1c0d53cb52cd291a43cebbc809a1246e1",
+  "integration_base": "bba063c12fb5d1d0e60c6162d101942c77b827f5",
+  "gpui_pin": "03e5ad8a630c84c3990055905d0444ea0a519b7f",
+  "candidates": [
+    {
+      "model": "openai-codex/gpt-5.6-sol",
+      "commit": "5c38fabb079e3537a53d9af69d16c33abe02a5ae",
+      "status": "rejected"
+    },
+    {
+      "model": "cli-proxy/grok-4.6",
+      "commit": "2a61f56d881b2584119173d20787d0c63493fbaf",
+      "status": "rejected"
+    },
+    {
+      "model": "cli-proxy/muse-spark-1.2-contributor",
+      "commit": "a07944d7fdfa0da3fda7463c09c789cf5c5eb2c5",
+      "status": "selected"
+    },
+    {
+      "model": "cli-proxy/deepseek-v4-pro",
+      "commit": "715eb14129d1233b4a8f1afb968ae9452fb3bdb3",
+      "status": "rejected"
+    }
+  ],
+  "adjudication": {
+    "selected_model": "cli-proxy/muse-spark-1.2-contributor",
+    "selected_commit": "a07944d7fdfa0da3fda7463c09c789cf5c5eb2c5",
+    "reason": "The Muse candidate supplied the most complete modular frame pool, damage cache, geometry, selection, cursor, palette, element, app wiring, and tests. Lead reconciliation corrected compile failures and observable rendering defects rather than combining incompatible candidate architectures.",
+    "integration_commits": [
+      "c555a5192bac6dfa3189d4df40d57ac3ee671dda",
+      "79bc14ca7c935b72b54361137a51523571b9c402"
+    ],
+    "rollback_point": "bba063c12fb5d1d0e60c6162d101942c77b827f5"
+  },
+  "implemented_contract": [
+    "Owned pooled FrameDelta boundary with clean, partial, and full damage",
+    "GPUI-only custom Element with retained row batches and retained ShapedLine values",
+    "Every GPUI redraw emits cached background and glyph paint commands; clean cursor redraws do not reshape",
+    "Menlo shaping through GPUI/CoreText with bold, italic, dim, hidden, inverse, underline, undercurl, and strikethrough attributes",
+    "Wide-cell spacer handling and physical-cell run geometry",
+    "Selection and block, bar, underline, and hollow-block cursor rendering",
+    "Wall-clock cursor blink phase with zero idle animation requests when blinking and transitions are inactive",
+    "Font-version invalidation and full-cache rebuild",
+    "Deduplicated cell-grid resize callback",
+    "Stateful marked-text IME handler with committed-text callback and cursor bounds",
+    "Headless render-cache smoke using real RenderCache and FrameDelta values"
+  ],
+  "verification": {
+    "cargo_check_workspace_all_targets": "passed",
+    "terminal_tests": "34 passed",
+    "element_tests": "62 passed",
+    "app_tests": "3 passed",
+    "bench_tests": "2 passed",
+    "clippy_workspace_all_targets_deny_warnings": "passed",
+    "headless_smoke": {
+      "command": "cargo run -p mr-crabs-bench -- --suite s4-smoke --json verification/s4-smoke.json",
+      "result": "ok=true",
+      "artifact": "verification/s4-smoke.json"
+    },
+    "dependency_tree": {
+      "command": "cargo tree -p mr-crabs-app",
+      "gpui": "0.2.2 at 03e5ad8a630c84c3990055905d0444ea0a519b7f",
+      "forbidden_lockfile_packages": []
+    },
+    "gui_launch": "not run: the frozen S4 contract permits an actual app launch only when explicitly authorized"
+  }
+}

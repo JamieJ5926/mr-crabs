@@ -1,0 +1,18 @@
+[package]
+name = "mr-crabs-element"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+gpui.workspace = true
+image = { version = "0.25", default-features = false }
+mr-crabs-effects.workspace = true
+mr-crabs-graphics.workspace = true
+mr-crabs-terminal.workspace = true
+parking_lot.workspace = true
+
+[dev-dependencies]
+base64.workspace = true

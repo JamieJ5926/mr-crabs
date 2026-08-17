@@ -1,0 +1,700 @@
+{
+  "schema_version": 1,
+  "slice": "S8",
+  "title": "History, search, selection, viewport, persistence, restore",
+  "source_head": "d2c70a8c7b9b6893c13640c02d7b6f9a1624f3f0",
+  "source_notes": [
+    "search: src/terminal/search/Thread.zig:470-477 (needle cap), sliding_window.zig:111-143 (reverse), formatter.zig:1180-1343 (plain+unwrap+trim encoding)",
+    "selection: src/terminal/SelectionGesture.zig:151-152 (cell/word/line defaults), Screen.zig:2960 selectLine, 3217 selectWord, config/Config.zig:744-756 (selection-word-chars)",
+    "snapshot: src/terminal/snapshot/terminal.zig:914-1031 (encode/decode/restore lifecycle)",
+    "alt screen: per-screen PageLists; alternate-screen scrollback is discarded on exit",
+    "The search/selection text contract is defined in rust/crates/mr-crabs-history/src/search.rs (row rules) and selection.rs; storage page compression is invisible to search (pages are not search units)."
+  ],
+  "cases": [
+    {
+      "name": "search-forward-plain",
+      "kind": "search",
+      "size": {
+        "cols": 10,
+        "rows": 2
+      },
+      "input_hex": "616263206465660d0a676869206a6b6c0d0a6d6e6f207071720d0a737475207677780d0a6e6565646c65210d0a",
+      "compress": false,
+      "request": {
+        "needle": "jkl",
+        "direction": "forward",
+        "start": "top",
+        "limit": 1000,
+        "case_sensitive": false,
+        "include_visible": true
+      },
+      "expect": {
+        "matches": [
+          {
+            "start_line": 1,
+            "start_col": 4,
+            "spans": [
+              {
+                "line": 1,
+                "start_col": 4,
+                "end_col": 7
+              }
+            ]
+          }
+        ],
+        "truncated": false,
+        "completed": true
+      }
+    },
+    {
+      "name": "search-forward-includes-visible",
+      "kind": "search",
+      "size": {
+        "cols": 10,
+        "rows": 2
+      },
+      "input_hex": "616263206465660d0a676869206a6b6c0d0a6d6e6f207071720d0a737475207677780d0a6e6565646c65210d0a",
+      "compress": false,
+      "request": {
+        "needle": "needle",
+        "direction": "forward",
+        "start": "top",
+        "limit": 1000,
+        "case_sensitive": false,
+        "include_visible": true
+      },
+      "expect": {
+        "matches": [
+          {
+            "start_line": 4,
+            "start_col": 0,
+            "spans": [
+              {
+                "line": 4,
+                "start_col": 0,
+                "end_col": 6
+              }
+            ]
+          }
+        ],
+        "truncated": false,
+        "completed": true
+      }
+    },
+    {
+      "name": "search-case-insensitive",
+      "kind": "search",
+      "size": {
+        "cols": 10,
+        "rows": 2
+      },
+      "input_hex": "616263206465660d0a676869206a6b6c0d0a6d6e6f207071720d0a737475207677780d0a6e6565646c65210d0a",
+      "compress": false,
+      "request": {
+        "needle": "JKL",
+        "direction": "forward",
+        "start": "top",
+        "limit": 1000,
+        "case_sensitive": false,
+        "include_visible": true
+      },
+      "expect": {
+        "matches": [
+          {
+            "start_line": 1,
+            "start_col": 4,
+            "spans": [
+              {
+                "line": 1,
+                "start_col": 4,
+                "end_col": 7
+              }
+            ]
+          }
+        ],
+        "truncated": false,
+        "completed": true
+      }
+    },
+    {
+      "name": "search-cross-wrapped-hot",
+      "kind": "search",
+      "size": {
+        "cols": 6,
+        "rows": 2
+      },
+      "input_hex": "61626364656667680a696a6b6c0a",
+      "compress": false,
+      "request": {
+        "needle": "efgh",
+        "direction": "forward",
+        "start": "top",
+        "limit": 1000,
+        "case_sensitive": false,
+        "include_visible": true
+      },
+      "expect": {
+        "matches": [
+          {
+            "start_line": 0,
+            "start_col": 4,
+            "spans": [
+              {
+                "line": 0,
+                "start_col": 4,
+                "end_col": 6
+              },
+              {
+                "line": 1,
+                "start_col": 0,
+                "end_col": 2
+              }
+            ]
+          }
+        ],
+        "truncated": false,
+        "completed": true
+      }
+    },
+    {
+      "name": "search-cross-wrapped-cold",
+      "kind": "search",
+      "size": {
+        "cols": 6,
+        "rows": 2
+      },
+      "input_hex": "61626364656667680a696a6b6c0a",
+      "compress": true,
+      "request": {
+        "needle": "efgh",
+        "direction": "forward",
+        "start": "top",
+        "limit": 1000,
+        "case_sensitive": false,
+        "include_visible": true
+      },
+      "expect": {
+        "matches": [
+          {
+            "start_line": 0,
+            "start_col": 4,
+            "spans": [
+              {
+                "line": 0,
+                "start_col": 4,
+                "end_col": 6
+              },
+              {
+                "line": 1,
+                "start_col": 0,
+                "end_col": 2
+              }
+            ]
+          }
+        ],
+        "truncated": false,
+        "completed": true
+      }
+    },
+    {
+      "name": "search-reverse-newest-first",
+      "kind": "search",
+      "size": {
+        "cols": 10,
+        "rows": 2
+      },
+      "input_hex": "6e3030206c696e650d0a6e3031206c696e650d0a6e3032206c696e650d0a6e3033206c696e650d0a6e3034206c696e650d0a6e3035206c696e650d0a6e3036206c696e650d0a6e3037206c696e650d0a6e3038206c696e650d0a6e3039206c696e650d0a6e3130206c696e650d0a6e3131206c696e65",
+      "compress": false,
+      "request": {
+        "needle": "line",
+        "direction": "reverse",
+        "start": "bottom",
+        "limit": 3,
+        "case_sensitive": false,
+        "include_visible": true
+      },
+      "expect": {
+        "matches": [
+          {
+            "start_line": 11,
+            "start_col": 4,
+            "spans": [
+              {
+                "line": 11,
+                "start_col": 4,
+                "end_col": 8
+              }
+            ]
+          },
+          {
+            "start_line": 10,
+            "start_col": 4,
+            "spans": [
+              {
+                "line": 10,
+                "start_col": 4,
+                "end_col": 8
+              }
+            ]
+          },
+          {
+            "start_line": 9,
+            "start_col": 4,
+            "spans": [
+              {
+                "line": 9,
+                "start_col": 4,
+                "end_col": 8
+              }
+            ]
+          }
+        ],
+        "truncated": true,
+        "completed": false
+      }
+    },
+    {
+      "name": "search-limited-truncated",
+      "kind": "search",
+      "size": {
+        "cols": 10,
+        "rows": 2
+      },
+      "input_hex": "6e3030206c696e650d0a6e3031206c696e650d0a6e3032206c696e650d0a6e3033206c696e650d0a6e3034206c696e650d0a6e3035206c696e650d0a6e3036206c696e650d0a6e3037206c696e650d0a6e3038206c696e650d0a6e3039206c696e650d0a6e3130206c696e650d0a6e3131206c696e65",
+      "compress": false,
+      "request": {
+        "needle": "line",
+        "direction": "forward",
+        "start": "top",
+        "limit": 5,
+        "case_sensitive": false,
+        "include_visible": true
+      },
+      "expect": {
+        "matches": [
+          {
+            "start_line": 0,
+            "start_col": 4,
+            "spans": [
+              {
+                "line": 0,
+                "start_col": 4,
+                "end_col": 8
+              }
+            ]
+          },
+          {
+            "start_line": 1,
+            "start_col": 4,
+            "spans": [
+              {
+                "line": 1,
+                "start_col": 4,
+                "end_col": 8
+              }
+            ]
+          },
+          {
+            "start_line": 2,
+            "start_col": 4,
+            "spans": [
+              {
+                "line": 2,
+                "start_col": 4,
+                "end_col": 8
+              }
+            ]
+          },
+          {
+            "start_line": 3,
+            "start_col": 4,
+            "spans": [
+              {
+                "line": 3,
+                "start_col": 4,
+                "end_col": 8
+              }
+            ]
+          },
+          {
+            "start_line": 4,
+            "start_col": 4,
+            "spans": [
+              {
+                "line": 4,
+                "start_col": 4,
+                "end_col": 8
+              }
+            ]
+          }
+        ],
+        "truncated": true,
+        "completed": false
+      }
+    },
+    {
+      "name": "search-start-at-line",
+      "kind": "search",
+      "size": {
+        "cols": 10,
+        "rows": 2
+      },
+      "input_hex": "6e3030206c696e650d0a6e3031206c696e650d0a6e3032206c696e650d0a6e3033206c696e650d0a6e3034206c696e650d0a6e3035206c696e650d0a6e3036206c696e650d0a6e3037206c696e650d0a6e3038206c696e650d0a6e3039206c696e650d0a6e3130206c696e650d0a6e3131206c696e65",
+      "compress": false,
+      "request": {
+        "needle": "line",
+        "direction": "forward",
+        "start": "line:4",
+        "limit": 2,
+        "case_sensitive": false,
+        "include_visible": true
+      },
+      "expect": {
+        "matches": [
+          {
+            "start_line": 4,
+            "start_col": 4,
+            "spans": [
+              {
+                "line": 4,
+                "start_col": 4,
+                "end_col": 8
+              }
+            ]
+          },
+          {
+            "start_line": 5,
+            "start_col": 4,
+            "spans": [
+              {
+                "line": 5,
+                "start_col": 4,
+                "end_col": 8
+              }
+            ]
+          }
+        ],
+        "truncated": true,
+        "completed": false
+      }
+    },
+    {
+      "name": "viewport-hot-scrolled",
+      "kind": "viewport",
+      "size": {
+        "cols": 10,
+        "rows": 2
+      },
+      "input_hex": "616263206465660d0a676869206a6b6c0d0a6d6e6f207071720d0a737475207677780d0a6e6565646c65210d0a",
+      "compress": false,
+      "viewport": {
+        "offset": 2,
+        "row": 0
+      },
+      "expect": {
+        "absolute": 2,
+        "cols": 10,
+        "text": "mno pqr"
+      }
+    },
+    {
+      "name": "viewport-cold-scrolled",
+      "kind": "viewport",
+      "size": {
+        "cols": 10,
+        "rows": 2
+      },
+      "input_hex": "616263206465660d0a676869206a6b6c0d0a6d6e6f207071720d0a737475207677780d0a6e6565646c65210d0a",
+      "compress": true,
+      "viewport": {
+        "offset": 2,
+        "row": 0
+      },
+      "expect": {
+        "absolute": 2,
+        "cols": 10,
+        "text": "mno pqr"
+      }
+    },
+    {
+      "name": "viewport-bottom-visible",
+      "kind": "viewport",
+      "size": {
+        "cols": 10,
+        "rows": 2
+      },
+      "input_hex": "616263206465660d0a676869206a6b6c0d0a6d6e6f207071720d0a737475207677780d0a6e6565646c65210d0a",
+      "compress": false,
+      "viewport": {
+        "offset": 0,
+        "row": 0
+      },
+      "expect": {
+        "absolute": 4,
+        "cols": 10,
+        "text": "needle!"
+      }
+    },
+    {
+      "name": "viewport-top-of-buffer",
+      "kind": "viewport",
+      "size": {
+        "cols": 10,
+        "rows": 2
+      },
+      "input_hex": "6e3030206c696e650d0a6e3031206c696e650d0a6e3032206c696e650d0a6e3033206c696e650d0a6e3034206c696e650d0a6e3035206c696e650d0a6e3036206c696e650d0a6e3037206c696e650d0a6e3038206c696e650d0a6e3039206c696e650d0a6e3130206c696e650d0a6e3131206c696e65",
+      "compress": true,
+      "viewport": {
+        "offset": 10,
+        "row": 0
+      },
+      "expect": {
+        "absolute": 0,
+        "cols": 10,
+        "text": "n00 line"
+      }
+    },
+    {
+      "name": "selection-cell-across-rows",
+      "kind": "selection",
+      "size": {
+        "cols": 10,
+        "rows": 2
+      },
+      "input_hex": "616263206465660d0a676869206a6b6c0d0a6d6e6f207071720d0a737475207677780d0a6e6565646c65210d0a",
+      "selection": {
+        "gesture": "cell",
+        "anchor": {
+          "line": 1,
+          "col": 0
+        },
+        "active": {
+          "line": 2,
+          "col": 5
+        }
+      },
+      "expect": {
+        "text": "ghi jkl\nmno pq"
+      }
+    },
+    {
+      "name": "selection-word",
+      "kind": "selection",
+      "size": {
+        "cols": 10,
+        "rows": 2
+      },
+      "input_hex": "616263206465660d0a676869206a6b6c0d0a6d6e6f207071720d0a737475207677780d0a6e6565646c65210d0a",
+      "selection": {
+        "gesture": "word",
+        "anchor": {
+          "line": 0,
+          "col": 2
+        },
+        "active": {
+          "line": 0,
+          "col": 2
+        }
+      },
+      "expect": {
+        "text": "abc"
+      }
+    },
+    {
+      "name": "selection-block-rectangle",
+      "kind": "selection",
+      "size": {
+        "cols": 10,
+        "rows": 2
+      },
+      "input_hex": "616263206465660d0a676869206a6b6c0d0a6d6e6f207071720d0a737475207677780d0a6e6565646c65210d0a",
+      "selection": {
+        "gesture": "block",
+        "anchor": {
+          "line": 1,
+          "col": 1
+        },
+        "active": {
+          "line": 2,
+          "col": 3
+        }
+      },
+      "expect": {
+        "text": "hi\nno"
+      }
+    },
+    {
+      "name": "selection-line-wrapped",
+      "kind": "selection",
+      "size": {
+        "cols": 6,
+        "rows": 2
+      },
+      "input_hex": "6162636465666768696a6b6c",
+      "selection": {
+        "gesture": "line",
+        "anchor": {
+          "line": 1,
+          "col": 2
+        },
+        "active": {
+          "line": 1,
+          "col": 2
+        }
+      },
+      "expect": {
+        "text": "abcdefghijkl"
+      }
+    },
+    {
+      "name": "persist-roundtrip",
+      "kind": "persist",
+      "size": {
+        "cols": 10,
+        "rows": 2
+      },
+      "input_hex": "6e3030206c696e650d0a6e3031206c696e650d0a6e3032206c696e650d0a6e3033206c696e650d0a6e3034206c696e650d0a6e3035206c696e650d0a6e3036206c696e650d0a6e3037206c696e650d0a6e3038206c696e650d0a6e3039206c696e650d0a6e3130206c696e650d0a6e3131206c696e65",
+      "expect": {
+        "roundtrip": true,
+        "lines": 10
+      }
+    },
+    {
+      "name": "persist-reject-corrupt",
+      "kind": "persist",
+      "size": {
+        "cols": 10,
+        "rows": 2
+      },
+      "payload_hex": "4d43483801000000010100000037847c420a0000000a000a000a000a000a000a000a000a000a000a0050000000800200006e000000000000003000000000000000300000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000310000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000320000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000330000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000340000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000350000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000360000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000370000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000380000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000390000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000ff",
+      "expect": {
+        "decode_error": "corrupt"
+      }
+    },
+    {
+      "name": "persist-reject-version-mismatch",
+      "kind": "persist",
+      "size": {
+        "cols": 10,
+        "rows": 2
+      },
+      "payload_hex": "4d43483863000000010100000037847c420a0000000a000a000a000a000a000a000a000a000a000a0050000000800200006e000000000000003000000000000000300000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000310000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000320000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000330000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000340000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000350000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000360000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000370000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000380000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000390000000000000020000000000000006c0000000000000069000000000000006e000000000000006500000000000000",
+      "expect": {
+        "decode_error": "version_mismatch"
+      }
+    },
+    {
+      "name": "persist-reject-bad-magic",
+      "kind": "persist",
+      "size": {
+        "cols": 10,
+        "rows": 2
+      },
+      "payload_hex": "5843483801000000010100000037847c420a0000000a000a000a000a000a000a000a000a000a000a0050000000800200006e000000000000003000000000000000300000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000310000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000320000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000330000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000340000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000350000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000360000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000370000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000380000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000390000000000000020000000000000006c0000000000000069000000000000006e000000000000006500000000000000",
+      "expect": {
+        "decode_error": "bad_magic"
+      }
+    },
+    {
+      "name": "persist-reject-truncated",
+      "kind": "persist",
+      "size": {
+        "cols": 10,
+        "rows": 2
+      },
+      "payload_hex": "4d43483801000000010100000037847c420a0000000a000a000a000a000a000a000a000a000a000a0050000000800200006e000000000000003000000000000000300000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000310000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000320000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000330000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000340000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000350000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000360000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000370000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000380000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000390000000000000020000000000000006c0000000000000069000000000000006e0000000000000065",
+      "expect": {
+        "decode_error": "corrupt"
+      }
+    },
+    {
+      "name": "persist-reject-oversized",
+      "kind": "persist",
+      "size": {
+        "cols": 10,
+        "rows": 2
+      },
+      "payload_hex": "4d43483801000000010100000037847c420a0000000a000a000a000a000a000a000a000a000a000a0050000000800200006e000000000000003000000000000000300000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000310000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000320000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000330000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000340000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000350000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000360000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000370000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000380000000000000020000000000000006c0000000000000069000000000000006e0000000000000065000000000000006e000000000000003000000000000000390000000000000020000000000000006c0000000000000069000000000000006e000000000000006500000000000000",
+      "max_bytes": 16,
+      "expect": {
+        "decode_error": "too_large"
+      }
+    },
+    {
+      "name": "restore-equal",
+      "kind": "restore",
+      "size": {
+        "cols": 10,
+        "rows": 2
+      },
+      "input_hex": "616263206465660d0a676869206a6b6c0d0a6d6e6f207071720d0a737475207677780d0a6e6565646c65210d0a",
+      "expect": {
+        "equal": true
+      }
+    },
+    {
+      "name": "replay-deterministic",
+      "kind": "replay",
+      "size": {
+        "cols": 10,
+        "rows": 2
+      },
+      "input_hex": "616263206465660d0a676869206a6b6c0d0a6d6e6f207071720d0a737475207677780d0a6e6565646c65210d0a",
+      "events": [
+        {
+          "feed": "6578747261206c696e650a"
+        },
+        {
+          "resize": {
+            "cols": 12,
+            "rows": 3
+          }
+        },
+        {
+          "feed": "6c6f6e67657220636f6e74656e7420686572650a"
+        }
+      ],
+      "expect": {
+        "final_equal": true
+      }
+    },
+    {
+      "name": "altscreen-history-discard",
+      "kind": "altscreen",
+      "size": {
+        "cols": 10,
+        "rows": 2
+      },
+      "input_hex": "6f6e650d0a74776f0d0a74687265650d0a666f75721b5b3f3130343968616c74310d0a616c74320d0a616c74331b5b3f313034396c",
+      "expect": {
+        "history_len": 2,
+        "visible_text": "three"
+      }
+    },
+    {
+      "name": "resize-history-widths",
+      "kind": "resize",
+      "size": {
+        "cols": 8,
+        "rows": 2
+      },
+      "input_hex": "61626364656667680d0a696a6b6c6d6e6f700d0a71727374757677780d0a3132333435363738",
+      "resizes": [
+        {
+          "cols": 12,
+          "rows": 2
+        }
+      ],
+      "after_resize_input_hex": "0d0a3334353637383930313233340d0a",
+      "expect": {
+        "history_cols": [
+          8,
+          8,
+          12,
+          12
+        ],
+        "history_lines": 4
+      }
+    }
+  ]
+}

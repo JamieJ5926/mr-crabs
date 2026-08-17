@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "purpose": "Shared aggregation-arithmetic fixture. The Rust stats module (crates/mr-crabs-bench/src/stats.rs) and the Python gate driver (verification/tools/release_gate.py --self-test) both assert these exact values; drift between the two implementations fails on one side or the other.",
+  "rules": {
+    "median": "odd n: middle value of the sorted sample; even n: integer average (floor) of the two middle values.",
+    "percentile": "nearest-rank: rank = ceil(p/100 * n), 1-based; value = sorted[rank-1]."
+  },
+  "cases": [
+    { "name": "median_odd", "values": [5, 1, 4, 2, 3], "expected_median": 3 },
+    { "name": "median_even", "values": [8, 3, 5, 10], "expected_median": 6 },
+    { "name": "median_single", "values": [7], "expected_median": 7 },
+    {
+      "name": "percentile_n5",
+      "values": [1, 2, 3, 4, 5],
+      "expected_percentiles": { "p50": 3, "p90": 5, "p95": 5, "p99": 5 }
+    },
+    {
+      "name": "percentile_n5_dup",
+      "values": [10, 20, 30, 40, 50],
+      "expected_percentiles": { "p50": 30, "p95": 50, "p99": 50 }
+    },
+    {
+      "name": "percentile_n1",
+      "values": [7],
+      "expected_percentiles": { "p50": 7, "p95": 7, "p99": 7 }
+    }
+  ]
+}

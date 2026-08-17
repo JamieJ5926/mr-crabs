@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "slice": "S0",
+  "source_head": "d2c70a8c7b9b6893c13640c02d7b6f9a1624f3f0",
+  "commands": [
+    {
+      "command": "zig build test -Dtest-filter=\"text animation\"",
+      "result": "passed"
+    },
+    {
+      "command": "zig build test -Dtest-filter=\"cursor trail\"",
+      "result": "passed"
+    },
+    {
+      "command": "zig build test -Dtest-filter=\"pager:\"",
+      "result": "passed"
+    },
+    {
+      "command": "zig build -Doptimize=ReleaseFast",
+      "result": "passed"
+    },
+    {
+      "command": "zig build -Demit-bench -Demit-macos-app=false -Doptimize=ReleaseFast",
+      "result": "passed"
+    }
+  ],
+  "gui_launched": false,
+  "artifacts": {
+    "oracle-freeze.json": "9717d110e1be66e81d6e19e8a4c821513e6a9740efd849d867c828e60b33f9e7",
+    "dirty-oracle.patch": "6260fcd96857a6c0e6aca96da68d9694927f7dbb826d71db50e3d85dfe8274fa",
+    "pins-and-toolchains.json": "b60a4816c39b94fb1f3f3823ba644317c47238526d7e1805edb829c80f16bd06",
+    "callable-parity.json": "f62fd8b0ec81965bd9b368e0a2738eef5eee63b49179104806913c96c631a9ca",
+    "baseline.schema.json": "d7aaa921562e87343d0285a65ffb5b3ee7c0dada9780c2937e3c926ec52a6aa5",
+    "oracle-baseline.json": "913fc1cf1ab1fc5516b4a866f380af7f549ab1bad29ee4297852792533322926",
+    "oracle-default-config.txt": "287af8bbb1c1d37202179f2e4e0493623b67f49e2034638c8569e689f2d2c6a8"
+  },
+  "candidate_model_preflight": {
+    "mr-crabs-gpt": "openai-codex/gpt-5.6-sol",
+    "mr-crabs-grok": "cli-proxy/grok-4.6",
+    "mr-crabs-muse": "cli-proxy/muse-spark-1.2-contributor",
+    "mr-crabs-deepseek": "cli-proxy/deepseek-v4-pro"
+  },
+  "adjudication": "Not applicable: S0 freezes evidence and contains no implementation candidate patch.",
+  "rollback_point": "d2c70a8c7b9b6893c13640c02d7b6f9a1624f3f0"
+}

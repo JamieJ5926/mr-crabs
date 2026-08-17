@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "source_head": "d2c70a8c7b9b6893c13640c02d7b6f9a1624f3f0",
+  "source_bundle": "/Users/jamie/Documents/Projects/active/mr-crabs/zig-out/Mr Crabs.app/Contents/Resources",
+  "theme_source": {
+    "url": "https://deps.files.ghostty.org/ghostty-themes-release-20260803-155300-875a82f.tgz",
+    "build_zig_zon_hash": "N-V-__8AAPpcBAD4_75xLBbLiYqdojOwQP74eoWmpL3jPrBl"
+  },
+  "frozen_tree": {
+    "files": 634,
+    "bytes": 1810388,
+    "sha256": "9d3c2e629030fe0d3f2c2e8f4ec11e643851637bf70492e2083f5bd1a1562365"
+  },
+  "excluded_from_tree_hash": ["THIRD_PARTY_NOTICES.txt"],
+  "key_files": {
+    "LICENSE": "386211873e5b7a02f663ae4d7adf96285999f91608f8f9f31fecfd0f4095e6f1",
+    "terminfo/ghostty.terminfo": "e5e9cc4e9fddf6aab3088b40ec42fafe8309ef1ae5d3764d0bbf2fc44105ccf0",
+    "MrCrabs.icns": "3e4c9f9b63a187d85e4ca3851e745b9d11fb5eb3fb29cb73052840d922d2b01e"
+  }
+}

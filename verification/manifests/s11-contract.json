@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "slice": "S11",
+  "title": "Packaging and clean cutover",
+  "product": {
+    "bundle_name": "Mr Crabs.app",
+    "bundle_identifier": "dev.jamie.mr-crabs",
+    "executable": "ghostty",
+    "minimum_macos": "13.0"
+  },
+  "owned_paths": [
+    "package/**",
+    "verification/manifests/s11-*.json"
+  ],
+  "resources": "s11-resources.json",
+  "acceptance": [
+    "cargo build --release -p mr-crabs-app --bin ghostty",
+    "package/macos/package.sh creates the bundle without invoking Zig, xcodebuild, Swift, or libghostty-vt",
+    "Info.plist identity is exact and the internal executable is ghostty",
+    "shell integration, terminfo, icon, and MIT license are staged",
+    "codesign --verify --deep --strict succeeds",
+    "otool output contains no libghostty, libzig, or libswift dependency",
+    "bundled executable reports configuration defaults through its CLI"
+  ],
+  "gui_launch": false
+}

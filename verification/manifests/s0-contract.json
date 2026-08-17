@@ -1,0 +1,16 @@
+{
+  "slice": "S0",
+  "title": "Freeze oracle, pins, and baselines",
+  "requirements": [
+    "Record source HEAD, dirty-file hashes, toolchain versions, config defaults, licenses, GPUI/Alacritty pins.",
+    "Build ReleaseFast oracle and run focused cursor-trail, streaming-text, and Pager tests.",
+    "Capture nonvisual baseline metrics without launching extra GUI instances.",
+    "Generate exact-once parity manifest with no unclassified entry."
+  ],
+  "gate": [
+    "reproducible oracle build/tests",
+    "immutable pins",
+    "complete parity manifest",
+    "fixed baseline JSON schema"
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "slice": "S1-synthesis",
+  "integration_base": "e68384b73",
+  "implementer": "cli-proxy/grok-4.6",
+  "selected_candidate": {
+    "model": "cli-proxy/deepseek-v4-pro",
+    "commit": "c12342a8c175e93d815678d263e3a4e6fc266591",
+    "reason": "Most complete independent candidate: immutable expected snapshots, full pinned upstream fixture set, and process-only oracle refresh boundary. It failed compilation only in oracle chunk accounting and failed the format gate because cargo fmt traversed byte-frozen vendored source."
+  },
+  "rejected_candidates": [
+    {
+      "model": "openai-codex/gpt-5.6-sol",
+      "reason": "Both runs timed out and did not create the required single candidate commit."
+    },
+    {
+      "model": "cli-proxy/grok-4.6",
+      "commit": "4b5bb8e0f01484ac6fcee8998896053bb98dbaab",
+      "reason": "Compilation failed because snapshot Color lacked Hash; checked-in corpus had no independent Ghostty expected snapshots, violating the differential contract."
+    },
+    {
+      "model": "cli-proxy/muse-spark-1.2-contributor",
+      "commit": "600a72d49b01000bbdc1952691fb335597258a41",
+      "reason": "Candidate disclosed copying another candidate worktree, violating independent implementation; it also shared the oracle compile failure."
+    }
+  ],
+  "required_changes": [
+    "Fix mr-crabs-oracle chunk accounting with explicit usize types and checked arithmetic; no casts that can truncate.",
+    "Make cargo fmt --all -- --check validate owned Rust code without rewriting or traversing the byte-frozen vendored Alacritty source. Preserve every vendored source byte and its provenance hashes.",
+    "Resolve every cargo check, test, and clippy error without suppressing warnings or weakening assertions.",
+    "Ensure the checked-in ANSI/DEC corpus contains immutable normalized expected snapshots and the runner compares every whole/split/random chunk execution against them.",
+    "Ensure every short case runs every possible byte split and long cases run deterministic seeded randomized chunking.",
+    "Ensure Cell remains exactly 8 bytes and has a focused assertion.",
+    "Ensure mr-crabs-app cargo tree contains no ghostty, zig, libghostty-vt, wgpu, or sugarloaf dependency.",
+    "Do not change the S1 contract, pins, selected architecture, or any source outside rust/. Do not launch GUI applications."
+  ],
+  "acceptance": [
+    "cargo fmt --all -- --check",
+    "cargo check --workspace --all-targets",
+    "cargo test -p mr-crabs-terminal",
+    "cargo test -p mr-crabs-oracle",
+    "cargo test --workspace",
+    "cargo clippy --workspace --all-targets -- -D warnings",
+    "cargo run -p mr-crabs-oracle -- corpus verification/corpus",
+    "cargo tree -p mr-crabs-app contains no forbidden dependency",
+    "vendored source hashes still match rust/verification/manifests/alacritty-terminal.json"
+  ],
+  "execution": "Grok implements only this synthesis in the integration worktree, skips validation, commits once, and reports the commit SHA. The lead runs every acceptance command."
+}

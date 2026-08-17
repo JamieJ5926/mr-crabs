@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "slice": "S8",
+  "title": "Search, selection, history, viewport, persistence, and restore",
+  "base_commit": "a56687bfa Mark S4/S5 parity passing",
+  "scope": [
+    "rust/Cargo.toml",
+    "rust/Cargo.lock",
+    "rust/crates/mr-crabs-history/**",
+    "rust/crates/mr-crabs-terminal/src/storage.rs",
+    "rust/crates/mr-crabs-terminal/src/lib.rs",
+    "rust/verification/history-corpus/s8-history.json",
+    "rust/verification/manifests/s8-*.json"
+  ],
+  "parity_items": {
+    "viewport-scrolling": "mr_crabs_history::viewport::{Viewport, viewport_row}",
+    "search-worker": "mr_crabs_history::search::{SearchWorker, SearchRequest, SearchOutcome}",
+    "search-cancellation": "mr_crabs_history::search::{SearchWorker::cancel, SearchWorker::note_history_changed, SearchOutcome::is_stale}",
+    "selection-gestures": "mr_crabs_history::selection::{Selection, SelectionGesture, expand_word, expand_line, selection_text}",
+    "hyperlink-interaction": "mr_crabs_history::hyperlinks::{hyperlink_at, hyperlink_span}",
+    "history-persistence": "mr_crabs_history::persist::{HistoryFile, PersistConfig, PersistError}",
+    "snapshot-restore": "mr_crabs_history::replay::{TerminalSnapshot::capture, TerminalSnapshot::restore}",
+    "replay-restore": "mr_crabs_history::replay::{ReplayLog, ReplayEvent, ReplayLog::verify}",
+    "compressed-page-boundaries": "mr_crabs_terminal::HistoryRead::read_history_line (cold-page read cache) + viewport/search/persist over compressed storage",
+    "uncompressed-page-boundaries": "mr_crabs_terminal::HistoryRead::read_history_line (hot pages) + viewport/search/persist",
+    "history-resize-reflow": "mr_crabs_terminal::{HistoryRead::history_line_cols, Terminal::resize} + viewport_row mixed-width handling",
+    "history-alt-screen-transitions": "mr_crabs_terminal::Terminal::feed alt_history_mark + ScrollbackStorage::truncate_lines"
+  },
+  "required_api": {
+    "terminal-additions": [
+      "HistoryRead trait: history_len / history_line_cols / read_history_line",
+      "Terminal::history_len, history_line_cols, read_history_line, push_history_line, clear_history",
+      "Terminal::hyperlink_at -> Option<HyperlinkInfo>",
+      "Terminal::restore_visible_grid, restore_cursor, restore_modes, mode_restore_escape, mode_clear_escape",
+      "ScrollbackStorage::{total_lines, line_cols, read_line, truncate_lines, push_line, clear}",
+      "Alt-screen history mark/truncation inside Terminal::feed (1049h/1049l)",
+      "TerminalError::{RestoreSizeMismatch, RestoreStyleIndex}"
+    ],
+    "viewport": [
+      "Viewport offset/clamp/scroll_up/scroll_down/to_top/reset/top_line/absolute_line",
+      "viewport_row(reader, snapshot, viewport, row) -> Option<ViewportRow> across hot/cold history and visible rows"
+    ],
+    "search": [
+      "SearchRequest { needle, direction, start, limit, case_sensitive, visible_rows }",
+      "SearchDirection::{Forward, Reverse}; SearchStart::{Top, Bottom, Line}",
+      "search_sync(reader, request, token) -> SearchOutcome",
+      "SearchWorker::{new, start, cancel, poll, poll_wait, generation, note_history_changed}",
+      "SearchMatch/ SearchSpan with per-line spans; MAX_NEEDLE_BYTES=255, DEFAULT_SEARCH_LIMIT=1000, MAX_SEARCH_LIMIT=100000",
+      "row_text(cells) -> Vec<u8> plain+unwrap+trim encoding contract"
+    ],
+    "selection": [
+      "SelectionGesture::{Cell, Word, Line, Block}",
+      "WordBoundaries (default = Ghostty selection-word-chars)",
+      "expand_word, expand_line, selection_text, read_line_at, ExtractOptions"
+    ],
+    "hyperlinks": [
+      "hyperlink_at(term, row, col), hyperlink_span(term, row, col) with id/uri"
+    ],
+    "persist": [
+      "HistoryFile::{capture, encode, decode}; PersistConfig { max_bytes, max_lines, compress }",
+      "PersistError::{TooLarge, TooManyLines, VersionMismatch, BadMagic, Corrupt, Truncated}",
+      "Versioned MCH8 format (magic/version/flags/chunks/CRC32) with per-chunk LZ4"
+    ],
+    "replay": [
+      "TerminalSnapshot::{capture, restore, encode, decode}",
+      "ReplayLog::{new, record_feed, record_resize, apply, verify, expected_end}",
+      "ReplayEvent::{Feed, Resize}; ReplayError variants"
+    ]
+  },
+  "acceptance": [
+    "s8-history.json contains 26 provenance-cited cases covering search (forward/reverse/limit/start/case/wrapped), viewport hot+cold, selection gestures, persistence roundtrip and rejections, restore equality, deterministic replay, alt-screen history discard, and resize widths",
+    "Search results are identical across compressed and uncompressed page boundaries",
+    "SearchWorker cancellation reports cancelled=true and stale results are token-rejected; replacement requests win",
+    "Persistence rejects corrupt, version-mismatched, bad-magic, truncated, and oversized payloads before allocation",
+    "Snapshot restore reproduces the exact captured NormalizedSnapshot and history byte-for-byte",
+    "ReplayLog::verify passes for restore + feed/resize replay",
+    "Every S8 parity item has exact production ownership (see parity_items) and focused tests in mr-crabs-history",
+    "No second terminal model; all reads go through mr-crabs-terminal HistoryRead/storage APIs"
+  ],
+  "constraints": [
+    "Read the source Ghostty worktree only; do not modify it",
+    "Do not run formatting, builds, tests, lint, benchmarks, or the oracle",
+    "Do not edit callable-parity.json; lead updates acceptance state",
+    "Do not commit; report files and APIs"
+  ]
+}

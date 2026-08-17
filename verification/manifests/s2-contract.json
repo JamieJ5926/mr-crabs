@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "slice": "S2",
+  "base_commit": "4373cf5ede3484aabbc3ce9294a988062c8d2f61",
+  "title": "macOS PTY and process lifecycle",
+  "scope": ["rust/crates/mr-crabs-pty/**", "rust/Cargo.toml", "rust/Cargo.lock", "rust/verification/manifests/s2-*.json"],
+  "constraints": [
+    "Pure Rust crate with rustix-openpty/POSIX APIs; do not import Alacritty's tty or event-loop stack.",
+    "macOS implementation now; expose internal platform boundary without fake Linux/Windows implementations.",
+    "One bounded writer queue with explicit capacity and backpressure result; no unbounded std or async channel.",
+    "Reader output delivery is bounded and preserves byte order.",
+    "Resize requests coalesce and identical dimensions are ignored.",
+    "Child becomes session/process-group leader with controlling terminal; parent retains master only.",
+    "Every successful spawn is terminated and reaped on explicit shutdown; Drop provides bounded best-effort terminate/reap without panic.",
+    "No unsafe block without a local SAFETY comment naming every invariant.",
+    "No GUI launch. Candidate skips validation and commits once."
+  ],
+  "api": [
+    "PtySize validates nonzero rows/cols and converts to winsize.",
+    "CommandBuilder supports executable/argv, cwd, deterministic environment overlay, TERM, COLORTERM, and shell discovery from explicit value then SHELL then passwd fallback.",
+    "PtySession::spawn(config) returns a session plus bounded ordered output receiver and exit notification receiver.",
+    "PtySession implements resize, nonblocking bounded write enqueue, blocking/bounded write with timeout or equivalent explicit backpressure, child identity, try_wait, and shutdown_and_reap(grace).",
+    "Shutdown is idempotent; closes queues/master, sends SIGHUP/SIGTERM to child process group, waits grace, escalates SIGKILL, and waitpid reaps exactly once.",
+    "Reader handles EOF/EIO as clean closure; writer handles short writes/EINTR/EAGAIN; exit thread/owner cannot race double waitpid.",
+    "Public errors preserve io::Error sources and distinguish queue full/closed/timeout."
+  ],
+  "tests": [
+    "real /bin/zsh and /bin/bash command output and exit status",
+    "stdin round-trip and EOF",
+    "nonzero child exit/crash",
+    "rapid resize ends at final dimensions and duplicate resize is ignored",
+    "blocked writer hits bounded backpressure without memory growth",
+    "explicit shutdown leaves no child process",
+    "Drop fallback leaves no child process",
+    "cwd and environment reach child",
+    "shell discovery precedence"
+  ],
+  "acceptance": [
+    "cargo fmt --all -- --check",
+    "cargo check --workspace --all-targets",
+    "cargo test -p mr-crabs-pty -- --test-threads=1",
+    "cargo clippy -p mr-crabs-pty --all-targets -- -D warnings",
+    "No orphan child after test completion",
+    "No unbounded queue type in production PTY code"
+  ]
+}

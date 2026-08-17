@@ -1,0 +1,10 @@
+{
+  "suite": "s3",
+  "logical_lines": 999928,
+  "hot_resident_bytes": 0,
+  "compressed_bytes": 8276,
+  "throughput_mbps": 51.78677897042479,
+  "peak_rss_bytes": 9781248,
+  "compression_latency_ms": 0.133375,
+  "restored_pages": 0
+}

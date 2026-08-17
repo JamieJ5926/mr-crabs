@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "slice": "S1",
+  "base_commit": "fc06c7297",
+  "title": "Workspace, vendored core, and differential harness",
+  "constraints": [
+    "Edit only the isolated candidate worktree; never edit /Users/jamie/Documents/Projects/active/mr-crabs.",
+    "Pure Rust shipped crates: no Zig build dependency, linked libghostty-vt, build.rs linker directive, wgpu, Sugarloaf, or copied GPL Zed terminal code/comments.",
+    "Pin upstream alacritty_terminal to commit 1b2b36a64e88068ad02c95fad00ee2fad31c00bf and preserve Apache-2.0 provenance and notices.",
+    "Use vte 0.15 as the byte parser.",
+    "Keep oracle integration dev-only and process-based; it must never be a normal or build dependency of mr-crabs-app.",
+    "Do not launch a GUI application.",
+    "Do not run formatting, linting, builds, or tests; the lead performs identical validation for all candidates.",
+    "Commit the completed candidate implementation once and report the commit SHA."
+  ],
+  "required_layout": [
+    "rust/Cargo.toml",
+    "rust/crates/mr-crabs-terminal",
+    "rust/crates/mr-crabs-pty",
+    "rust/crates/mr-crabs-app",
+    "rust/crates/mr-crabs-element",
+    "rust/crates/mr-crabs-config",
+    "rust/crates/mr-crabs-oracle",
+    "rust/crates/mr-crabs-bench",
+    "rust/vendor/alacritty-terminal",
+    "rust/verification/corpus/ansi-dec.json",
+    "rust/verification/manifests/alacritty-terminal.json"
+  ],
+  "terminal_contract": {
+    "GridSize": {"cols": "u16", "rows": "u16"},
+    "Cell": {"repr": "C", "content": "u32", "style": "u16", "flags": "u16", "size_bytes": 8},
+    "DamageKind": ["Clean", "Partial", "Full"],
+    "behavior": [
+      "Construct a terminal with nonzero GridSize.",
+      "Feed arbitrary byte chunks while preserving parser state across calls.",
+      "Produce a deterministic normalized snapshot containing size, cursor, cells, styles, and terminal modes.",
+      "Feeding the same stream whole or at every possible split point produces the same normalized snapshot for every short corpus case.",
+      "Long corpus cases exercise deterministic seeded randomized chunk boundaries."
+    ]
+  },
+  "oracle_contract": [
+    "mr-crabs-oracle is a CLI differential runner with a corpus subcommand compatible with: cargo run -p mr-crabs-oracle -- corpus verification/corpus (from rust/).",
+    "The runner compares normalized Rust snapshots with checked-in Ghostty oracle expectations and exits nonzero on any mismatch.",
+    "A separate explicit refresh path may execute an externally supplied Ghostty oracle executable/library path, but ordinary checks use immutable checked-in fixtures and require no Zig toolchain.",
+    "Initial ANSI/DEC corpus covers printable ASCII, CR/LF, SGR reset/colors/styles, cursor movement/positioning, erase line/display, save/restore cursor, insert/delete characters and lines, scrolling region, primary/alternate screen, tabs, DEC origin/wrap/cursor visibility modes, UTF-8 wide text, and split escape/UTF-8 boundaries."
+  ],
+  "workspace_contract": [
+    "All seven crates are workspace members and cargo metadata resolves them.",
+    "Non-S1 crates remain minimal compilable libraries/binaries with no fake production behavior or TODO placeholders.",
+    "mr-crabs-app dependency graph contains no Zig/libghostty-vt dependency.",
+    "Workspace dependency versions are pinned or exact where reproducibility requires it; Cargo.lock is checked in."
+  ],
+  "acceptance": [
+    "cargo fmt --all -- --check",
+    "cargo check --workspace --all-targets",
+    "cargo test -p mr-crabs-terminal",
+    "cargo test -p mr-crabs-oracle",
+    "cargo test --workspace",
+    "cargo clippy --workspace --all-targets -- -D warnings",
+    "cargo run -p mr-crabs-oracle -- corpus verification/corpus",
+    "cargo tree -p mr-crabs-app contains no ghostty, zig, libghostty-vt, wgpu, or sugarloaf dependency",
+    "Every short corpus case passes at all byte split points and long cases pass seeded randomized chunkings",
+    "std::mem::size_of::<Cell>() equals 8"
+  ]
+}

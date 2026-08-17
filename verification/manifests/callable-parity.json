@@ -1,0 +1,1384 @@
+{
+  "schema_version": 1,
+  "source_head": "d2c70a8c7b9b6893c13640c02d7b6f9a1624f3f0",
+  "scope": "macOS Ghostty 1.3.2-dev terminal/protocol/input/render/app-shell parity plus Mr Crabs effects",
+  "entries": [
+    {
+      "id": "vendored-alacritty-core",
+      "slice": "S1",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "S1 gate: 21 actual libghostty-vt normalized corpus cases pass whole/all-split/seeded chunking; full cargo fmt/check/test/clippy passed."
+    },
+    {
+      "id": "vte-byte-parser",
+      "slice": "S1",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "S1 gate: 21 actual libghostty-vt normalized corpus cases pass whole/all-split/seeded chunking; full cargo fmt/check/test/clippy passed."
+    },
+    {
+      "id": "normalized-snapshot-schema",
+      "slice": "S1",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "S1 gate: 21 actual libghostty-vt normalized corpus cases pass whole/all-split/seeded chunking; full cargo fmt/check/test/clippy passed."
+    },
+    {
+      "id": "byte-stream-chunking",
+      "slice": "S1",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "S1 gate: 21 actual libghostty-vt normalized corpus cases pass whole/all-split/seeded chunking; full cargo fmt/check/test/clippy passed."
+    },
+    {
+      "id": "ghostty-oracle-runner",
+      "slice": "S1",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "S1 gate: 21 actual libghostty-vt normalized corpus cases pass whole/all-split/seeded chunking; full cargo fmt/check/test/clippy passed."
+    },
+    {
+      "id": "ansi-dec-initial-corpus",
+      "slice": "S1",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "S1 gate: 21 actual libghostty-vt normalized corpus cases pass whole/all-split/seeded chunking; full cargo fmt/check/test/clippy passed."
+    },
+    {
+      "id": "zig-link-absence",
+      "slice": "S1",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "S1 gate: 21 actual libghostty-vt normalized corpus cases pass whole/all-split/seeded chunking; full cargo fmt/check/test/clippy passed."
+    },
+    {
+      "id": "macos-openpty",
+      "slice": "S2",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S2 execution slice"
+    },
+    {
+      "id": "controlling-terminal",
+      "slice": "S2",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S2 execution slice"
+    },
+    {
+      "id": "process-group-session",
+      "slice": "S2",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S2 execution slice"
+    },
+    {
+      "id": "environment",
+      "slice": "S2",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S2 execution slice"
+    },
+    {
+      "id": "working-directory",
+      "slice": "S2",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S2 execution slice"
+    },
+    {
+      "id": "shell-discovery",
+      "slice": "S2",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S2 execution slice"
+    },
+    {
+      "id": "pty-reader-loop",
+      "slice": "S2",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S2 execution slice"
+    },
+    {
+      "id": "bounded-writer-queue",
+      "slice": "S2",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S2 execution slice"
+    },
+    {
+      "id": "resize-coalescing",
+      "slice": "S2",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S2 execution slice"
+    },
+    {
+      "id": "exit-notification",
+      "slice": "S2",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S2 execution slice"
+    },
+    {
+      "id": "shutdown-reap",
+      "slice": "S2",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S2 execution slice"
+    },
+    {
+      "id": "drop-reap-fallback",
+      "slice": "S2",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S2 execution slice"
+    },
+    {
+      "id": "zsh-pty",
+      "slice": "S2",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S2 execution slice"
+    },
+    {
+      "id": "bash-pty",
+      "slice": "S2",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S2 execution slice"
+    },
+    {
+      "id": "pty-eof",
+      "slice": "S2",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S2 execution slice"
+    },
+    {
+      "id": "child-crash",
+      "slice": "S2",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S2 execution slice"
+    },
+    {
+      "id": "blocked-writer",
+      "slice": "S2",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S2 execution slice"
+    },
+    {
+      "id": "primary-screen",
+      "slice": "S3",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S3 execution slice"
+    },
+    {
+      "id": "alternate-screen",
+      "slice": "S3",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S3 execution slice"
+    },
+    {
+      "id": "cursor",
+      "slice": "S3",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S3 execution slice"
+    },
+    {
+      "id": "saved-cursor",
+      "slice": "S3",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S3 execution slice"
+    },
+    {
+      "id": "scroll-margins",
+      "slice": "S3",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S3 execution slice"
+    },
+    {
+      "id": "tab-stops",
+      "slice": "S3",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S3 execution slice"
+    },
+    {
+      "id": "terminal-modes",
+      "slice": "S3",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S3 execution slice"
+    },
+    {
+      "id": "colors",
+      "slice": "S3",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S3 execution slice"
+    },
+    {
+      "id": "styles",
+      "slice": "S3",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S3 execution slice"
+    },
+    {
+      "id": "wide-characters",
+      "slice": "S3",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S3 execution slice"
+    },
+    {
+      "id": "grapheme-clusters",
+      "slice": "S3",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S3 execution slice"
+    },
+    {
+      "id": "unicode-width",
+      "slice": "S3",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S3 execution slice"
+    },
+    {
+      "id": "scrolling",
+      "slice": "S3",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S3 execution slice"
+    },
+    {
+      "id": "insert-delete",
+      "slice": "S3",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S3 execution slice"
+    },
+    {
+      "id": "erasure",
+      "slice": "S3",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S3 execution slice"
+    },
+    {
+      "id": "osc8-hyperlinks-state",
+      "slice": "S3",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S3 execution slice"
+    },
+    {
+      "id": "semantic-regions-state",
+      "slice": "S3",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S3 execution slice"
+    },
+    {
+      "id": "selection-anchors",
+      "slice": "S3",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S3 execution slice"
+    },
+    {
+      "id": "resize-reflow",
+      "slice": "S3",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S3 execution slice"
+    },
+    {
+      "id": "compact-8-byte-cell",
+      "slice": "S3",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S3 execution slice"
+    },
+    {
+      "id": "interned-styles",
+      "slice": "S3",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S3 execution slice"
+    },
+    {
+      "id": "interned-graphemes",
+      "slice": "S3",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S3 execution slice"
+    },
+    {
+      "id": "sparse-metadata",
+      "slice": "S3",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S3 execution slice"
+    },
+    {
+      "id": "paged-scrollback",
+      "slice": "S3",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S3 execution slice"
+    },
+    {
+      "id": "lz4-cold-scrollback",
+      "slice": "S3",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S3 execution slice"
+    },
+    {
+      "id": "cold-page-decommit",
+      "slice": "S3",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S3 execution slice"
+    },
+    {
+      "id": "scrollback-byte-cap",
+      "slice": "S3",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S3 execution slice"
+    },
+    {
+      "id": "scrollback-line-cap",
+      "slice": "S3",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S3 execution slice"
+    },
+    {
+      "id": "gpui-bootstrap",
+      "slice": "S4",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-element TerminalElement at 03e5ad8a630c84c3990055905d0444ea0a519b7f; retained ShapedLine; font family/features (b7d1aa2ed..fe8b151c4)"
+    },
+    {
+      "id": "terminal-element",
+      "slice": "S4",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-element TerminalElement at 03e5ad8a630c84c3990055905d0444ea0a519b7f; retained ShapedLine; font family/features (b7d1aa2ed..fe8b151c4)"
+    },
+    {
+      "id": "layout",
+      "slice": "S4",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-element TerminalElement at 03e5ad8a630c84c3990055905d0444ea0a519b7f; retained ShapedLine; font family/features (b7d1aa2ed..fe8b151c4)"
+    },
+    {
+      "id": "font-resolution",
+      "slice": "S4",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-element TerminalElement at 03e5ad8a630c84c3990055905d0444ea0a519b7f; retained ShapedLine; font family/features (b7d1aa2ed..fe8b151c4)"
+    },
+    {
+      "id": "font-features",
+      "slice": "S4",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-element TerminalElement at 03e5ad8a630c84c3990055905d0444ea0a519b7f; retained ShapedLine; font family/features (b7d1aa2ed..fe8b151c4)"
+    },
+    {
+      "id": "coretext-shaping",
+      "slice": "S4",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-element TerminalElement at 03e5ad8a630c84c3990055905d0444ea0a519b7f; retained ShapedLine; font family/features (b7d1aa2ed..fe8b151c4)"
+    },
+    {
+      "id": "render-run-batching",
+      "slice": "S4",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-element TerminalElement at 03e5ad8a630c84c3990055905d0444ea0a519b7f; retained ShapedLine; font family/features (b7d1aa2ed..fe8b151c4)"
+    },
+    {
+      "id": "cell-backgrounds",
+      "slice": "S4",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-element TerminalElement at 03e5ad8a630c84c3990055905d0444ea0a519b7f; retained ShapedLine; font family/features (b7d1aa2ed..fe8b151c4)"
+    },
+    {
+      "id": "glyph-rendering",
+      "slice": "S4",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-element TerminalElement at 03e5ad8a630c84c3990055905d0444ea0a519b7f; retained ShapedLine; font family/features (b7d1aa2ed..fe8b151c4)"
+    },
+    {
+      "id": "emoji-rendering",
+      "slice": "S4",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-element TerminalElement at 03e5ad8a630c84c3990055905d0444ea0a519b7f; retained ShapedLine; font family/features (b7d1aa2ed..fe8b151c4)"
+    },
+    {
+      "id": "underline",
+      "slice": "S4",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-element TerminalElement at 03e5ad8a630c84c3990055905d0444ea0a519b7f; retained ShapedLine; font family/features (b7d1aa2ed..fe8b151c4)"
+    },
+    {
+      "id": "strikethrough",
+      "slice": "S4",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-element TerminalElement at 03e5ad8a630c84c3990055905d0444ea0a519b7f; retained ShapedLine; font family/features (b7d1aa2ed..fe8b151c4)"
+    },
+    {
+      "id": "cursor-shapes",
+      "slice": "S4",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-element TerminalElement at 03e5ad8a630c84c3990055905d0444ea0a519b7f; retained ShapedLine; font family/features (b7d1aa2ed..fe8b151c4)"
+    },
+    {
+      "id": "cursor-blink",
+      "slice": "S4",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-element TerminalElement at 03e5ad8a630c84c3990055905d0444ea0a519b7f; retained ShapedLine; font family/features (b7d1aa2ed..fe8b151c4)"
+    },
+    {
+      "id": "selection-rendering",
+      "slice": "S4",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-element TerminalElement at 03e5ad8a630c84c3990055905d0444ea0a519b7f; retained ShapedLine; font family/features (b7d1aa2ed..fe8b151c4)"
+    },
+    {
+      "id": "focus",
+      "slice": "S4",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-element TerminalElement at 03e5ad8a630c84c3990055905d0444ea0a519b7f; retained ShapedLine; font family/features (b7d1aa2ed..fe8b151c4)"
+    },
+    {
+      "id": "ime-rendering",
+      "slice": "S4",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-element TerminalElement at 03e5ad8a630c84c3990055905d0444ea0a519b7f; retained ShapedLine; font family/features (b7d1aa2ed..fe8b151c4)"
+    },
+    {
+      "id": "damage-application",
+      "slice": "S4",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-element TerminalElement at 03e5ad8a630c84c3990055905d0444ea0a519b7f; retained ShapedLine; font family/features (b7d1aa2ed..fe8b151c4)"
+    },
+    {
+      "id": "atlas-invalidation",
+      "slice": "S4",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-element TerminalElement at 03e5ad8a630c84c3990055905d0444ea0a519b7f; retained ShapedLine; font family/features (b7d1aa2ed..fe8b151c4)"
+    },
+    {
+      "id": "render-resize-dedupe",
+      "slice": "S4",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-element TerminalElement at 03e5ad8a630c84c3990055905d0444ea0a519b7f; retained ShapedLine; font family/features (b7d1aa2ed..fe8b151c4)"
+    },
+    {
+      "id": "pooled-frame-delta",
+      "slice": "S4",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-element TerminalElement at 03e5ad8a630c84c3990055905d0444ea0a519b7f; retained ShapedLine; font family/features (b7d1aa2ed..fe8b151c4)"
+    },
+    {
+      "id": "paint-no-engine-lock",
+      "slice": "S4",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-element TerminalElement at 03e5ad8a630c84c3990055905d0444ea0a519b7f; retained ShapedLine; font family/features (b7d1aa2ed..fe8b151c4)"
+    },
+    {
+      "id": "warm-frame-no-allocation",
+      "slice": "S4",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-element TerminalElement at 03e5ad8a630c84c3990055905d0444ea0a519b7f; retained ShapedLine; font family/features (b7d1aa2ed..fe8b151c4)"
+    },
+    {
+      "id": "idle-zero-redraw",
+      "slice": "S4",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-element TerminalElement at 03e5ad8a630c84c3990055905d0444ea0a519b7f; retained ShapedLine; font family/features (b7d1aa2ed..fe8b151c4)"
+    },
+    {
+      "id": "legacy-key-encoding",
+      "slice": "S5",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-input crate, s5-input.json corpus, byte-for-byte tests, PTY /bin/cat smoke (544e5797e)"
+    },
+    {
+      "id": "csi-u-key-encoding",
+      "slice": "S5",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-input crate, s5-input.json corpus, byte-for-byte tests, PTY /bin/cat smoke (544e5797e)"
+    },
+    {
+      "id": "kitty-key-press",
+      "slice": "S5",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-input crate, s5-input.json corpus, byte-for-byte tests, PTY /bin/cat smoke (544e5797e)"
+    },
+    {
+      "id": "kitty-key-repeat",
+      "slice": "S5",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-input crate, s5-input.json corpus, byte-for-byte tests, PTY /bin/cat smoke (544e5797e)"
+    },
+    {
+      "id": "kitty-key-release",
+      "slice": "S5",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-input crate, s5-input.json corpus, byte-for-byte tests, PTY /bin/cat smoke (544e5797e)"
+    },
+    {
+      "id": "modify-other-keys",
+      "slice": "S5",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-input crate, s5-input.json corpus, byte-for-byte tests, PTY /bin/cat smoke (544e5797e)"
+    },
+    {
+      "id": "decbkm",
+      "slice": "S5",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-input crate, s5-input.json corpus, byte-for-byte tests, PTY /bin/cat smoke (544e5797e)"
+    },
+    {
+      "id": "alt-escape",
+      "slice": "S5",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-input crate, s5-input.json corpus, byte-for-byte tests, PTY /bin/cat smoke (544e5797e)"
+    },
+    {
+      "id": "mouse-encoding",
+      "slice": "S5",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-input crate, s5-input.json corpus, byte-for-byte tests, PTY /bin/cat smoke (544e5797e)"
+    },
+    {
+      "id": "focus-reports",
+      "slice": "S5",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-input crate, s5-input.json corpus, byte-for-byte tests, PTY /bin/cat smoke (544e5797e)"
+    },
+    {
+      "id": "bracketed-paste",
+      "slice": "S5",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-input crate, s5-input.json corpus, byte-for-byte tests, PTY /bin/cat smoke (544e5797e)"
+    },
+    {
+      "id": "paste-sanitization",
+      "slice": "S5",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-input crate, s5-input.json corpus, byte-for-byte tests, PTY /bin/cat smoke (544e5797e)"
+    },
+    {
+      "id": "ime-input",
+      "slice": "S5",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-input crate, s5-input.json corpus, byte-for-byte tests, PTY /bin/cat smoke (544e5797e)"
+    },
+    {
+      "id": "selection-copy",
+      "slice": "S5",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-input crate, s5-input.json corpus, byte-for-byte tests, PTY /bin/cat smoke (544e5797e)"
+    },
+    {
+      "id": "clipboard",
+      "slice": "S5",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-input crate, s5-input.json corpus, byte-for-byte tests, PTY /bin/cat smoke (544e5797e)"
+    },
+    {
+      "id": "osc52-permissions",
+      "slice": "S5",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-input crate, s5-input.json corpus, byte-for-byte tests, PTY /bin/cat smoke (544e5797e)"
+    },
+    {
+      "id": "drag-drop",
+      "slice": "S5",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-input crate, s5-input.json corpus, byte-for-byte tests, PTY /bin/cat smoke (544e5797e)"
+    },
+    {
+      "id": "url-opening",
+      "slice": "S5",
+      "classification": "required",
+      "status": "passing",
+      "evidence": "mr-crabs-input crate, s5-input.json corpus, byte-for-byte tests, PTY /bin/cat smoke (544e5797e)"
+    },
+    {
+      "id": "osc-handling",
+      "slice": "S6",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S6 execution slice"
+    },
+    {
+      "id": "dcs-handling",
+      "slice": "S6",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S6 execution slice"
+    },
+    {
+      "id": "apc-handling",
+      "slice": "S6",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S6 execution slice"
+    },
+    {
+      "id": "device-reports",
+      "slice": "S6",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S6 execution slice"
+    },
+    {
+      "id": "status-reports",
+      "slice": "S6",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S6 execution slice"
+    },
+    {
+      "id": "title-reporting",
+      "slice": "S6",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S6 execution slice"
+    },
+    {
+      "id": "cwd-reporting",
+      "slice": "S6",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S6 execution slice"
+    },
+    {
+      "id": "bell",
+      "slice": "S6",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S6 execution slice"
+    },
+    {
+      "id": "osc8-hyperlinks-protocol",
+      "slice": "S6",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S6 execution slice"
+    },
+    {
+      "id": "osc133-semantic-prompts",
+      "slice": "S6",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S6 execution slice"
+    },
+    {
+      "id": "desktop-notifications",
+      "slice": "S6",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S6 execution slice"
+    },
+    {
+      "id": "tmux-control-mode",
+      "slice": "S6",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S6 execution slice"
+    },
+    {
+      "id": "shell-integration",
+      "slice": "S6",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S6 execution slice"
+    },
+    {
+      "id": "terminfo-generation",
+      "slice": "S6",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S6 execution slice"
+    },
+    {
+      "id": "terminfo-installation",
+      "slice": "S6",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S6 execution slice"
+    },
+    {
+      "id": "snapshot-codec",
+      "slice": "S6",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S6 execution slice"
+    },
+    {
+      "id": "replay",
+      "slice": "S6",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S6 execution slice"
+    },
+    {
+      "id": "zsh-prompt-cwd-status",
+      "slice": "S6",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S6 execution slice"
+    },
+    {
+      "id": "bash-prompt-cwd-status",
+      "slice": "S6",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S6 execution slice"
+    },
+    {
+      "id": "kitty-transmit",
+      "slice": "S7",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S7 execution slice"
+    },
+    {
+      "id": "kitty-display",
+      "slice": "S7",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S7 execution slice"
+    },
+    {
+      "id": "kitty-delete",
+      "slice": "S7",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S7 execution slice"
+    },
+    {
+      "id": "kitty-query",
+      "slice": "S7",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S7 execution slice"
+    },
+    {
+      "id": "kitty-png",
+      "slice": "S7",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S7 execution slice"
+    },
+    {
+      "id": "kitty-placement",
+      "slice": "S7",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S7 execution slice"
+    },
+    {
+      "id": "kitty-z-index",
+      "slice": "S7",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S7 execution slice"
+    },
+    {
+      "id": "kitty-scroll",
+      "slice": "S7",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S7 execution slice"
+    },
+    {
+      "id": "kitty-resize",
+      "slice": "S7",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S7 execution slice"
+    },
+    {
+      "id": "kitty-cache-budget",
+      "slice": "S7",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S7 execution slice"
+    },
+    {
+      "id": "kitty-temp-file-transport",
+      "slice": "S7",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S7 execution slice"
+    },
+    {
+      "id": "kitty-shm-transport",
+      "slice": "S7",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S7 execution slice"
+    },
+    {
+      "id": "iterm2-images",
+      "slice": "S7",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S7 execution slice"
+    },
+    {
+      "id": "ghostty-glyph-apc",
+      "slice": "S7",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S7 execution slice"
+    },
+    {
+      "id": "bounded-texture-cache",
+      "slice": "S7",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S7 execution slice"
+    },
+    {
+      "id": "graphics-malformed-bounds",
+      "slice": "S7",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S7 execution slice"
+    },
+    {
+      "id": "graphics-oversized-bounds",
+      "slice": "S7",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S7 execution slice"
+    },
+    {
+      "id": "viewport-scrolling",
+      "slice": "S8",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S8 execution slice"
+    },
+    {
+      "id": "search-worker",
+      "slice": "S8",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S8 execution slice"
+    },
+    {
+      "id": "search-cancellation",
+      "slice": "S8",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S8 execution slice"
+    },
+    {
+      "id": "selection-gestures",
+      "slice": "S8",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S8 execution slice"
+    },
+    {
+      "id": "hyperlink-interaction",
+      "slice": "S8",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S8 execution slice"
+    },
+    {
+      "id": "history-persistence",
+      "slice": "S8",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S8 execution slice"
+    },
+    {
+      "id": "snapshot-restore",
+      "slice": "S8",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S8 execution slice"
+    },
+    {
+      "id": "replay-restore",
+      "slice": "S8",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S8 execution slice"
+    },
+    {
+      "id": "compressed-page-boundaries",
+      "slice": "S8",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S8 execution slice"
+    },
+    {
+      "id": "uncompressed-page-boundaries",
+      "slice": "S8",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S8 execution slice"
+    },
+    {
+      "id": "history-resize-reflow",
+      "slice": "S8",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S8 execution slice"
+    },
+    {
+      "id": "history-alt-screen-transitions",
+      "slice": "S8",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S8 execution slice"
+    },
+    {
+      "id": "cursor-trail-config",
+      "slice": "S9",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S9 execution slice"
+    },
+    {
+      "id": "cursor-trail-default-enabled",
+      "slice": "S9",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S9 execution slice"
+    },
+    {
+      "id": "cursor-trail-opacity-0.35",
+      "slice": "S9",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S9 execution slice"
+    },
+    {
+      "id": "cursor-trail-duration-250ms",
+      "slice": "S9",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S9 execution slice"
+    },
+    {
+      "id": "cursor-trail-gradient-cache",
+      "slice": "S9",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S9 execution slice"
+    },
+    {
+      "id": "cursor-trail-bounded-quads",
+      "slice": "S9",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S9 execution slice"
+    },
+    {
+      "id": "streaming-text-config",
+      "slice": "S9",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S9 execution slice"
+    },
+    {
+      "id": "streaming-text-default",
+      "slice": "S9",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S9 execution slice"
+    },
+    {
+      "id": "streaming-text-duration-120ms",
+      "slice": "S9",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S9 execution slice"
+    },
+    {
+      "id": "streaming-text-intensity-1.0",
+      "slice": "S9",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S9 execution slice"
+    },
+    {
+      "id": "streaming-cell-timestamps",
+      "slice": "S9",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S9 execution slice"
+    },
+    {
+      "id": "streaming-cell-clipping",
+      "slice": "S9",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S9 execution slice"
+    },
+    {
+      "id": "animation-disabled-zero-allocation",
+      "slice": "S9",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S9 execution slice"
+    },
+    {
+      "id": "animation-disabled-zero-scheduling",
+      "slice": "S9",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S9 execution slice"
+    },
+    {
+      "id": "animation-expiry-zero-frames",
+      "slice": "S9",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S9 execution slice"
+    },
+    {
+      "id": "windows",
+      "slice": "S10",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S10 execution slice"
+    },
+    {
+      "id": "tabs",
+      "slice": "S10",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S10 execution slice"
+    },
+    {
+      "id": "splits",
+      "slice": "S10",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S10 execution slice"
+    },
+    {
+      "id": "pane-focus",
+      "slice": "S10",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S10 execution slice"
+    },
+    {
+      "id": "pane-navigation",
+      "slice": "S10",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S10 execution slice"
+    },
+    {
+      "id": "command-palette",
+      "slice": "S10",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S10 execution slice"
+    },
+    {
+      "id": "settings",
+      "slice": "S10",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S10 execution slice"
+    },
+    {
+      "id": "config-reload",
+      "slice": "S10",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S10 execution slice"
+    },
+    {
+      "id": "quick-terminal",
+      "slice": "S10",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S10 execution slice"
+    },
+    {
+      "id": "menus",
+      "slice": "S10",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S10 execution slice"
+    },
+    {
+      "id": "secure-input",
+      "slice": "S10",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S10 execution slice"
+    },
+    {
+      "id": "accessibility",
+      "slice": "S10",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S10 execution slice"
+    },
+    {
+      "id": "app-intents",
+      "slice": "S10",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S10 execution slice"
+    },
+    {
+      "id": "dock-behavior",
+      "slice": "S10",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S10 execution slice"
+    },
+    {
+      "id": "updates",
+      "slice": "S10",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S10 execution slice"
+    },
+    {
+      "id": "crash-reporting",
+      "slice": "S10",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S10 execution slice"
+    },
+    {
+      "id": "platform-integrations",
+      "slice": "S10",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S10 execution slice"
+    },
+    {
+      "id": "keyboard-only-operation",
+      "slice": "S10",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S10 execution slice"
+    },
+    {
+      "id": "shell-state-restore",
+      "slice": "S10",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S10 execution slice"
+    },
+    {
+      "id": "mr-crabs-app-bundle",
+      "slice": "S11",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S11 execution slice"
+    },
+    {
+      "id": "bundle-id",
+      "slice": "S11",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S11 execution slice"
+    },
+    {
+      "id": "ghostty-executable-name",
+      "slice": "S11",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S11 execution slice"
+    },
+    {
+      "id": "resources",
+      "slice": "S11",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S11 execution slice"
+    },
+    {
+      "id": "terminfo-bundle",
+      "slice": "S11",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S11 execution slice"
+    },
+    {
+      "id": "shell-integration-bundle",
+      "slice": "S11",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S11 execution slice"
+    },
+    {
+      "id": "icons",
+      "slice": "S11",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S11 execution slice"
+    },
+    {
+      "id": "notices",
+      "slice": "S11",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S11 execution slice"
+    },
+    {
+      "id": "signing-config",
+      "slice": "S11",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S11 execution slice"
+    },
+    {
+      "id": "zig-runtime-removal",
+      "slice": "S11",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S11 execution slice"
+    },
+    {
+      "id": "swift-runtime-removal",
+      "slice": "S11",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S11 execution slice"
+    },
+    {
+      "id": "cargo-release-build",
+      "slice": "S11",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S11 execution slice"
+    },
+    {
+      "id": "deep-codesign",
+      "slice": "S11",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S11 execution slice"
+    },
+    {
+      "id": "cli-config-output",
+      "slice": "S11",
+      "classification": "required",
+      "status": "pending",
+      "evidence": "Authoritative rewrite plan S11 execution slice"
+    },
+    {
+      "id": "sixel",
+      "slice": null,
+      "classification": "excluded",
+      "status": "closed",
+      "evidence": "Authoritative plan lines 13 and 217: Ghostty does not implement Sixel; not parity scope."
+    },
+    {
+      "id": "linked-libghostty-vt",
+      "slice": null,
+      "classification": "excluded",
+      "status": "closed",
+      "evidence": "Authoritative plan lines 5 and 35: shipped app must be pure Rust with no Zig library."
+    },
+    {
+      "id": "zed-terminal-source-copy",
+      "slice": null,
+      "classification": "excluded",
+      "status": "closed",
+      "evidence": "Authoritative plan lines 14 and 36: GPL-3.0-or-later reference only; no code/comments copied."
+    },
+    {
+      "id": "wgpu-sugarloaf-renderer",
+      "slice": null,
+      "classification": "excluded",
+      "status": "closed",
+      "evidence": "Authoritative plan lines 27 and 40: GPUI TerminalElement is the only renderer."
+    },
+    {
+      "id": "linux-platform-release",
+      "slice": null,
+      "classification": "blocked",
+      "status": "blocked",
+      "evidence": "Authoritative plan line 26: add after macOS release parity."
+    },
+    {
+      "id": "windows-platform-release",
+      "slice": null,
+      "classification": "blocked",
+      "status": "blocked",
+      "evidence": "Authoritative plan line 26: add after macOS release parity."
+    }
+  ],
+  "counts": {
+    "required": 190,
+    "excluded": 4,
+    "blocked": 2
+  }
+}

@@ -1,0 +1,532 @@
+{
+  "schema_version": 1,
+  "oracle": {
+    "engine": "Ghostty 1.3.2-dev",
+    "source_commit": "d2c70a8c7b9b6893c13640c02d7b6f9a1624f3f0",
+    "fixture_format": "mr-crabs-input-v1",
+    "provenance": [
+      "src/input/key_encode.zig:14-97 (Options, encode dispatch, legacy/kitty split)",
+      "src/input/key_encode.zig:99-230 (kitty encoding, report_events/report_all, composing, utf8)",
+      "src/input/key_encode.zig:300-600 (legacy encoding, DECBKM, alt_esc_prefix, cursor_key_application)",
+      "src/input/mouse_encode.zig:10-180 (Options.fromTerminal, Event.Pos, encode, shouldReport, buttonCode, formats)",
+      "src/input/paste.zig:4-111 (strip controls, bracketed fenceposts, newline->CR)",
+      "src/terminal/main.zig: DEC modes 1/66/1035/1036/2004 and mouse report modes",
+      "src/terminal/mode.zig and src/input/mouse.zig (Button/Action encodings)"
+    ]
+  },
+  "cases": [
+    {
+      "id": "legacy-key-encoding",
+      "name": "legacy-enter-cr",
+      "category": "keyboard",
+      "input": {
+        "key": "Enter",
+        "mods": {},
+        "utf8": "",
+        "action": "press"
+      },
+      "mode": {
+        "kitty": 0,
+        "modifyOtherKeys2": false,
+        "backarrow": false,
+        "altEsc": false,
+        "cursorApp": false
+      },
+      "expected_hex": "0d",
+      "provenance": "src/input/key_encode.zig: legacy Enter -> CR"
+    },
+    {
+      "id": "legacy-key-encoding",
+      "name": "legacy-arrow-up-normal",
+      "category": "keyboard",
+      "input": {
+        "key": "ArrowUp",
+        "mods": {},
+        "utf8": "",
+        "action": "press"
+      },
+      "mode": {
+        "kitty": 0,
+        "cursorApp": false
+      },
+      "expected_hex": "1b5b41",
+      "provenance": "src/input/key_encode.zig: cursor_key_application false -> CSI A"
+    },
+    {
+      "id": "legacy-key-encoding",
+      "name": "legacy-arrow-up-app",
+      "category": "keyboard",
+      "input": {
+        "key": "ArrowUp",
+        "mods": {},
+        "utf8": "",
+        "action": "press"
+      },
+      "mode": {
+        "kitty": 0,
+        "cursorApp": true
+      },
+      "expected_hex": "1b4f41",
+      "provenance": "src/input/key_encode.zig: cursor_key_application true -> SS3 A"
+    },
+    {
+      "id": "legacy-key-encoding",
+      "name": "legacy-ctrl-a",
+      "category": "keyboard",
+      "input": {
+        "key": "Character:a",
+        "mods": {
+          "ctrl": true
+        },
+        "utf8": "",
+        "action": "press"
+      },
+      "mode": {
+        "kitty": 0
+      },
+      "expected_hex": "01",
+      "provenance": "src/input/key_encode.zig: ctrl+letter -> 0x01..0x1a"
+    },
+    {
+      "id": "csi-u-key-encoding",
+      "name": "csi-u-ctrl-a-modifyOtherKeys2",
+      "category": "keyboard",
+      "input": {
+        "key": "Character:a",
+        "mods": {
+          "ctrl": true
+        },
+        "utf8": "",
+        "action": "press"
+      },
+      "mode": {
+        "kitty": 0,
+        "modifyOtherKeys2": true
+      },
+      "expected_hex": "1b5b32373b353b39377e",
+      "provenance": "src/input/key_encode.zig: modifyOtherKeys 2 -> CSI 27 ; mods ; code ~"
+    },
+    {
+      "id": "kitty-key-press",
+      "name": "kitty-arrow-up-press",
+      "category": "keyboard",
+      "input": {
+        "key": "ArrowUp",
+        "mods": {},
+        "utf8": "",
+        "action": "press"
+      },
+      "mode": {
+        "kitty": 1
+      },
+      "expected_hex": "1b5b41",
+      "provenance": "src/input/kitty.zig: arrow_up -> code 1/final A; key_encode.zig: special no-modifier press -> CSI A"
+    },
+    {
+      "id": "kitty-key-repeat",
+      "name": "kitty-arrow-up-repeat",
+      "category": "keyboard",
+      "input": {
+        "key": "ArrowUp",
+        "mods": {},
+        "utf8": "",
+        "action": "repeat"
+      },
+      "mode": {
+        "kitty": 3
+      },
+      "expected_hex": "1b5b313b313a3241",
+      "provenance": "src/input/kitty.zig: arrow_up -> special final A; key_encode.zig: report_events repeat -> CSI 1;1:2A"
+    },
+    {
+      "id": "kitty-key-release",
+      "name": "kitty-arrow-up-release-with-report-events",
+      "category": "keyboard",
+      "input": {
+        "key": "ArrowUp",
+        "mods": {},
+        "utf8": "",
+        "action": "release"
+      },
+      "mode": {
+        "kitty": 3
+      },
+      "expected_hex": "1b5b313b313a3341",
+      "provenance": "src/input/kitty.zig: arrow_up -> special final A; key_encode.zig: report_events release -> CSI 1;1:3A"
+    },
+    {
+      "id": "modify-other-keys",
+      "name": "modifyOtherKeys-ctrl-bracket",
+      "category": "keyboard",
+      "input": {
+        "key": "Character:[",
+        "mods": {
+          "ctrl": true
+        },
+        "utf8": "",
+        "action": "press"
+      },
+      "mode": {
+        "kitty": 0,
+        "modifyOtherKeys2": true
+      },
+      "expected_hex": "1b5b32373b353b39317e",
+      "provenance": "src/input/key_encode.zig: modifyOtherKeys encodes CSI 27"
+    },
+    {
+      "id": "decbkm",
+      "name": "decbkm-backspace-bs",
+      "category": "keyboard",
+      "input": {
+        "key": "Backspace",
+        "mods": {},
+        "utf8": "",
+        "action": "press"
+      },
+      "mode": {
+        "kitty": 0,
+        "backarrow": true
+      },
+      "expected_hex": "08",
+      "provenance": "src/input/key_encode.zig: DECBKM true -> 0x08"
+    },
+    {
+      "id": "decbkm",
+      "name": "decbkm-backspace-del",
+      "category": "keyboard",
+      "input": {
+        "key": "Backspace",
+        "mods": {},
+        "utf8": "",
+        "action": "press"
+      },
+      "mode": {
+        "kitty": 0,
+        "backarrow": false
+      },
+      "expected_hex": "7f",
+      "provenance": "src/input/key_encode.zig: DECBKM false -> 0x7f"
+    },
+    {
+      "id": "alt-escape",
+      "name": "alt-escape-a",
+      "category": "keyboard",
+      "input": {
+        "key": "Character:a",
+        "mods": {
+          "alt": true
+        },
+        "utf8": "a",
+        "action": "press"
+      },
+      "mode": {
+        "kitty": 0,
+        "altEsc": true
+      },
+      "expected_hex": "1b61",
+      "provenance": "src/input/key_encode.zig: alt_esc_prefix true -> ESC prefix"
+    },
+    {
+      "id": "mouse-encoding",
+      "name": "mouse-x10-left-press",
+      "category": "mouse",
+      "input": {
+        "button": "Left",
+        "action": "press",
+        "mods": {},
+        "col": 10,
+        "row": 5
+      },
+      "mode": {
+        "report": "X10",
+        "encoding": "X10"
+      },
+      "expected_hex": "1b5b4d202b26",
+      "provenance": "src/input/mouse_encode.zig: X10 press -> ESC [ M cb cx cy"
+    },
+    {
+      "id": "mouse-encoding",
+      "name": "mouse-sgr-left-press",
+      "category": "mouse",
+      "input": {
+        "button": "Left",
+        "action": "press",
+        "mods": {},
+        "col": 10,
+        "row": 5
+      },
+      "mode": {
+        "report": "Any",
+        "encoding": "Sgr"
+      },
+      "expected_hex": "1b5b3c303b31313b364d",
+      "provenance": "src/input/mouse_encode.zig: SGR -> ESC [ < cb ; x ; y M"
+    },
+    {
+      "id": "mouse-encoding",
+      "name": "mouse-sgr-release",
+      "category": "mouse",
+      "input": {
+        "button": "Left",
+        "action": "release",
+        "mods": {},
+        "col": 10,
+        "row": 5
+      },
+      "mode": {
+        "report": "Any",
+        "encoding": "Sgr"
+      },
+      "expected_hex": "1b5b3c303b31313b366d",
+      "provenance": "src/input/mouse_encode.zig: SGR release -> lowercase m"
+    },
+    {
+      "id": "mouse-encoding",
+      "name": "mouse-urxvt-left-press",
+      "category": "mouse",
+      "input": {
+        "button": "Left",
+        "action": "press",
+        "mods": {},
+        "col": 10,
+        "row": 5
+      },
+      "mode": {
+        "report": "Any",
+        "encoding": "Urxvt"
+      },
+      "expected_hex": "1b5b33323b31313b364d",
+      "provenance": "src/input/mouse_encode.zig: urxvt -> ESC [ 32+cb ; x ; y M"
+    },
+    {
+      "id": "mouse-encoding",
+      "name": "mouse-utf8-left-press",
+      "category": "mouse",
+      "input": {
+        "button": "Left",
+        "action": "press",
+        "mods": {},
+        "col": 10,
+        "row": 5
+      },
+      "mode": {
+        "report": "Any",
+        "encoding": "Utf8"
+      },
+      "expected_hex": "1b5b4d202b26",
+      "provenance": "src/input/mouse_encode.zig: UTF8 mirrors X10 for small coords"
+    },
+    {
+      "id": "mouse-encoding",
+      "name": "mouse-sgr-pixels",
+      "category": "mouse",
+      "input": {
+        "button": "Left",
+        "action": "press",
+        "mods": {},
+        "x_px": 100,
+        "y_px": 200
+      },
+      "mode": {
+        "report": "Any",
+        "encoding": "SgrPixels"
+      },
+      "expected_hex": "1b5b3c303b3130303b3230304d",
+      "provenance": "src/input/mouse_encode.zig: SGR-Pixels -> pixel coords"
+    },
+    {
+      "id": "mouse-encoding",
+      "name": "mouse-sgr-motion-with-mask",
+      "category": "mouse",
+      "input": {
+        "button": "Left",
+        "action": "motion",
+        "mods": {},
+        "col": 10,
+        "row": 5
+      },
+      "mode": {
+        "report": "Any",
+        "encoding": "Sgr"
+      },
+      "expected_hex": "1b5b3c33323b31313b364d",
+      "provenance": "src/input/mouse_encode.zig: motion adds 32 to button code"
+    },
+    {
+      "id": "mouse-encoding",
+      "name": "mouse-x10-suppressed-release",
+      "category": "mouse",
+      "input": {
+        "button": "Left",
+        "action": "release",
+        "mods": {},
+        "col": 10,
+        "row": 5
+      },
+      "mode": {
+        "report": "X10",
+        "encoding": "X10"
+      },
+      "expected_hex": "",
+      "provenance": "src/input/mouse_encode.zig: X10 never reports release",
+      "split": true
+    },
+    {
+      "id": "focus-reports",
+      "name": "focus-in-enabled",
+      "category": "focus",
+      "input": {
+        "focused": true,
+        "enabled": true
+      },
+      "expected_hex": "1b5b49",
+      "provenance": "Ghostty terminal/mode FocusInOut -> ESC [ I"
+    },
+    {
+      "id": "focus-reports",
+      "name": "focus-out-enabled",
+      "category": "focus",
+      "input": {
+        "focused": false,
+        "enabled": true
+      },
+      "expected_hex": "1b5b4f",
+      "provenance": "Ghostty terminal/mode FocusInOut -> ESC [ O"
+    },
+    {
+      "id": "focus-reports",
+      "name": "focus-disabled",
+      "category": "focus",
+      "input": {
+        "focused": true,
+        "enabled": false
+      },
+      "expected_hex": "",
+      "provenance": "Focus reports suppressed when mode disabled",
+      "split": true
+    },
+    {
+      "id": "bracketed-paste",
+      "name": "bracketed-paste-wraps",
+      "category": "paste",
+      "input": {
+        "text": "hi\nthere",
+        "bracketed": true
+      },
+      "expected_hex": "1b5b3230307e68690a74686572651b5b3230317e",
+      "provenance": "src/input/paste.zig: bracketed -> ESC[200~ data ESC[201~"
+    },
+    {
+      "id": "bracketed-paste",
+      "name": "non-bracketed-paste-cr",
+      "category": "paste",
+      "input": {
+        "text": "hi\nthere",
+        "bracketed": false
+      },
+      "expected_hex": "68690d7468657265",
+      "provenance": "src/input/paste.zig: non-bracketed newline -> CR"
+    },
+    {
+      "id": "paste-sanitization",
+      "name": "paste-strip-controls",
+      "category": "paste",
+      "input": {
+        "text": "a\u0000b\u001bc",
+        "bracketed": true
+      },
+      "expected_hex": "1b5b3230307e61206220631b5b3230317e",
+      "provenance": "src/input/paste.zig: strip controls -> space"
+    },
+    {
+      "id": "ime-input",
+      "name": "ime-commit-utf8",
+      "category": "ime",
+      "input": {
+        "text": "\u754c"
+      },
+      "expected_hex": "e7958c",
+      "provenance": "IME committed text passes through verbatim"
+    },
+    {
+      "id": "selection-copy",
+      "name": "selection-single-line",
+      "category": "selection",
+      "provenance": "NormalizedSnapshot + SelectionState visible grid copy"
+    },
+    {
+      "id": "clipboard",
+      "name": "clipboard-system-write-denied-fails-closed",
+      "category": "clipboard",
+      "provenance": "ClipboardController denies before backend"
+    },
+    {
+      "id": "osc52-permissions",
+      "name": "osc52-write-denied",
+      "category": "osc52",
+      "provenance": "OSC52 write denied fails closed, no backend call, 1MiB bound"
+    },
+    {
+      "id": "osc52-permissions",
+      "name": "osc52-decode-roundtrip",
+      "category": "osc52",
+      "input": {
+        "text": "hello world"
+      },
+      "expected_hex": "68656c6c6f20776f726c64",
+      "provenance": "OSC52 base64 encode/decode"
+    },
+    {
+      "id": "drag-drop",
+      "name": "drag-drop-quoted-path",
+      "category": "dragdrop",
+      "input": {
+        "paths": [
+          "/tmp/my file.txt",
+          "/tmp/a.txt"
+        ]
+      },
+      "expected_hex": "272f746d702f6d792066696c652e74787427202f746d702f612e747874",
+      "provenance": "Drag/drop encodes quoted paths, no shell execution"
+    },
+    {
+      "id": "url-opening",
+      "name": "url-https-allowed",
+      "category": "url",
+      "input": {
+        "url": "https://example.com"
+      },
+      "expected_allowed": true,
+      "provenance": "UrlPolicy allows http/https/mailto/file only"
+    },
+    {
+      "id": "url-opening",
+      "name": "url-javascript-denied",
+      "category": "url",
+      "input": {
+        "url": "javascript:alert(1)"
+      },
+      "expected_allowed": false,
+      "provenance": "UrlPolicy denies javascript scheme, no shell"
+    },
+    {
+      "id": "mouse-encoding",
+      "name": "mouse-x10-null-button-suppressed",
+      "category": "mouse",
+      "input": {
+        "button": null,
+        "action": "press",
+        "mods": {},
+        "col": 0,
+        "row": 0
+      },
+      "mode": {
+        "report": "X10",
+        "encoding": "X10"
+      },
+      "expected_hex": "",
+      "provenance": "src/input/mouse_encode.zig: X10 null button not reported",
+      "split": true
+    }
+  ]
+}

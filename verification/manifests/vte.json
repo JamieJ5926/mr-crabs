@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "upstream": {
+    "repository": "https://github.com/alacritty/vte",
+    "commit": "3b3da71c34cc1256c7e20981cf03f8eb95e08ffc",
+    "crate_name": "vte",
+    "crate_version": "0.15.0",
+    "license": "Apache-2.0 OR MIT",
+    "registry_source": "crates.io vte 0.15.0"
+  },
+  "local_adaptations": [
+    "src/lib.rs: add printable ground-run dispatch with a control-preserving default Perform implementation",
+    "src/ansi.rs: forward printable runs through Handler::input_run while preserving C0/C1 dispatch and preceding-character state"
+  ],
+  "files": [
+    {
+      "path": ".gitignore",
+      "bytes": 18,
+      "sha256": "f9b1ca6ae27d1c18215265024629a8960c31379f206d9ed20f64e0b2dcf79805"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "bytes": 2613,
+      "sha256": "f5d291cdb0b340c13aca2203c271ade81d45e0b6f2dcedbc442b2a4ee219ca60"
+    },
+    {
+      "path": "Cargo.lock",
+      "bytes": 2580,
+      "sha256": "cb213727d54ce62cd0fe9422fd11b8d6e6747844549a63a040da92ab429e35b1"
+    },
+    {
+      "path": "Cargo.toml",
+      "bytes": 1763,
+      "sha256": "06bfdd57dec95f9172d84e867e9fcdd02c46eb5008b5d7e75848d76cbfaa96ef"
+    },
+    {
+      "path": "Cargo.toml.orig",
+      "bytes": 998,
+      "sha256": "180c11737a8870eca54a25ee3c1ad3455a814ec35664bf09a68e1293fe2f8809"
+    },
+    {
+      "path": "LICENSE-APACHE",
+      "bytes": 9723,
+      "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+    },
+    {
+      "path": "LICENSE-MIT",
+      "bytes": 1052,
+      "sha256": "e4c9b06fa850cb9b540a5e400e9f6394cf15efcf4098144de477d1d3dae10150"
+    },
+    {
+      "path": "README.md",
+      "bytes": 843,
+      "sha256": "ff6200be737dfb4275b2cfbcd7742a7d7031f159908dd7799925733782341995"
+    },
+    {
+      "path": "doc/modifyOtherKeys-example.txt",
+      "bytes": 145477,
+      "sha256": "b6eca4ccc196d3345f9a9b32d6f256fd7ac31d579e42609aae435d77de411903"
+    },
+    {
+      "path": "examples/parselog.rs",
+      "bytes": 1886,
+      "sha256": "f7cf1a8ac1eb0579c6546603584fc73b8895038085006f351fa1a17a924e8fc4"
+    },
+    {
+      "path": "rustfmt.toml",
+      "bytes": 492,
+      "sha256": "8776da01d4b25480e1950b88500044bad40ae10b197cb89f4f17dd3f34480d3e"
+    },
+    {
+      "path": "src/ansi.rs",
+      "bytes": 84629,
+      "sha256": "8bc3f6a0ae17b861cb2991a44c36fe07b83b872c6188b028cf8b0ab24e9b6d55"
+    },
+    {
+      "path": "src/lib.rs",
+      "bytes": 53861,
+      "sha256": "01742631f63cdb6ad87374d2ce4cc0c1ca81dd5b5bb76c05b2f2f6237f470893"
+    },
+    {
+      "path": "src/params.rs",
+      "bytes": 3670,
+      "sha256": "a305b112e6779d14537fd420aad45722b9cde756aba75153ac8560b7aa7d4c4a"
+    },
+    {
+      "path": "tests/demo.vte",
+      "bytes": 13809,
+      "sha256": "1ac4e7fe28999e2aa632cd80f85d4f5dae776499164ffe0fa792151614ef80fe"
+    }
+  ]
+}

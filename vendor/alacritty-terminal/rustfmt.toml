@@ -1,0 +1,2 @@
+# Preserve the byte-frozen upstream source. Owned adaptation files live outside src/.
+disable_all_formatting = true

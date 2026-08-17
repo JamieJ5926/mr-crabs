@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "slice": "S3",
+  "base_commit": "395df05e3b8dd9b0d057b728a4440bc4416561ef",
+  "candidates": [
+    {
+      "model": "openai-codex/gpt-5.6-sol",
+      "status": "rejected",
+      "reason": "two bounded runs timed out with an uncommitted partial tree and no candidate commit"
+    },
+    {
+      "model": "cli-proxy/grok-4.6",
+      "status": "rejected",
+      "reason": "two bounded runs timed out with uncommitted alternative modules and no candidate commit"
+    },
+    {
+      "model": "cli-proxy/muse-spark-1.2-contributor",
+      "commit": "81f54d2cb53f9fc82fae4daa849aec37e6c3fca3",
+      "status": "selected-for-synthesis",
+      "reason": "only candidate with a committed end-to-end terminal, storage, corpus, and benchmark implementation"
+    },
+    {
+      "model": "cli-proxy/deepseek-v4-pro",
+      "status": "rejected",
+      "reason": "two bounded OpenCode-Go runs timed out without worktree changes; no fallback route was used"
+    }
+  ],
+  "selected_candidate_integration_commit": "ee7e35254",
+  "lead_acceptance_commit": "3b3885c1da845ef4c17ac14dae90617120e758ee",
+  "lead_fixes": [
+    "captured real parser-scrolled rows into compact paged history",
+    "made feed-side compression polling nonblocking and deterministic drain lossless",
+    "implemented truthful style, hyperlink, semantic-region, and selection-anchor side tables",
+    "made queue and completion statistics atomic and overload retryable",
+    "deduplicated byte-identical cold LZ4 pages while preserving independent generation and restore state",
+    "made the S3 benchmark use the exact S0 one-million line workload and report process peak RSS"
+  ],
+  "commands": [
+    {
+      "command": "cargo fmt --all -- --check",
+      "result": "passed"
+    },
+    {
+      "command": "cargo check --workspace --all-targets",
+      "result": "passed"
+    },
+    {
+      "command": "cargo test -p mr-crabs-terminal -- --test-threads=1",
+      "result": "15 passed across 2 suites"
+    },
+    {
+      "command": "cargo clippy -p mr-crabs-terminal --all-targets -- -D warnings",
+      "result": "passed"
+    },
+    {
+      "command": "cargo clippy -p mr-crabs-bench --all-targets -- -D warnings",
+      "result": "passed"
+    },
+    {
+      "command": "cargo run -p mr-crabs-oracle -- corpus verification/corpus",
+      "result": "27 immutable actual-Ghostty corpus cases passed"
+    },
+    {
+      "command": "cargo run --release -p mr-crabs-bench -- --suite s3 --json verification/s3-results.json",
+      "result": "passed; 999928 retained logical lines, 0 hot resident bytes, 8276 unique compressed bytes, 51.7868 MiB/s, 9781248 peak RSS bytes"
+    }
+  ],
+  "memory_gate": {
+    "workload": "1000000 repetitions of line\\n, matching S0",
+    "oracle_median_max_rss_bytes": 10059776,
+    "rust_peak_rss_bytes": 9781248,
+    "margin_bytes": 278528,
+    "result": "passed"
+  },
+  "rollback_point": "395df05e3b8dd9b0d057b728a4440bc4416561ef"
+}

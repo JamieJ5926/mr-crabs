@@ -1,0 +1,16 @@
+[package]
+name = "mr-crabs-terminal"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+lz4_flex.workspace = true
+mr-crabs-protocols.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+vte.workspace = true
+
+[dev-dependencies]

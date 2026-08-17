@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "slice": "S2-synthesis",
+  "selected_candidate": "1ddc86d465611bdf533c3e238da3ea52bd160d5b",
+  "implementer": "cli-proxy/grok-4.6",
+  "rejections": {
+    "gpt": "timed out without commit",
+    "grok": "timed out without commit",
+    "muse": "selected; complete design but failed fmt and compile",
+    "deepseek": "timed out without changes"
+  },
+  "required_fixes": [
+    "Remove invalid source attributes or adopt the existing no-new-abstraction error pattern; preserve Error::source for io errors.",
+    "Use rustix-openpty 0.2 APIs actually pinned in Cargo.lock; do not invent OpenptFlags::CLOEXEC.",
+    "Use CStr::as_ptr for CString values.",
+    "Treat libc WIFEXITED/WIFSIGNALED as bool on this target.",
+    "Fix temporary builder lifetimes and moved Arc ownership without leaks or global state.",
+    "Run no validation; lead validates real PTY behavior.",
+    "Do not weaken S2 tests, queue bounds, shutdown escalation, reap-once invariant, or safety comments."
+  ]
+}

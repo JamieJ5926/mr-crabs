@@ -1,0 +1,3947 @@
+{
+  "schema_version": 1,
+  "oracle": {
+    "engine": "Ghostty 1.3.2-dev (Mr Crabs fork)",
+    "source_commit": "d2c70a8c7b9b6893c13640c02d7b6f9a1624f3f0",
+    "fixture_format": "mr-crabs-effects-v1",
+    "provenance": [
+      "src/renderer/shaders/streaming-text.glsl:9-21 (streaming semantics: per-cell change texture, never-changed sentinel passes through)",
+      "src/renderer/shaders/streaming-text.glsl:40-81 (reveal math: elapsed window, left-to-right boundary, intensity*smoothstep conceal)",
+      "src/renderer/shaders/typewriter-text.glsl:10-21 (typewriter semantics: staggered per-cell timestamps, one eighth of duration per character)",
+      "src/renderer/shaders/typewriter-text.glsl:44-91 (typewriter math: future cells fully concealed, strike over first quarter, hold until window end)",
+      "src/renderer/shaders/cursor-trail.glsl:11-27 (defaults: opacity 0.35, duration 0.25)",
+      "src/renderer/shaders/cursor-trail.glsl:53-88 (trail math: linear fade, exp(-d/radius) glow, segment between centers, focus/visibility guards)",
+      "src/renderer/generic.zig:48-186 (TypewriterSchedule: burst continuation, fresh burst rules, max_ahead 1.0s)",
+      "src/renderer/generic.zig:730-811 (TextAnimationState: per-cell snapshot keys and change times, never sentinel -1000, row 0 = top row)",
+      "src/renderer/generic.zig:1396-1432 (textAnimationAnimating/cursorTrailAnimating: frames only while a reveal/fade is in progress; future timestamps keep frames alive)",
+      "src/renderer/generic.zig:1999-2020 (per-frame sync: none path deinits all text-animation state)",
+      "src/renderer/generic.zig:2621-2653 (iCellMetrics: cell width, signed row step, row-zero origin; negative step for bottom-up coordinates)",
+      "src/renderer/generic.zig:2907-2924 (rebuild time and textAnimationBeginBuild per rebuild)",
+      "src/renderer/generic.zig:2956-2972 (textAnimationUpdateRow: only rebuilt rows diffed, reading-order timestamps)",
+      "src/config/Config.zig:861-957 (keys and defaults: cursor-trail=true, opacity 0.35, 250ms; text-animation=streaming, 120ms, intensity 1.0)",
+      "src/config/Config.zig:4908-4932 (finalize clamps: opacity/intensity [0,1], trail duration [1ms,60s], text duration [1ms,5s])"
+    ],
+    "defaults": {
+      "text_animation": "streaming",
+      "text_animation_duration_ms": 120,
+      "text_animation_intensity": 1.0,
+      "cursor_trail": true,
+      "cursor_trail_opacity": 0.35,
+      "cursor_trail_duration_ms": 250
+    }
+  },
+  "cases": [
+    {
+      "id": "streaming-reveal-sequence",
+      "name": "streaming reveal, expiry, and zero frames after expiry",
+      "kind": "sequence",
+      "config": {
+        "text_animation": "streaming",
+        "text_animation_duration_ms": 120,
+        "text_animation_intensity": 1.0,
+        "cursor_trail": false,
+        "cursor_trail_opacity": 0.35,
+        "cursor_trail_duration_ms": 250,
+        "max_tracked_cells": 256
+      },
+      "grid": {
+        "cols": 8,
+        "rows": 3
+      },
+      "cell_px": {
+        "width": 10.0,
+        "height": 20.0
+      },
+      "sample_x": 9.0,
+      "steps": [
+        {
+          "now_ms": 1000,
+          "focus": true,
+          "damage": "partial",
+          "rows": [
+            {
+              "row": 0,
+              "generation": 1,
+              "cells": [
+                [
+                  65,
+                  0,
+                  0
+                ],
+                [
+                  66,
+                  0,
+                  0
+                ],
+                [
+                  32,
+                  0,
+                  0
+                ],
+                [
+                  32,
+                  0,
+                  0
+                ],
+                [
+                  32,
+                  0,
+                  0
+                ],
+                [
+                  32,
+                  0,
+                  0
+                ],
+                [
+                  32,
+                  0,
+                  0
+                ],
+                [
+                  32,
+                  0,
+                  0
+                ]
+              ]
+            },
+            {
+              "row": 1,
+              "generation": 1,
+              "cells": [
+                [
+                  32,
+                  0,
+                  0
+                ],
+                [
+                  32,
+                  0,
+                  0
+                ],
+                [
+                  32,
+                  0,
+                  0
+                ],
+                [
+                  32,
+                  0,
+                  0
+                ],
+                [
+                  88,
+                  0,
+                  0
+                ],
+                [
+                  32,
+                  0,
+                  0
+                ],
+                [
+                  32,
+                  0,
+                  0
+                ],
+                [
+                  32,
+                  0,
+                  0
+                ]
+              ]
+            }
+          ],
+          "cursor": {
+            "row": 0,
+            "col": 0,
+            "shape": "block",
+            "visible": true
+          },
+          "expected": {
+            "needs_frame": true,
+            "revealing": [
+              {
+                "row": 0,
+                "col": 0,
+                "change_ms": 1000.0,
+                "elapsed_ms": 0.0,
+                "phase": "animating",
+                "boundary": 0.0,
+                "hidden_at": 1.0
+              },
+              {
+                "row": 0,
+                "col": 1,
+                "change_ms": 1000.0,
+                "elapsed_ms": 0.0,
+                "phase": "animating",
+                "boundary": 0.0,
+                "hidden_at": 1.0
+              },
+              {
+                "row": 0,
+                "col": 2,
+                "change_ms": 1000.0,
+                "elapsed_ms": 0.0,
+                "phase": "animating",
+                "boundary": 0.0,
+                "hidden_at": 1.0
+              },
+              {
+                "row": 0,
+                "col": 3,
+                "change_ms": 1000.0,
+                "elapsed_ms": 0.0,
+                "phase": "animating",
+                "boundary": 0.0,
+                "hidden_at": 1.0
+              },
+              {
+                "row": 0,
+                "col": 4,
+                "change_ms": 1000.0,
+                "elapsed_ms": 0.0,
+                "phase": "animating",
+                "boundary": 0.0,
+                "hidden_at": 1.0
+              },
+              {
+                "row": 0,
+                "col": 5,
+                "change_ms": 1000.0,
+                "elapsed_ms": 0.0,
+                "phase": "animating",
+                "boundary": 0.0,
+                "hidden_at": 1.0
+              },
+              {
+                "row": 0,
+                "col": 6,
+                "change_ms": 1000.0,
+                "elapsed_ms": 0.0,
+                "phase": "animating",
+                "boundary": 0.0,
+                "hidden_at": 1.0
+              },
+              {
+                "row": 0,
+                "col": 7,
+                "change_ms": 1000.0,
+                "elapsed_ms": 0.0,
+                "phase": "animating",
+                "boundary": 0.0,
+                "hidden_at": 1.0
+              },
+              {
+                "row": 1,
+                "col": 0,
+                "change_ms": 1000.0,
+                "elapsed_ms": 0.0,
+                "phase": "animating",
+                "boundary": 0.0,
+                "hidden_at": 1.0
+              },
+              {
+                "row": 1,
+                "col": 1,
+                "change_ms": 1000.0,
+                "elapsed_ms": 0.0,
+                "phase": "animating",
+                "boundary": 0.0,
+                "hidden_at": 1.0
+              },
+              {
+                "row": 1,
+                "col": 2,
+                "change_ms": 1000.0,
+                "elapsed_ms": 0.0,
+                "phase": "animating",
+                "boundary": 0.0,
+                "hidden_at": 1.0
+              },
+              {
+                "row": 1,
+                "col": 3,
+                "change_ms": 1000.0,
+                "elapsed_ms": 0.0,
+                "phase": "animating",
+                "boundary": 0.0,
+                "hidden_at": 1.0
+              },
+              {
+                "row": 1,
+                "col": 4,
+                "change_ms": 1000.0,
+                "elapsed_ms": 0.0,
+                "phase": "animating",
+                "boundary": 0.0,
+                "hidden_at": 1.0
+              },
+              {
+                "row": 1,
+                "col": 5,
+                "change_ms": 1000.0,
+                "elapsed_ms": 0.0,
+                "phase": "animating",
+                "boundary": 0.0,
+                "hidden_at": 1.0
+              },
+              {
+                "row": 1,
+                "col": 6,
+                "change_ms": 1000.0,
+                "elapsed_ms": 0.0,
+                "phase": "animating",
+                "boundary": 0.0,
+                "hidden_at": 1.0
+              },
+              {
+                "row": 1,
+                "col": 7,
+                "change_ms": 1000.0,
+                "elapsed_ms": 0.0,
+                "phase": "animating",
+                "boundary": 0.0,
+                "hidden_at": 1.0
+              }
+            ],
+            "pending": [],
+            "trail": {
+              "active": false,
+              "alpha": 0.0,
+              "elapsed_ms": 0.0,
+              "radius": 0.0,
+              "segment": null,
+              "glow": null
+            }
+          }
+        },
+        {
+          "now_ms": 1016,
+          "focus": true,
+          "damage": "clean",
+          "rows": [],
+          "cursor": {
+            "row": 0,
+            "col": 0,
+            "shape": "block",
+            "visible": true
+          },
+          "expected": {
+            "needs_frame": true,
+            "revealing": [
+              {
+                "row": 0,
+                "col": 0,
+                "change_ms": 1000.0,
+                "elapsed_ms": 16.0,
+                "phase": "animating",
+                "boundary": 0.13333333333333333,
+                "hidden_at": 0.8666666666666667
+              },
+              {
+                "row": 0,
+                "col": 1,
+                "change_ms": 1000.0,
+                "elapsed_ms": 16.0,
+                "phase": "animating",
+                "boundary": 0.13333333333333333,
+                "hidden_at": 0.8666666666666667
+              },
+              {
+                "row": 0,
+                "col": 2,
+                "change_ms": 1000.0,
+                "elapsed_ms": 16.0,
+                "phase": "animating",
+                "boundary": 0.13333333333333333,
+                "hidden_at": 0.8666666666666667
+              },
+              {
+                "row": 0,
+                "col": 3,
+                "change_ms": 1000.0,
+                "elapsed_ms": 16.0,
+                "phase": "animating",
+                "boundary": 0.13333333333333333,
+                "hidden_at": 0.8666666666666667
+              },
+              {
+                "row": 0,
+                "col": 4,
+                "change_ms": 1000.0,
+                "elapsed_ms": 16.0,
+                "phase": "animating",
+                "boundary": 0.13333333333333333,
+                "hidden_at": 0.8666666666666667
+              },
+              {
+                "row": 0,
+                "col": 5,
+                "change_ms": 1000.0,
+                "elapsed_ms": 16.0,
+                "phase": "animating",
+                "boundary": 0.13333333333333333,
+                "hidden_at": 0.8666666666666667
+              },
+              {
+                "row": 0,
+                "col": 6,
+                "change_ms": 1000.0,
+                "elapsed_ms": 16.0,
+                "phase": "animating",
+                "boundary": 0.13333333333333333,
+                "hidden_at": 0.8666666666666667
+              },
+              {
+                "row": 0,
+                "col": 7,
+                "change_ms": 1000.0,
+                "elapsed_ms": 16.0,
+                "phase": "animating",
+                "boundary": 0.13333333333333333,
+                "hidden_at": 0.8666666666666667
+              },
+              {
+                "row": 1,
+                "col": 0,
+                "change_ms": 1000.0,
+                "elapsed_ms": 16.0,
+                "phase": "animating",
+                "boundary": 0.13333333333333333,
+                "hidden_at": 0.8666666666666667
+              },
+              {
+                "row": 1,
+                "col": 1,
+                "change_ms": 1000.0,
+                "elapsed_ms": 16.0,
+                "phase": "animating",
+                "boundary": 0.13333333333333333,
+                "hidden_at": 0.8666666666666667
+              },
+              {
+                "row": 1,
+                "col": 2,
+                "change_ms": 1000.0,
+                "elapsed_ms": 16.0,
+                "phase": "animating",
+                "boundary": 0.13333333333333333,
+                "hidden_at": 0.8666666666666667
+              },
+              {
+                "row": 1,
+                "col": 3,
+                "change_ms": 1000.0,
+                "elapsed_ms": 16.0,
+                "phase": "animating",
+                "boundary": 0.13333333333333333,
+                "hidden_at": 0.8666666666666667
+              },
+              {
+                "row": 1,
+                "col": 4,
+                "change_ms": 1000.0,
+                "elapsed_ms": 16.0,
+                "phase": "animating",
+                "boundary": 0.13333333333333333,
+                "hidden_at": 0.8666666666666667
+              },
+              {
+                "row": 1,
+                "col": 5,
+                "change_ms": 1000.0,
+                "elapsed_ms": 16.0,
+                "phase": "animating",
+                "boundary": 0.13333333333333333,
+                "hidden_at": 0.8666666666666667
+              },
+              {
+                "row": 1,
+                "col": 6,
+                "change_ms": 1000.0,
+                "elapsed_ms": 16.0,
+                "phase": "animating",
+                "boundary": 0.13333333333333333,
+                "hidden_at": 0.8666666666666667
+              },
+              {
+                "row": 1,
+                "col": 7,
+                "change_ms": 1000.0,
+                "elapsed_ms": 16.0,
+                "phase": "animating",
+                "boundary": 0.13333333333333333,
+                "hidden_at": 0.8666666666666667
+              }
+            ],
+            "pending": [],
+            "trail": {
+              "active": false,
+              "alpha": 0.0,
+              "elapsed_ms": 0.0,
+              "radius": 0.0,
+              "segment": null,
+              "glow": null
+            }
+          }
+        },
+        {
+          "now_ms": 1048,
+          "focus": true,
+          "damage": "clean",
+          "rows": [],
+          "cursor": {
+            "row": 0,
+            "col": 0,
+            "shape": "block",
+            "visible": true
+          },
+          "expected": {
+            "needs_frame": true,
+            "revealing": [
+              {
+                "row": 0,
+                "col": 0,
+                "change_ms": 1000.0,
+                "elapsed_ms": 48.0,
+                "phase": "animating",
+                "boundary": 0.4,
+                "hidden_at": 0.6
+              },
+              {
+                "row": 0,
+                "col": 1,
+                "change_ms": 1000.0,
+                "elapsed_ms": 48.0,
+                "phase": "animating",
+                "boundary": 0.4,
+                "hidden_at": 0.6
+              },
+              {
+                "row": 0,
+                "col": 2,
+                "change_ms": 1000.0,
+                "elapsed_ms": 48.0,
+                "phase": "animating",
+                "boundary": 0.4,
+                "hidden_at": 0.6
+              },
+              {
+                "row": 0,
+                "col": 3,
+                "change_ms": 1000.0,
+                "elapsed_ms": 48.0,
+                "phase": "animating",
+                "boundary": 0.4,
+                "hidden_at": 0.6
+              },
+              {
+                "row": 0,
+                "col": 4,
+                "change_ms": 1000.0,
+                "elapsed_ms": 48.0,
+                "phase": "animating",
+                "boundary": 0.4,
+                "hidden_at": 0.6
+              },
+              {
+                "row": 0,
+                "col": 5,
+                "change_ms": 1000.0,
+                "elapsed_ms": 48.0,
+                "phase": "animating",
+                "boundary": 0.4,
+                "hidden_at": 0.6
+              },
+              {
+                "row": 0,
+                "col": 6,
+                "change_ms": 1000.0,
+                "elapsed_ms": 48.0,
+                "phase": "animating",
+                "boundary": 0.4,
+                "hidden_at": 0.6
+              },
+              {
+                "row": 0,
+                "col": 7,
+                "change_ms": 1000.0,
+                "elapsed_ms": 48.0,
+                "phase": "animating",
+                "boundary": 0.4,
+                "hidden_at": 0.6
+              },
+              {
+                "row": 1,
+                "col": 0,
+                "change_ms": 1000.0,
+                "elapsed_ms": 48.0,
+                "phase": "animating",
+                "boundary": 0.4,
+                "hidden_at": 0.6
+              },
+              {
+                "row": 1,
+                "col": 1,
+                "change_ms": 1000.0,
+                "elapsed_ms": 48.0,
+                "phase": "animating",
+                "boundary": 0.4,
+                "hidden_at": 0.6
+              },
+              {
+                "row": 1,
+                "col": 2,
+                "change_ms": 1000.0,
+                "elapsed_ms": 48.0,
+                "phase": "animating",
+                "boundary": 0.4,
+                "hidden_at": 0.6
+              },
+              {
+                "row": 1,
+                "col": 3,
+                "change_ms": 1000.0,
+                "elapsed_ms": 48.0,
+                "phase": "animating",
+                "boundary": 0.4,
+                "hidden_at": 0.6
+              },
+              {
+                "row": 1,
+                "col": 4,
+                "change_ms": 1000.0,
+                "elapsed_ms": 48.0,
+                "phase": "animating",
+                "boundary": 0.4,
+                "hidden_at": 0.6
+              },
+              {
+                "row": 1,
+                "col": 5,
+                "change_ms": 1000.0,
+                "elapsed_ms": 48.0,
+                "phase": "animating",
+                "boundary": 0.4,
+                "hidden_at": 0.6
+              },
+              {
+                "row": 1,
+                "col": 6,
+                "change_ms": 1000.0,
+                "elapsed_ms": 48.0,
+                "phase": "animating",
+                "boundary": 0.4,
+                "hidden_at": 0.6
+              },
+              {
+                "row": 1,
+                "col": 7,
+                "change_ms": 1000.0,
+                "elapsed_ms": 48.0,
+                "phase": "animating",
+                "boundary": 0.4,
+                "hidden_at": 0.6
+              }
+            ],
+            "pending": [],
+            "trail": {
+              "active": false,
+              "alpha": 0.0,
+              "elapsed_ms": 0.0,
+              "radius": 0.0,
+              "segment": null,
+              "glow": null
+            }
+          }
+        },
+        {
+          "now_ms": 1096,
+          "focus": true,
+          "damage": "clean",
+          "rows": [],
+          "cursor": {
+            "row": 0,
+            "col": 0,
+            "shape": "block",
+            "visible": true
+          },
+          "expected": {
+            "needs_frame": true,
+            "revealing": [
+              {
+                "row": 0,
+                "col": 0,
+                "change_ms": 1000.0,
+                "elapsed_ms": 96.0,
+                "phase": "animating",
+                "boundary": 0.8,
+                "hidden_at": 0.09999999999999998
+              },
+              {
+                "row": 0,
+                "col": 1,
+                "change_ms": 1000.0,
+                "elapsed_ms": 96.0,
+                "phase": "animating",
+                "boundary": 0.8,
+                "hidden_at": 0.09999999999999998
+              },
+              {
+                "row": 0,
+                "col": 2,
+                "change_ms": 1000.0,
+                "elapsed_ms": 96.0,
+                "phase": "animating",
+                "boundary": 0.8,
+                "hidden_at": 0.09999999999999998
+              },
+              {
+                "row": 0,
+                "col": 3,
+                "change_ms": 1000.0,
+                "elapsed_ms": 96.0,
+                "phase": "animating",
+                "boundary": 0.8,
+                "hidden_at": 0.09999999999999998
+              },
+              {
+                "row": 0,
+                "col": 4,
+                "change_ms": 1000.0,
+                "elapsed_ms": 96.0,
+                "phase": "animating",
+                "boundary": 0.8,
+                "hidden_at": 0.09999999999999998
+              },
+              {
+                "row": 0,
+                "col": 5,
+                "change_ms": 1000.0,
+                "elapsed_ms": 96.0,
+                "phase": "animating",
+                "boundary": 0.8,
+                "hidden_at": 0.09999999999999998
+              },
+              {
+                "row": 0,
+                "col": 6,
+                "change_ms": 1000.0,
+                "elapsed_ms": 96.0,
+                "phase": "animating",
+                "boundary": 0.8,
+                "hidden_at": 0.09999999999999998
+              },
+              {
+                "row": 0,
+                "col": 7,
+                "change_ms": 1000.0,
+                "elapsed_ms": 96.0,
+                "phase": "animating",
+                "boundary": 0.8,
+                "hidden_at": 0.09999999999999998
+              },
+              {
+                "row": 1,
+                "col": 0,
+                "change_ms": 1000.0,
+                "elapsed_ms": 96.0,
+                "phase": "animating",
+                "boundary": 0.8,
+                "hidden_at": 0.09999999999999998
+              },
+              {
+                "row": 1,
+                "col": 1,
+                "change_ms": 1000.0,
+                "elapsed_ms": 96.0,
+                "phase": "animating",
+                "boundary": 0.8,
+                "hidden_at": 0.09999999999999998
+              },
+              {
+                "row": 1,
+                "col": 2,
+                "change_ms": 1000.0,
+                "elapsed_ms": 96.0,
+                "phase": "animating",
+                "boundary": 0.8,
+                "hidden_at": 0.09999999999999998
+              },
+              {
+                "row": 1,
+                "col": 3,
+                "change_ms": 1000.0,
+                "elapsed_ms": 96.0,
+                "phase": "animating",
+                "boundary": 0.8,
+                "hidden_at": 0.09999999999999998
+              },
+              {
+                "row": 1,
+                "col": 4,
+                "change_ms": 1000.0,
+                "elapsed_ms": 96.0,
+                "phase": "animating",
+                "boundary": 0.8,
+                "hidden_at": 0.09999999999999998
+              },
+              {
+                "row": 1,
+                "col": 5,
+                "change_ms": 1000.0,
+                "elapsed_ms": 96.0,
+                "phase": "animating",
+                "boundary": 0.8,
+                "hidden_at": 0.09999999999999998
+              },
+              {
+                "row": 1,
+                "col": 6,
+                "change_ms": 1000.0,
+                "elapsed_ms": 96.0,
+                "phase": "animating",
+                "boundary": 0.8,
+                "hidden_at": 0.09999999999999998
+              },
+              {
+                "row": 1,
+                "col": 7,
+                "change_ms": 1000.0,
+                "elapsed_ms": 96.0,
+                "phase": "animating",
+                "boundary": 0.8,
+                "hidden_at": 0.09999999999999998
+              }
+            ],
+            "pending": [],
+            "trail": {
+              "active": false,
+              "alpha": 0.0,
+              "elapsed_ms": 0.0,
+              "radius": 0.0,
+              "segment": null,
+              "glow": null
+            }
+          }
+        },
+        {
+          "now_ms": 1112,
+          "focus": true,
+          "damage": "clean",
+          "rows": [],
+          "cursor": {
+            "row": 0,
+            "col": 0,
+            "shape": "block",
+            "visible": true
+          },
+          "expected": {
+            "needs_frame": true,
+            "revealing": [
+              {
+                "row": 0,
+                "col": 0,
+                "change_ms": 1000.0,
+                "elapsed_ms": 112.0,
+                "phase": "animating",
+                "boundary": 0.9333333333333333,
+                "hidden_at": 0.0
+              },
+              {
+                "row": 0,
+                "col": 1,
+                "change_ms": 1000.0,
+                "elapsed_ms": 112.0,
+                "phase": "animating",
+                "boundary": 0.9333333333333333,
+                "hidden_at": 0.0
+              },
+              {
+                "row": 0,
+                "col": 2,
+                "change_ms": 1000.0,
+                "elapsed_ms": 112.0,
+                "phase": "animating",
+                "boundary": 0.9333333333333333,
+                "hidden_at": 0.0
+              },
+              {
+                "row": 0,
+                "col": 3,
+                "change_ms": 1000.0,
+                "elapsed_ms": 112.0,
+                "phase": "animating",
+                "boundary": 0.9333333333333333,
+                "hidden_at": 0.0
+              },
+              {
+                "row": 0,
+                "col": 4,
+                "change_ms": 1000.0,
+                "elapsed_ms": 112.0,
+                "phase": "animating",
+                "boundary": 0.9333333333333333,
+                "hidden_at": 0.0
+              },
+              {
+                "row": 0,
+                "col": 5,
+                "change_ms": 1000.0,
+                "elapsed_ms": 112.0,
+                "phase": "animating",
+                "boundary": 0.9333333333333333,
+                "hidden_at": 0.0
+              },
+              {
+                "row": 0,
+                "col": 6,
+                "change_ms": 1000.0,
+                "elapsed_ms": 112.0,
+                "phase": "animating",
+                "boundary": 0.9333333333333333,
+                "hidden_at": 0.0
+              },
+              {
+                "row": 0,
+                "col": 7,
+                "change_ms": 1000.0,
+                "elapsed_ms": 112.0,
+                "phase": "animating",
+                "boundary": 0.9333333333333333,
+                "hidden_at": 0.0
+              },
+              {
+                "row": 1,
+                "col": 0,
+                "change_ms": 1000.0,
+                "elapsed_ms": 112.0,
+                "phase": "animating",
+                "boundary": 0.9333333333333333,
+                "hidden_at": 0.0
+              },
+              {
+                "row": 1,
+                "col": 1,
+                "change_ms": 1000.0,
+                "elapsed_ms": 112.0,
+                "phase": "animating",
+                "boundary": 0.9333333333333333,
+                "hidden_at": 0.0
+              },
+              {
+                "row": 1,
+                "col": 2,
+                "change_ms": 1000.0,
+                "elapsed_ms": 112.0,
+                "phase": "animating",
+                "boundary": 0.9333333333333333,
+                "hidden_at": 0.0
+              },
+              {
+                "row": 1,
+                "col": 3,
+                "change_ms": 1000.0,
+                "elapsed_ms": 112.0,
+                "phase": "animating",
+                "boundary": 0.9333333333333333,
+                "hidden_at": 0.0
+              },
+              {
+                "row": 1,
+                "col": 4,
+                "change_ms": 1000.0,
+                "elapsed_ms": 112.0,
+                "phase": "animating",
+                "boundary": 0.9333333333333333,
+                "hidden_at": 0.0
+              },
+              {
+                "row": 1,
+                "col": 5,
+                "change_ms": 1000.0,
+                "elapsed_ms": 112.0,
+                "phase": "animating",
+                "boundary": 0.9333333333333333,
+                "hidden_at": 0.0
+              },
+              {
+                "row": 1,
+                "col": 6,
+                "change_ms": 1000.0,
+                "elapsed_ms": 112.0,
+                "phase": "animating",
+                "boundary": 0.9333333333333333,
+                "hidden_at": 0.0
+              },
+              {
+                "row": 1,
+                "col": 7,
+                "change_ms": 1000.0,
+                "elapsed_ms": 112.0,
+                "phase": "animating",
+                "boundary": 0.9333333333333333,
+                "hidden_at": 0.0
+              }
+            ],
+            "pending": [],
+            "trail": {
+              "active": false,
+              "alpha": 0.0,
+              "elapsed_ms": 0.0,
+              "radius": 0.0,
+              "segment": null,
+              "glow": null
+            }
+          }
+        },
+        {
+          "now_ms": 1120,
+          "focus": true,
+          "damage": "clean",
+          "rows": [],
+          "cursor": {
+            "row": 0,
+            "col": 0,
+            "shape": "block",
+            "visible": true
+          },
+          "expected": {
+            "needs_frame": false,
+            "revealing": [],
+            "pending": [],
+            "trail": {
+              "active": false,
+              "alpha": 0.0,
+              "elapsed_ms": 0.0,
+              "radius": 0.0,
+              "segment": null,
+              "glow": null
+            }
+          }
+        },
+        {
+          "now_ms": 2000,
+          "focus": true,
+          "damage": "clean",
+          "rows": [],
+          "cursor": {
+            "row": 0,
+            "col": 0,
+            "shape": "block",
+            "visible": true
+          },
+          "expected": {
+            "needs_frame": false,
+            "revealing": [],
+            "pending": [],
+            "trail": {
+              "active": false,
+              "alpha": 0.0,
+              "elapsed_ms": 0.0,
+              "radius": 0.0,
+              "segment": null,
+              "glow": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "streaming-sentinel-pass-through",
+      "name": "unchanged cells never appear and never schedule",
+      "kind": "sequence",
+      "config": {
+        "text_animation": "streaming",
+        "text_animation_duration_ms": 120,
+        "text_animation_intensity": 1.0,
+        "cursor_trail": false,
+        "cursor_trail_opacity": 0.35,
+        "cursor_trail_duration_ms": 250,
+        "max_tracked_cells": 256
+      },
+      "grid": {
+        "cols": 8,
+        "rows": 3
+      },
+      "cell_px": {
+        "width": 10.0,
+        "height": 20.0
+      },
+      "sample_x": 9.0,
+      "steps": [
+        {
+          "now_ms": 1000,
+          "focus": true,
+          "damage": "clean",
+          "rows": [],
+          "cursor": {
+            "row": 0,
+            "col": 0,
+            "shape": "block",
+            "visible": true
+          },
+          "expected": {
+            "needs_frame": false,
+            "revealing": [],
+            "pending": [],
+            "trail": {
+              "active": false,
+              "alpha": 0.0,
+              "elapsed_ms": 0.0,
+              "radius": 0.0,
+              "segment": null,
+              "glow": null
+            }
+          }
+        },
+        {
+          "now_ms": 1016,
+          "focus": true,
+          "damage": "clean",
+          "rows": [],
+          "cursor": {
+            "row": 0,
+            "col": 0,
+            "shape": "block",
+            "visible": true
+          },
+          "expected": {
+            "needs_frame": false,
+            "revealing": [],
+            "pending": [],
+            "trail": {
+              "active": false,
+              "alpha": 0.0,
+              "elapsed_ms": 0.0,
+              "radius": 0.0,
+              "segment": null,
+              "glow": null
+            }
+          }
+        },
+        {
+          "now_ms": 2000,
+          "focus": true,
+          "damage": "clean",
+          "rows": [],
+          "cursor": {
+            "row": 0,
+            "col": 0,
+            "shape": "block",
+            "visible": true
+          },
+          "expected": {
+            "needs_frame": false,
+            "revealing": [],
+            "pending": [],
+            "trail": {
+              "active": false,
+              "alpha": 0.0,
+              "elapsed_ms": 0.0,
+              "radius": 0.0,
+              "segment": null,
+              "glow": null
+            }
+          }
+        }
+      ],
+      "expected_texture_len": 96
+    },
+    {
+      "id": "typewriter-stagger-burst",
+      "name": "typewriter stagger, pending concealment, expiry at last stamp + duration",
+      "kind": "sequence",
+      "config": {
+        "text_animation": "typewriter",
+        "text_animation_duration_ms": 120,
+        "text_animation_intensity": 1.0,
+        "cursor_trail": false,
+        "cursor_trail_opacity": 0.35,
+        "cursor_trail_duration_ms": 250,
+        "max_tracked_cells": 256
+      },
+      "grid": {
+        "cols": 4,
+        "rows": 1
+      },
+      "cell_px": {
+        "width": 10.0,
+        "height": 20.0
+      },
+      "sample_x": 9.0,
+      "steps": [
+        {
+          "now_ms": 1000,
+          "focus": true,
+          "damage": "partial",
+          "rows": [
+            {
+              "row": 0,
+              "generation": 1,
+              "cells": [
+                [
+                  65,
+                  0,
+                  0
+                ],
+                [
+                  66,
+                  0,
+                  0
+                ],
+                [
+                  67,
+                  0,
+                  0
+                ],
+                [
+                  32,
+                  0,
+                  0
+                ]
+              ]
+            }
+          ],
+          "cursor": {
+            "row": 0,
+            "col": 0,
+            "shape": "block",
+            "visible": true
+          },
+          "expected": {
+            "needs_frame": true,
+            "revealing": [
+              {
+                "row": 0,
+                "col": 0,
+                "change_ms": 1000.0,
+                "elapsed_ms": 0.0,
+                "phase": "animating",
+                "boundary": 0.0,
+                "hidden_at": 1.0
+              }
+            ],
+            "pending": [
+              {
+                "row": 0,
+                "col": 1
+              },
+              {
+                "row": 0,
+                "col": 2
+              },
+              {
+                "row": 0,
+                "col": 3
+              }
+            ],
+            "trail": {
+              "active": false,
+              "alpha": 0.0,
+              "elapsed_ms": 0.0,
+              "radius": 0.0,
+              "segment": null,
+              "glow": null
+            }
+          }
+        },
+        {
+          "now_ms": 1010,
+          "focus": true,
+          "damage": "clean",
+          "rows": [],
+          "cursor": {
+            "row": 0,
+            "col": 0,
+            "shape": "block",
+            "visible": true
+          },
+          "expected": {
+            "needs_frame": true,
+            "revealing": [
+              {
+                "row": 0,
+                "col": 0,
+                "change_ms": 1000.0,
+                "elapsed_ms": 10.0,
+                "phase": "animating",
+                "boundary": 0.3333333333333333,
+                "hidden_at": 0.6666666666666667
+              }
+            ],
+            "pending": [
+              {
+                "row": 0,
+                "col": 1
+              },
+              {
+                "row": 0,
+                "col": 2
+              },
+              {
+                "row": 0,
+                "col": 3
+              }
+            ],
+            "trail": {
+              "active": false,
+              "alpha": 0.0,
+              "elapsed_ms": 0.0,
+              "radius": 0.0,
+              "segment": null,
+              "glow": null
+            }
+          }
+        },
+        {
+          "now_ms": 1016,
+          "focus": true,
+          "damage": "clean",
+          "rows": [],
+          "cursor": {
+            "row": 0,
+            "col": 0,
+            "shape": "block",
+            "visible": true
+          },
+          "expected": {
+            "needs_frame": true,
+            "revealing": [
+              {
+                "row": 0,
+                "col": 0,
+                "change_ms": 1000.0,
+                "elapsed_ms": 16.0,
+                "phase": "animating",
+                "boundary": 0.5333333333333333,
+                "hidden_at": 0.4666666666666667
+              },
+              {
+                "row": 0,
+                "col": 1,
+                "change_ms": 1015.0,
+                "elapsed_ms": 1.0,
+                "phase": "animating",
+                "boundary": 0.03333333333333333,
+                "hidden_at": 0.9666666666666667
+              }
+            ],
+            "pending": [
+              {
+                "row": 0,
+                "col": 2
+              },
+              {
+                "row": 0,
+                "col": 3
+              }
+            ],
+            "trail": {
+              "active": false,
+              "alpha": 0.0,
+              "elapsed_ms": 0.0,
+              "radius": 0.0,
+              "segment": null,
+              "glow": null
+            }
+          }
+        },
+        {
+          "now_ms": 1030,
+          "focus": true,
+          "damage": "clean",
+          "rows": [],
+          "cursor": {
+            "row": 0,
+            "col": 0,
+            "shape": "block",
+            "visible": true
+          },
+          "expected": {
+            "needs_frame": true,
+            "revealing": [
+              {
+                "row": 0,
+                "col": 0,
+                "change_ms": 1000.0,
+                "elapsed_ms": 30.0,
+                "phase": "animating",
+                "boundary": 1.0,
+                "hidden_at": 0.0
+              },
+              {
+                "row": 0,
+                "col": 1,
+                "change_ms": 1015.0,
+                "elapsed_ms": 15.0,
+                "phase": "animating",
+                "boundary": 0.5,
+                "hidden_at": 0.5
+              },
+              {
+                "row": 0,
+                "col": 2,
+                "change_ms": 1030.0,
+                "elapsed_ms": 0.0,
+                "phase": "animating",
+                "boundary": 0.0,
+                "hidden_at": 1.0
+              }
+            ],
+            "pending": [
+              {
+                "row": 0,
+                "col": 3
+              }
+            ],
+            "trail": {
+              "active": false,
+              "alpha": 0.0,
+              "elapsed_ms": 0.0,
+              "radius": 0.0,
+              "segment": null,
+              "glow": null
+            }
+          }
+        },
+        {
+          "now_ms": 1045,
+          "focus": true,
+          "damage": "clean",
+          "rows": [],
+          "cursor": {
+            "row": 0,
+            "col": 0,
+            "shape": "block",
+            "visible": true
+          },
+          "expected": {
+            "needs_frame": true,
+            "revealing": [
+              {
+                "row": 0,
+                "col": 0,
+                "change_ms": 1000.0,
+                "elapsed_ms": 45.0,
+                "phase": "animating",
+                "boundary": 1.0,
+                "hidden_at": 0.0
+              },
+              {
+                "row": 0,
+                "col": 1,
+                "change_ms": 1015.0,
+                "elapsed_ms": 30.0,
+                "phase": "animating",
+                "boundary": 1.0,
+                "hidden_at": 0.0
+              },
+              {
+                "row": 0,
+                "col": 2,
+                "change_ms": 1030.0,
+                "elapsed_ms": 15.0,
+                "phase": "animating",
+                "boundary": 0.5,
+                "hidden_at": 0.5
+              },
+              {
+                "row": 0,
+                "col": 3,
+                "change_ms": 1045.0,
+                "elapsed_ms": 0.0,
+                "phase": "animating",
+                "boundary": 0.0,
+                "hidden_at": 1.0
+              }
+            ],
+            "pending": [],
+            "trail": {
+              "active": false,
+              "alpha": 0.0,
+              "elapsed_ms": 0.0,
+              "radius": 0.0,
+              "segment": null,
+              "glow": null
+            }
+          }
+        },
+        {
+          "now_ms": 1150,
+          "focus": true,
+          "damage": "clean",
+          "rows": [],
+          "cursor": {
+            "row": 0,
+            "col": 0,
+            "shape": "block",
+            "visible": true
+          },
+          "expected": {
+            "needs_frame": true,
+            "revealing": [
+              {
+                "row": 0,
+                "col": 3,
+                "change_ms": 1045.0,
+                "elapsed_ms": 105.0,
+                "phase": "animating",
+                "boundary": 1.0,
+                "hidden_at": 0.0
+              }
+            ],
+            "pending": [],
+            "trail": {
+              "active": false,
+              "alpha": 0.0,
+              "elapsed_ms": 0.0,
+              "radius": 0.0,
+              "segment": null,
+              "glow": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "typewriter-across-rebuilds",
+      "name": "persistent burst schedules adjacent rebuilds in reading order",
+      "kind": "sequence",
+      "config": {
+        "text_animation": "typewriter",
+        "text_animation_duration_ms": 120,
+        "text_animation_intensity": 1.0,
+        "cursor_trail": false,
+        "cursor_trail_opacity": 0.35,
+        "cursor_trail_duration_ms": 250,
+        "max_tracked_cells": 256
+      },
+      "grid": {
+        "cols": 4,
+        "rows": 1
+      },
+      "cell_px": {
+        "width": 10.0,
+        "height": 20.0
+      },
+      "sample_x": 9.0,
+      "steps": [
+        {
+          "now_ms": 1000,
+          "focus": true,
+          "damage": "partial",
+          "rows": [
+            {
+              "row": 0,
+              "generation": 1,
+              "cells": [
+                [
+                  65,
+                  0,
+                  0
+                ],
+                [
+                  32,
+                  0,
+                  0
+                ],
+                [
+                  32,
+                  0,
+                  0
+                ],
+                [
+                  32,
+                  0,
+                  0
+                ]
+              ]
+            }
+          ],
+          "cursor": {
+            "row": 0,
+            "col": 0,
+            "shape": "block",
+            "visible": true
+          },
+          "expected": {
+            "needs_frame": true,
+            "revealing": [
+              {
+                "row": 0,
+                "col": 0,
+                "change_ms": 1000.0,
+                "elapsed_ms": 0.0,
+                "phase": "animating",
+                "boundary": 0.0,
+                "hidden_at": 1.0
+              }
+            ],
+            "pending": [
+              {
+                "row": 0,
+                "col": 1
+              },
+              {
+                "row": 0,
+                "col": 2
+              },
+              {
+                "row": 0,
+                "col": 3
+              }
+            ],
+            "trail": {
+              "active": false,
+              "alpha": 0.0,
+              "elapsed_ms": 0.0,
+              "radius": 0.0,
+              "segment": null,
+              "glow": null
+            }
+          }
+        },
+        {
+          "now_ms": 1016,
+          "focus": true,
+          "damage": "partial",
+          "rows": [
+            {
+              "row": 0,
+              "generation": 2,
+              "cells": [
+                [
+                  65,
+                  0,
+                  0
+                ],
+                [
+                  66,
+                  0,
+                  0
+                ],
+                [
+                  32,
+                  0,
+                  0
+                ],
+                [
+                  32,
+                  0,
+                  0
+                ]
+              ]
+            }
+          ],
+          "cursor": {
+            "row": 0,
+            "col": 0,
+            "shape": "block",
+            "visible": true
+          },
+          "expected": {
+            "needs_frame": true,
+            "revealing": [
+              {
+                "row": 0,
+                "col": 0,
+                "change_ms": 1000.0,
+                "elapsed_ms": 16.0,
+                "phase": "animating",
+                "boundary": 0.5333333333333333,
+                "hidden_at": 0.4666666666666667
+              }
+            ],
+            "pending": [
+              {
+                "row": 0,
+                "col": 1
+              },
+              {
+                "row": 0,
+                "col": 2
+              },
+              {
+                "row": 0,
+                "col": 3
+              }
+            ],
+            "trail": {
+              "active": false,
+              "alpha": 0.0,
+              "elapsed_ms": 0.0,
+              "radius": 0.0,
+              "segment": null,
+              "glow": null
+            }
+          }
+        },
+        {
+          "now_ms": 1032,
+          "focus": true,
+          "damage": "partial",
+          "rows": [
+            {
+              "row": 0,
+              "generation": 3,
+              "cells": [
+                [
+                  65,
+                  0,
+                  0
+                ],
+                [
+                  66,
+                  0,
+                  0
+                ],
+                [
+                  67,
+                  0,
+                  0
+                ],
+                [
+                  32,
+                  0,
+                  0
+                ]
+              ]
+            }
+          ],
+          "cursor": {
+            "row": 0,
+            "col": 0,
+            "shape": "block",
+            "visible": true
+          },
+          "expected": {
+            "needs_frame": true,
+            "revealing": [
+              {
+                "row": 0,
+                "col": 0,
+                "change_ms": 1000.0,
+                "elapsed_ms": 32.0,
+                "phase": "animating",
+                "boundary": 1.0,
+                "hidden_at": 0.0
+              }
+            ],
+            "pending": [
+              {
+                "row": 0,
+                "col": 1
+              },
+              {
+                "row": 0,
+                "col": 2
+              },
+              {
+                "row": 0,
+                "col": 3
+              }
+            ],
+            "trail": {
+              "active": false,
+              "alpha": 0.0,
+              "elapsed_ms": 0.0,
+              "radius": 0.0,
+              "segment": null,
+              "glow": null
+            }
+          }
+        },
+        {
+          "now_ms": 2000,
+          "focus": true,
+          "damage": "partial",
+          "rows": [
+            {
+              "row": 0,
+              "generation": 4,
+              "cells": [
+                [
+                  90,
+                  0,
+                  0
+                ],
+                [
+                  66,
+                  0,
+                  0
+                ],
+                [
+                  67,
+                  0,
+                  0
+                ],
+                [
+                  32,
+                  0,
+                  0
+                ]
+              ]
+            }
+          ],
+          "cursor": {
+            "row": 0,
+            "col": 0,
+            "shape": "block",
+            "visible": true
+          },
+          "expected": {
+            "needs_frame": true,
+            "revealing": [
+              {
+                "row": 0,
+                "col": 0,
+                "change_ms": 2000.0,
+                "elapsed_ms": 0.0,
+                "phase": "animating",
+                "boundary": 0.0,
+                "hidden_at": 1.0
+              }
+            ],
+            "pending": [],
+            "trail": {
+              "active": false,
+              "alpha": 0.0,
+              "elapsed_ms": 0.0,
+              "radius": 0.0,
+              "segment": null,
+              "glow": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "typewriter-max-ahead",
+      "name": "sustained output never grows the animation window past max_ahead",
+      "kind": "sequence",
+      "config": {
+        "text_animation": "typewriter",
+        "text_animation_duration_ms": 120,
+        "text_animation_intensity": 1.0,
+        "cursor_trail": false,
+        "cursor_trail_opacity": 0.35,
+        "cursor_trail_duration_ms": 250,
+        "max_tracked_cells": 256
+      },
+      "grid": {
+        "cols": 74,
+        "rows": 1
+      },
+      "cell_px": {
+        "width": 10.0,
+        "height": 20.0
+      },
+      "sample_x": 9.0,
+      "steps": [
+        {
+          "now_ms": 1000,
+          "focus": true,
+          "damage": "partial",
+          "rows": [
+            {
+              "row": 0,
+              "generation": 1,
+              "cells": [
+                [
+                  65,
+                  0,
+                  0
+                ],
+                [
+                  66,
+                  0,
+                  0
+                ],
+                [
+                  67,
+                  0,
+                  0
+                ],
+                [
+                  68,
+                  0,
+                  0
+                ],
+                [
+                  69,
+                  0,
+                  0
+                ],
+                [
+                  70,
+                  0,
+                  0
+                ],
+                [
+                  71,
+                  0,
+                  0
+                ],
+                [
+                  72,
+                  0,
+                  0
+                ],
+                [
+                  73,
+                  0,
+                  0
+                ],
+                [
+                  74,
+                  0,
+                  0
+                ],
+                [
+                  75,
+                  0,
+                  0
+                ],
+                [
+                  76,
+                  0,
+                  0
+                ],
+                [
+                  77,
+                  0,
+                  0
+                ],
+                [
+                  78,
+                  0,
+                  0
+                ],
+                [
+                  79,
+                  0,
+                  0
+                ],
+                [
+                  80,
+                  0,
+                  0
+                ],
+                [
+                  81,
+                  0,
+                  0
+                ],
+                [
+                  82,
+                  0,
+                  0
+                ],
+                [
+                  83,
+                  0,
+                  0
+                ],
+                [
+                  84,
+                  0,
+                  0
+                ],
+                [
+                  85,
+                  0,
+                  0
+                ],
+                [
+                  86,
+                  0,
+                  0
+                ],
+                [
+                  87,
+                  0,
+                  0
+                ],
+                [
+                  88,
+                  0,
+                  0
+                ],
+                [
+                  89,
+                  0,
+                  0
+                ],
+                [
+                  90,
+                  0,
+                  0
+                ],
+                [
+                  65,
+                  0,
+                  0
+                ],
+                [
+                  66,
+                  0,
+                  0
+                ],
+                [
+                  67,
+                  0,
+                  0
+                ],
+                [
+                  68,
+                  0,
+                  0
+                ],
+                [
+                  69,
+                  0,
+                  0
+                ],
+                [
+                  70,
+                  0,
+                  0
+                ],
+                [
+                  71,
+                  0,
+                  0
+                ],
+                [
+                  72,
+                  0,
+                  0
+                ],
+                [
+                  73,
+                  0,
+                  0
+                ],
+                [
+                  74,
+                  0,
+                  0
+                ],
+                [
+                  75,
+                  0,
+                  0
+                ],
+                [
+                  76,
+                  0,
+                  0
+                ],
+                [
+                  77,
+                  0,
+                  0
+                ],
+                [
+                  78,
+                  0,
+                  0
+                ],
+                [
+                  79,
+                  0,
+                  0
+                ],
+                [
+                  80,
+                  0,
+                  0
+                ],
+                [
+                  81,
+                  0,
+                  0
+                ],
+                [
+                  82,
+                  0,
+                  0
+                ],
+                [
+                  83,
+                  0,
+                  0
+                ],
+                [
+                  84,
+                  0,
+                  0
+                ],
+                [
+                  85,
+                  0,
+                  0
+                ],
+                [
+                  86,
+                  0,
+                  0
+                ],
+                [
+                  87,
+                  0,
+                  0
+                ],
+                [
+                  88,
+                  0,
+                  0
+                ],
+                [
+                  89,
+                  0,
+                  0
+                ],
+                [
+                  90,
+                  0,
+                  0
+                ],
+                [
+                  65,
+                  0,
+                  0
+                ],
+                [
+                  66,
+                  0,
+                  0
+                ],
+                [
+                  67,
+                  0,
+                  0
+                ],
+                [
+                  68,
+                  0,
+                  0
+                ],
+                [
+                  69,
+                  0,
+                  0
+                ],
+                [
+                  70,
+                  0,
+                  0
+                ],
+                [
+                  71,
+                  0,
+                  0
+                ],
+                [
+                  72,
+                  0,
+                  0
+                ],
+                [
+                  73,
+                  0,
+                  0
+                ],
+                [
+                  74,
+                  0,
+                  0
+                ],
+                [
+                  75,
+                  0,
+                  0
+                ],
+                [
+                  76,
+                  0,
+                  0
+                ],
+                [
+                  77,
+                  0,
+                  0
+                ],
+                [
+                  78,
+                  0,
+                  0
+                ],
+                [
+                  79,
+                  0,
+                  0
+                ],
+                [
+                  80,
+                  0,
+                  0
+                ],
+                [
+                  81,
+                  0,
+                  0
+                ],
+                [
+                  82,
+                  0,
+                  0
+                ],
+                [
+                  83,
+                  0,
+                  0
+                ],
+                [
+                  84,
+                  0,
+                  0
+                ],
+                [
+                  85,
+                  0,
+                  0
+                ],
+                [
+                  86,
+                  0,
+                  0
+                ]
+              ]
+            }
+          ],
+          "cursor": {
+            "row": 0,
+            "col": 0,
+            "shape": "block",
+            "visible": true
+          },
+          "expected": {
+            "needs_frame": true,
+            "revealing": [
+              {
+                "row": 0,
+                "col": 0,
+                "change_ms": 1000.0,
+                "elapsed_ms": 0.0,
+                "phase": "animating",
+                "boundary": 0.0,
+                "hidden_at": 1.0
+              }
+            ],
+            "pending": [
+              {
+                "row": 0,
+                "col": 1
+              },
+              {
+                "row": 0,
+                "col": 2
+              },
+              {
+                "row": 0,
+                "col": 3
+              },
+              {
+                "row": 0,
+                "col": 4
+              },
+              {
+                "row": 0,
+                "col": 5
+              },
+              {
+                "row": 0,
+                "col": 6
+              },
+              {
+                "row": 0,
+                "col": 7
+              },
+              {
+                "row": 0,
+                "col": 8
+              },
+              {
+                "row": 0,
+                "col": 9
+              },
+              {
+                "row": 0,
+                "col": 10
+              },
+              {
+                "row": 0,
+                "col": 11
+              },
+              {
+                "row": 0,
+                "col": 12
+              },
+              {
+                "row": 0,
+                "col": 13
+              },
+              {
+                "row": 0,
+                "col": 14
+              },
+              {
+                "row": 0,
+                "col": 15
+              },
+              {
+                "row": 0,
+                "col": 16
+              },
+              {
+                "row": 0,
+                "col": 17
+              },
+              {
+                "row": 0,
+                "col": 18
+              },
+              {
+                "row": 0,
+                "col": 19
+              },
+              {
+                "row": 0,
+                "col": 20
+              },
+              {
+                "row": 0,
+                "col": 21
+              },
+              {
+                "row": 0,
+                "col": 22
+              },
+              {
+                "row": 0,
+                "col": 23
+              },
+              {
+                "row": 0,
+                "col": 24
+              },
+              {
+                "row": 0,
+                "col": 25
+              },
+              {
+                "row": 0,
+                "col": 26
+              },
+              {
+                "row": 0,
+                "col": 27
+              },
+              {
+                "row": 0,
+                "col": 28
+              },
+              {
+                "row": 0,
+                "col": 29
+              },
+              {
+                "row": 0,
+                "col": 30
+              },
+              {
+                "row": 0,
+                "col": 31
+              },
+              {
+                "row": 0,
+                "col": 32
+              },
+              {
+                "row": 0,
+                "col": 33
+              },
+              {
+                "row": 0,
+                "col": 34
+              },
+              {
+                "row": 0,
+                "col": 35
+              },
+              {
+                "row": 0,
+                "col": 36
+              },
+              {
+                "row": 0,
+                "col": 37
+              },
+              {
+                "row": 0,
+                "col": 38
+              },
+              {
+                "row": 0,
+                "col": 39
+              },
+              {
+                "row": 0,
+                "col": 40
+              },
+              {
+                "row": 0,
+                "col": 41
+              },
+              {
+                "row": 0,
+                "col": 42
+              },
+              {
+                "row": 0,
+                "col": 43
+              },
+              {
+                "row": 0,
+                "col": 44
+              },
+              {
+                "row": 0,
+                "col": 45
+              },
+              {
+                "row": 0,
+                "col": 46
+              },
+              {
+                "row": 0,
+                "col": 47
+              },
+              {
+                "row": 0,
+                "col": 48
+              },
+              {
+                "row": 0,
+                "col": 49
+              },
+              {
+                "row": 0,
+                "col": 50
+              },
+              {
+                "row": 0,
+                "col": 51
+              },
+              {
+                "row": 0,
+                "col": 52
+              },
+              {
+                "row": 0,
+                "col": 53
+              },
+              {
+                "row": 0,
+                "col": 54
+              },
+              {
+                "row": 0,
+                "col": 55
+              },
+              {
+                "row": 0,
+                "col": 56
+              },
+              {
+                "row": 0,
+                "col": 57
+              },
+              {
+                "row": 0,
+                "col": 58
+              },
+              {
+                "row": 0,
+                "col": 59
+              },
+              {
+                "row": 0,
+                "col": 60
+              },
+              {
+                "row": 0,
+                "col": 61
+              },
+              {
+                "row": 0,
+                "col": 62
+              },
+              {
+                "row": 0,
+                "col": 63
+              },
+              {
+                "row": 0,
+                "col": 64
+              },
+              {
+                "row": 0,
+                "col": 65
+              },
+              {
+                "row": 0,
+                "col": 66
+              },
+              {
+                "row": 0,
+                "col": 67
+              },
+              {
+                "row": 0,
+                "col": 68
+              },
+              {
+                "row": 0,
+                "col": 69
+              },
+              {
+                "row": 0,
+                "col": 70
+              },
+              {
+                "row": 0,
+                "col": 71
+              },
+              {
+                "row": 0,
+                "col": 72
+              },
+              {
+                "row": 0,
+                "col": 73
+              }
+            ],
+            "trail": {
+              "active": false,
+              "alpha": 0.0,
+              "elapsed_ms": 0.0,
+              "radius": 0.0,
+              "segment": null,
+              "glow": null
+            }
+          }
+        },
+        {
+          "now_ms": 1100,
+          "focus": true,
+          "damage": "partial",
+          "rows": [
+            {
+              "row": 0,
+              "generation": 2,
+              "cells": [
+                [
+                  122,
+                  0,
+                  0
+                ],
+                [
+                  66,
+                  0,
+                  0
+                ],
+                [
+                  67,
+                  0,
+                  0
+                ],
+                [
+                  68,
+                  0,
+                  0
+                ],
+                [
+                  69,
+                  0,
+                  0
+                ],
+                [
+                  70,
+                  0,
+                  0
+                ],
+                [
+                  71,
+                  0,
+                  0
+                ],
+                [
+                  72,
+                  0,
+                  0
+                ],
+                [
+                  73,
+                  0,
+                  0
+                ],
+                [
+                  74,
+                  0,
+                  0
+                ],
+                [
+                  75,
+                  0,
+                  0
+                ],
+                [
+                  76,
+                  0,
+                  0
+                ],
+                [
+                  77,
+                  0,
+                  0
+                ],
+                [
+                  78,
+                  0,
+                  0
+                ],
+                [
+                  79,
+                  0,
+                  0
+                ],
+                [
+                  80,
+                  0,
+                  0
+                ],
+                [
+                  81,
+                  0,
+                  0
+                ],
+                [
+                  82,
+                  0,
+                  0
+                ],
+                [
+                  83,
+                  0,
+                  0
+                ],
+                [
+                  84,
+                  0,
+                  0
+                ],
+                [
+                  85,
+                  0,
+                  0
+                ],
+                [
+                  86,
+                  0,
+                  0
+                ],
+                [
+                  87,
+                  0,
+                  0
+                ],
+                [
+                  88,
+                  0,
+                  0
+                ],
+                [
+                  89,
+                  0,
+                  0
+                ],
+                [
+                  90,
+                  0,
+                  0
+                ],
+                [
+                  65,
+                  0,
+                  0
+                ],
+                [
+                  66,
+                  0,
+                  0
+                ],
+                [
+                  67,
+                  0,
+                  0
+                ],
+                [
+                  68,
+                  0,
+                  0
+                ],
+                [
+                  69,
+                  0,
+                  0
+                ],
+                [
+                  70,
+                  0,
+                  0
+                ],
+                [
+                  71,
+                  0,
+                  0
+                ],
+                [
+                  72,
+                  0,
+                  0
+                ],
+                [
+                  73,
+                  0,
+                  0
+                ],
+                [
+                  74,
+                  0,
+                  0
+                ],
+                [
+                  75,
+                  0,
+                  0
+                ],
+                [
+                  76,
+                  0,
+                  0
+                ],
+                [
+                  77,
+                  0,
+                  0
+                ],
+                [
+                  78,
+                  0,
+                  0
+                ],
+                [
+                  79,
+                  0,
+                  0
+                ],
+                [
+                  80,
+                  0,
+                  0
+                ],
+                [
+                  81,
+                  0,
+                  0
+                ],
+                [
+                  82,
+                  0,
+                  0
+                ],
+                [
+                  83,
+                  0,
+                  0
+                ],
+                [
+                  84,
+                  0,
+                  0
+                ],
+                [
+                  85,
+                  0,
+                  0
+                ],
+                [
+                  86,
+                  0,
+                  0
+                ],
+                [
+                  87,
+                  0,
+                  0
+                ],
+                [
+                  88,
+                  0,
+                  0
+                ],
+                [
+                  89,
+                  0,
+                  0
+                ],
+                [
+                  90,
+                  0,
+                  0
+                ],
+                [
+                  65,
+                  0,
+                  0
+                ],
+                [
+                  66,
+                  0,
+                  0
+                ],
+                [
+                  67,
+                  0,
+                  0
+                ],
+                [
+                  68,
+                  0,
+                  0
+                ],
+                [
+                  69,
+                  0,
+                  0
+                ],
+                [
+                  70,
+                  0,
+                  0
+                ],
+                [
+                  71,
+                  0,
+                  0
+                ],
+                [
+                  72,
+                  0,
+                  0
+                ],
+                [
+                  73,
+                  0,
+                  0
+                ],
+                [
+                  74,
+                  0,
+                  0
+                ],
+                [
+                  75,
+                  0,
+                  0
+                ],
+                [
+                  76,
+                  0,
+                  0
+                ],
+                [
+                  77,
+                  0,
+                  0
+                ],
+                [
+                  78,
+                  0,
+                  0
+                ],
+                [
+                  79,
+                  0,
+                  0
+                ],
+                [
+                  80,
+                  0,
+                  0
+                ],
+                [
+                  81,
+                  0,
+                  0
+                ],
+                [
+                  82,
+                  0,
+                  0
+                ],
+                [
+                  83,
+                  0,
+                  0
+                ],
+                [
+                  84,
+                  0,
+                  0
+                ],
+                [
+                  85,
+                  0,
+                  0
+                ],
+                [
+                  86,
+                  0,
+                  0
+                ]
+              ]
+            }
+          ],
+          "cursor": {
+            "row": 0,
+            "col": 0,
+            "shape": "block",
+            "visible": true
+          },
+          "expected": {
+            "needs_frame": true,
+            "revealing": [
+              {
+                "row": 0,
+                "col": 0,
+                "change_ms": 1100.0,
+                "elapsed_ms": 0.0,
+                "phase": "animating",
+                "boundary": 0.0,
+                "hidden_at": 1.0
+              },
+              {
+                "row": 0,
+                "col": 1,
+                "change_ms": 1015.0,
+                "elapsed_ms": 85.0,
+                "phase": "animating",
+                "boundary": 1.0,
+                "hidden_at": 0.0
+              },
+              {
+                "row": 0,
+                "col": 2,
+                "change_ms": 1030.0,
+                "elapsed_ms": 70.0,
+                "phase": "animating",
+                "boundary": 1.0,
+                "hidden_at": 0.0
+              },
+              {
+                "row": 0,
+                "col": 3,
+                "change_ms": 1045.0,
+                "elapsed_ms": 55.0,
+                "phase": "animating",
+                "boundary": 1.0,
+                "hidden_at": 0.0
+              },
+              {
+                "row": 0,
+                "col": 4,
+                "change_ms": 1060.0,
+                "elapsed_ms": 40.0,
+                "phase": "animating",
+                "boundary": 1.0,
+                "hidden_at": 0.0
+              },
+              {
+                "row": 0,
+                "col": 5,
+                "change_ms": 1075.0,
+                "elapsed_ms": 25.0,
+                "phase": "animating",
+                "boundary": 0.8333333333333334,
+                "hidden_at": 0.0432098765432098
+              },
+              {
+                "row": 0,
+                "col": 6,
+                "change_ms": 1090.0,
+                "elapsed_ms": 10.0,
+                "phase": "animating",
+                "boundary": 0.3333333333333333,
+                "hidden_at": 0.6666666666666667
+              }
+            ],
+            "pending": [
+              {
+                "row": 0,
+                "col": 7
+              },
+              {
+                "row": 0,
+                "col": 8
+              },
+              {
+                "row": 0,
+                "col": 9
+              },
+              {
+                "row": 0,
+                "col": 10
+              },
+              {
+                "row": 0,
+                "col": 11
+              },
+              {
+                "row": 0,
+                "col": 12
+              },
+              {
+                "row": 0,
+                "col": 13
+              },
+              {
+                "row": 0,
+                "col": 14
+              },
+              {
+                "row": 0,
+                "col": 15
+              },
+              {
+                "row": 0,
+                "col": 16
+              },
+              {
+                "row": 0,
+                "col": 17
+              },
+              {
+                "row": 0,
+                "col": 18
+              },
+              {
+                "row": 0,
+                "col": 19
+              },
+              {
+                "row": 0,
+                "col": 20
+              },
+              {
+                "row": 0,
+                "col": 21
+              },
+              {
+                "row": 0,
+                "col": 22
+              },
+              {
+                "row": 0,
+                "col": 23
+              },
+              {
+                "row": 0,
+                "col": 24
+              },
+              {
+                "row": 0,
+                "col": 25
+              },
+              {
+                "row": 0,
+                "col": 26
+              },
+              {
+                "row": 0,
+                "col": 27
+              },
+              {
+                "row": 0,
+                "col": 28
+              },
+              {
+                "row": 0,
+                "col": 29
+              },
+              {
+                "row": 0,
+                "col": 30
+              },
+              {
+                "row": 0,
+                "col": 31
+              },
+              {
+                "row": 0,
+                "col": 32
+              },
+              {
+                "row": 0,
+                "col": 33
+              },
+              {
+                "row": 0,
+                "col": 34
+              },
+              {
+                "row": 0,
+                "col": 35
+              },
+              {
+                "row": 0,
+                "col": 36
+              },
+              {
+                "row": 0,
+                "col": 37
+              },
+              {
+                "row": 0,
+                "col": 38
+              },
+              {
+                "row": 0,
+                "col": 39
+              },
+              {
+                "row": 0,
+                "col": 40
+              },
+              {
+                "row": 0,
+                "col": 41
+              },
+              {
+                "row": 0,
+                "col": 42
+              },
+              {
+                "row": 0,
+                "col": 43
+              },
+              {
+                "row": 0,
+                "col": 44
+              },
+              {
+                "row": 0,
+                "col": 45
+              },
+              {
+                "row": 0,
+                "col": 46
+              },
+              {
+                "row": 0,
+                "col": 47
+              },
+              {
+                "row": 0,
+                "col": 48
+              },
+              {
+                "row": 0,
+                "col": 49
+              },
+              {
+                "row": 0,
+                "col": 50
+              },
+              {
+                "row": 0,
+                "col": 51
+              },
+              {
+                "row": 0,
+                "col": 52
+              },
+              {
+                "row": 0,
+                "col": 53
+              },
+              {
+                "row": 0,
+                "col": 54
+              },
+              {
+                "row": 0,
+                "col": 55
+              },
+              {
+                "row": 0,
+                "col": 56
+              },
+              {
+                "row": 0,
+                "col": 57
+              },
+              {
+                "row": 0,
+                "col": 58
+              },
+              {
+                "row": 0,
+                "col": 59
+              },
+              {
+                "row": 0,
+                "col": 60
+              },
+              {
+                "row": 0,
+                "col": 61
+              },
+              {
+                "row": 0,
+                "col": 62
+              },
+              {
+                "row": 0,
+                "col": 63
+              },
+              {
+                "row": 0,
+                "col": 64
+              },
+              {
+                "row": 0,
+                "col": 65
+              },
+              {
+                "row": 0,
+                "col": 66
+              },
+              {
+                "row": 0,
+                "col": 67
+              },
+              {
+                "row": 0,
+                "col": 68
+              },
+              {
+                "row": 0,
+                "col": 69
+              },
+              {
+                "row": 0,
+                "col": 70
+              },
+              {
+                "row": 0,
+                "col": 71
+              },
+              {
+                "row": 0,
+                "col": 72
+              },
+              {
+                "row": 0,
+                "col": 73
+              }
+            ],
+            "trail": {
+              "active": false,
+              "alpha": 0.0,
+              "elapsed_ms": 0.0,
+              "radius": 0.0,
+              "segment": null,
+              "glow": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "cursor-trail-fade",
+      "name": "cursor trail linear 250ms fade at 0.35 with segment between centers",
+      "kind": "sequence",
+      "config": {
+        "text_animation": "none",
+        "text_animation_duration_ms": 120,
+        "text_animation_intensity": 1.0,
+        "cursor_trail": true,
+        "cursor_trail_opacity": 0.35,
+        "cursor_trail_duration_ms": 250,
+        "max_tracked_cells": 256
+      },
+      "grid": {
+        "cols": 8,
+        "rows": 1
+      },
+      "cell_px": {
+        "width": 10.0,
+        "height": 20.0
+      },
+      "sample_x": 9.0,
+      "steps": [
+        {
+          "now_ms": 2000,
+          "focus": true,
+          "damage": "clean",
+          "rows": [],
+          "cursor": {
+            "row": 0,
+            "col": 0,
+            "shape": "block",
+            "visible": true
+          },
+          "expected": {
+            "needs_frame": true,
+            "revealing": [],
+            "pending": [],
+            "trail": {
+              "active": true,
+              "alpha": 0.35,
+              "elapsed_ms": 0.0,
+              "radius": 10.0,
+              "segment": null,
+              "glow": [
+                0.0,
+                0.0,
+                10.0,
+                20.0
+              ]
+            }
+          }
+        },
+        {
+          "now_ms": 2016,
+          "focus": true,
+          "damage": "clean",
+          "rows": [],
+          "cursor": {
+            "row": 0,
+            "col": 5,
+            "shape": "block",
+            "visible": true
+          },
+          "expected": {
+            "needs_frame": true,
+            "revealing": [],
+            "pending": [],
+            "trail": {
+              "active": true,
+              "alpha": 0.35,
+              "elapsed_ms": 0.0,
+              "radius": 10.0,
+              "segment": [
+                [
+                  5.0,
+                  10.0
+                ],
+                [
+                  55.0,
+                  10.0
+                ]
+              ],
+              "glow": [
+                50.0,
+                0.0,
+                10.0,
+                20.0
+              ]
+            }
+          }
+        },
+        {
+          "now_ms": 2241,
+          "focus": true,
+          "damage": "clean",
+          "rows": [],
+          "cursor": {
+            "row": 0,
+            "col": 5,
+            "shape": "block",
+            "visible": true
+          },
+          "expected": {
+            "needs_frame": true,
+            "revealing": [],
+            "pending": [],
+            "trail": {
+              "active": true,
+              "alpha": 0.03499999999999999,
+              "elapsed_ms": 225.0,
+              "radius": 10.0,
+              "segment": [
+                [
+                  5.0,
+                  10.0
+                ],
+                [
+                  55.0,
+                  10.0
+                ]
+              ],
+              "glow": [
+                50.0,
+                0.0,
+                10.0,
+                20.0
+              ]
+            }
+          }
+        },
+        {
+          "now_ms": 2266,
+          "focus": true,
+          "damage": "clean",
+          "rows": [],
+          "cursor": {
+            "row": 0,
+            "col": 5,
+            "shape": "block",
+            "visible": true
+          },
+          "expected": {
+            "needs_frame": false,
+            "revealing": [],
+            "pending": [],
+            "trail": {
+              "active": false,
+              "alpha": 0.0,
+              "elapsed_ms": 0.0,
+              "radius": 0.0,
+              "segment": null,
+              "glow": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "cursor-trail-unfocused-resumes",
+      "name": "unfocused trail draws nothing and resumes the fade on refocus",
+      "kind": "sequence",
+      "config": {
+        "text_animation": "none",
+        "text_animation_duration_ms": 120,
+        "text_animation_intensity": 1.0,
+        "cursor_trail": true,
+        "cursor_trail_opacity": 0.35,
+        "cursor_trail_duration_ms": 250,
+        "max_tracked_cells": 256
+      },
+      "grid": {
+        "cols": 8,
+        "rows": 1
+      },
+      "cell_px": {
+        "width": 10.0,
+        "height": 20.0
+      },
+      "sample_x": 9.0,
+      "steps": [
+        {
+          "now_ms": 2000,
+          "focus": true,
+          "damage": "clean",
+          "rows": [],
+          "cursor": {
+            "row": 0,
+            "col": 0,
+            "shape": "block",
+            "visible": true
+          },
+          "expected": {
+            "needs_frame": true,
+            "revealing": [],
+            "pending": [],
+            "trail": {
+              "active": true,
+              "alpha": 0.35,
+              "elapsed_ms": 0.0,
+              "radius": 10.0,
+              "segment": null,
+              "glow": [
+                0.0,
+                0.0,
+                10.0,
+                20.0
+              ]
+            }
+          }
+        },
+        {
+          "now_ms": 2016,
+          "focus": false,
+          "damage": "clean",
+          "rows": [],
+          "cursor": {
+            "row": 0,
+            "col": 5,
+            "shape": "block",
+            "visible": true
+          },
+          "expected": {
+            "needs_frame": false,
+            "revealing": [],
+            "pending": [],
+            "trail": {
+              "active": false,
+              "alpha": 0.0,
+              "elapsed_ms": 0.0,
+              "radius": 0.0,
+              "segment": null,
+              "glow": null
+            }
+          }
+        },
+        {
+          "now_ms": 2041,
+          "focus": true,
+          "damage": "clean",
+          "rows": [],
+          "cursor": {
+            "row": 0,
+            "col": 5,
+            "shape": "block",
+            "visible": true
+          },
+          "expected": {
+            "needs_frame": true,
+            "revealing": [],
+            "pending": [],
+            "trail": {
+              "active": true,
+              "alpha": 0.315,
+              "elapsed_ms": 25.0,
+              "radius": 10.0,
+              "segment": [
+                [
+                  5.0,
+                  10.0
+                ],
+                [
+                  55.0,
+                  10.0
+                ]
+              ],
+              "glow": [
+                50.0,
+                0.0,
+                10.0,
+                20.0
+              ]
+            }
+          }
+        },
+        {
+          "now_ms": 2266,
+          "focus": true,
+          "damage": "clean",
+          "rows": [],
+          "cursor": {
+            "row": 0,
+            "col": 5,
+            "shape": "block",
+            "visible": true
+          },
+          "expected": {
+            "needs_frame": false,
+            "revealing": [],
+            "pending": [],
+            "trail": {
+              "active": false,
+              "alpha": 0.0,
+              "elapsed_ms": 0.0,
+              "radius": 0.0,
+              "segment": null,
+              "glow": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "disabled-zero-allocations",
+      "name": "disabled effects retain nothing and schedule no frames",
+      "kind": "sequence",
+      "config": {
+        "text_animation": "none",
+        "text_animation_duration_ms": 120,
+        "text_animation_intensity": 1.0,
+        "cursor_trail": false,
+        "cursor_trail_opacity": 0.35,
+        "cursor_trail_duration_ms": 250,
+        "max_tracked_cells": 256
+      },
+      "grid": {
+        "cols": 8,
+        "rows": 3
+      },
+      "cell_px": {
+        "width": 10.0,
+        "height": 20.0
+      },
+      "sample_x": 9.0,
+      "steps": [
+        {
+          "now_ms": 1000,
+          "focus": true,
+          "damage": "partial",
+          "rows": [
+            {
+              "row": 0,
+              "generation": 1,
+              "cells": [
+                [
+                  65,
+                  0,
+                  0
+                ],
+                [
+                  66,
+                  0,
+                  0
+                ],
+                [
+                  32,
+                  0,
+                  0
+                ],
+                [
+                  32,
+                  0,
+                  0
+                ],
+                [
+                  32,
+                  0,
+                  0
+                ],
+                [
+                  32,
+                  0,
+                  0
+                ],
+                [
+                  32,
+                  0,
+                  0
+                ],
+                [
+                  32,
+                  0,
+                  0
+                ]
+              ]
+            }
+          ],
+          "cursor": {
+            "row": 0,
+            "col": 0,
+            "shape": "block",
+            "visible": true
+          },
+          "expected": {
+            "needs_frame": false,
+            "revealing": [],
+            "pending": [],
+            "trail": {
+              "active": false,
+              "alpha": 0.0,
+              "elapsed_ms": 0.0,
+              "radius": 0.0,
+              "segment": null,
+              "glow": null
+            }
+          }
+        },
+        {
+          "now_ms": 2000,
+          "focus": true,
+          "damage": "clean",
+          "rows": [],
+          "cursor": {
+            "row": 0,
+            "col": 0,
+            "shape": "block",
+            "visible": true
+          },
+          "expected": {
+            "needs_frame": false,
+            "revealing": [],
+            "pending": [],
+            "trail": {
+              "active": false,
+              "alpha": 0.0,
+              "elapsed_ms": 0.0,
+              "radius": 0.0,
+              "segment": null,
+              "glow": null
+            }
+          }
+        }
+      ],
+      "expected_retained_capacity": 0
+    },
+    {
+      "id": "bounds-max-tracked-cells",
+      "name": "max_tracked_cells bounds the change store to the row-major prefix",
+      "kind": "sequence",
+      "config": {
+        "text_animation": "streaming",
+        "text_animation_duration_ms": 120,
+        "text_animation_intensity": 1.0,
+        "cursor_trail": false,
+        "cursor_trail_opacity": 0.35,
+        "cursor_trail_duration_ms": 250,
+        "max_tracked_cells": 4
+      },
+      "grid": {
+        "cols": 4,
+        "rows": 2
+      },
+      "cell_px": {
+        "width": 10.0,
+        "height": 20.0
+      },
+      "sample_x": 9.0,
+      "steps": [
+        {
+          "now_ms": 1000,
+          "focus": true,
+          "damage": "partial",
+          "rows": [
+            {
+              "row": 0,
+              "generation": 1,
+              "cells": [
+                [
+                  65,
+                  0,
+                  0
+                ],
+                [
+                  66,
+                  0,
+                  0
+                ],
+                [
+                  67,
+                  0,
+                  0
+                ],
+                [
+                  68,
+                  0,
+                  0
+                ]
+              ]
+            },
+            {
+              "row": 1,
+              "generation": 1,
+              "cells": [
+                [
+                  88,
+                  0,
+                  0
+                ],
+                [
+                  89,
+                  0,
+                  0
+                ],
+                [
+                  90,
+                  0,
+                  0
+                ],
+                [
+                  91,
+                  0,
+                  0
+                ]
+              ]
+            }
+          ],
+          "cursor": {
+            "row": 0,
+            "col": 0,
+            "shape": "block",
+            "visible": true
+          },
+          "expected": {
+            "needs_frame": true,
+            "revealing": [
+              {
+                "row": 0,
+                "col": 0,
+                "change_ms": 1000.0,
+                "elapsed_ms": 0.0,
+                "phase": "animating",
+                "boundary": 0.0,
+                "hidden_at": 1.0
+              },
+              {
+                "row": 0,
+                "col": 1,
+                "change_ms": 1000.0,
+                "elapsed_ms": 0.0,
+                "phase": "animating",
+                "boundary": 0.0,
+                "hidden_at": 1.0
+              },
+              {
+                "row": 0,
+                "col": 2,
+                "change_ms": 1000.0,
+                "elapsed_ms": 0.0,
+                "phase": "animating",
+                "boundary": 0.0,
+                "hidden_at": 1.0
+              },
+              {
+                "row": 0,
+                "col": 3,
+                "change_ms": 1000.0,
+                "elapsed_ms": 0.0,
+                "phase": "animating",
+                "boundary": 0.0,
+                "hidden_at": 1.0
+              }
+            ],
+            "pending": [],
+            "trail": {
+              "active": false,
+              "alpha": 0.0,
+              "elapsed_ms": 0.0,
+              "radius": 0.0,
+              "segment": null,
+              "glow": null
+            }
+          }
+        }
+      ],
+      "expected_texture_len": 16
+    },
+    {
+      "id": "top-down-cell-metrics",
+      "name": "top-down iCellMetrics mapping",
+      "kind": "coords",
+      "orientation": "top_down",
+      "cell_px": {
+        "width": 10.0,
+        "height": 20.0
+      },
+      "padding_top": 5.0,
+      "padding_left": 3.0,
+      "screen_height": 800.0,
+      "expected": {
+        "row_step": 20.0,
+        "origin_x": 3.0,
+        "origin_y": 5.0,
+        "mappings": [
+          [
+            8.0,
+            10.0,
+            0,
+            0
+          ],
+          [
+            13.0,
+            25.0,
+            1,
+            1
+          ],
+          [
+            2.0,
+            10.0,
+            -1,
+            -1
+          ],
+          [
+            8.0,
+            4.0,
+            -1,
+            -1
+          ]
+        ]
+      }
+    },
+    {
+      "id": "bottom-up-cell-metrics",
+      "name": "bottom-up iCellMetrics: negative row step, flipped origin",
+      "kind": "coords",
+      "orientation": "bottom_up",
+      "cell_px": {
+        "width": 10.0,
+        "height": 20.0
+      },
+      "padding_top": 5.0,
+      "padding_left": 3.0,
+      "screen_height": 800.0,
+      "expected": {
+        "row_step": -20.0,
+        "origin_x": 3.0,
+        "origin_y": 775.0,
+        "mappings": [
+          [
+            8.0,
+            765.0,
+            0,
+            0
+          ],
+          [
+            8.0,
+            745.0,
+            1,
+            0
+          ],
+          [
+            8.0,
+            775.0,
+            0,
+            0
+          ],
+          [
+            8.0,
+            785.0,
+            -1,
+            -1
+          ],
+          [
+            2.0,
+            765.0,
+            -1,
+            -1
+          ]
+        ]
+      }
+    }
+  ]
+}

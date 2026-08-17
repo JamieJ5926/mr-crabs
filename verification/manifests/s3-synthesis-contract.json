@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "slice": "S3-synthesis",
+  "integration_base": "ee7e35254",
+  "selected_candidate": {
+    "model": "cli-proxy/muse-spark-1.2-contributor",
+    "commit": "81f54d2cb53f9fc82fae4daa849aec37e6c3fca3",
+    "reason": "Only candidate to commit an end-to-end S3-shaped implementation; GPT and Grok timed out with uncommitted partial trees, DeepSeek timed out without changes."
+  },
+  "candidate_evidence": {
+    "openai-codex/gpt-5.6-sol": "Two bounded runs timed out; uncommitted partial terminal/bench/corpus changes; no candidate commit.",
+    "cli-proxy/grok-4.6": "Two bounded runs timed out; uncommitted modular storage/core files; no candidate commit.",
+    "cli-proxy/muse-spark-1.2-contributor": "Committed 81f54d2c; compile validation exposed missing local values and static review exposed placeholder behavior assertions.",
+    "cli-proxy/deepseek-v4-pro": "Two bounded OpenCode-Go runs timed out without worktree changes; no fallback route used."
+  },
+  "required_fixes": [
+    "Restore compilation and rustfmt/clippy cleanliness without weakening tests.",
+    "Make Terminal::feed capture actual scrolled-off rows into paged history; remove explicit push_history_cells as the production substitute.",
+    "Implement truthful hyperlink, semantic-region, and selection-anchor state rather than stability-only placeholder assertions.",
+    "Make pending-completion and queued-job statistics truthful with atomics or equivalent bounded accounting.",
+    "Guarantee completion-queue overload leaves pages retryable and never permanently pending.",
+    "Make deterministic drain hooks wait for or synchronously own known outstanding jobs without sleeps.",
+    "Verify LZ4 round trips, stale generations, bounded overload, worker shutdown, actual differential corpus, and 1M-line storage accounting.",
+    "Produce a real s3 benchmark result and compare measured resident memory to the S0 oracle baseline; do not substitute calculated bytes for RSS."
+  ]
+}

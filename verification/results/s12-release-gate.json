@@ -1,0 +1,1259 @@
+{
+  "schema_version": 1,
+  "suite": "release",
+  "bench_binary": "/Users/jamie/Documents/Projects/active/mr-crabs-rust/target/release/mr-crabs-bench",
+  "baseline": "/Users/jamie/Documents/Projects/active/mr-crabs-rust/verification/baselines/oracle-baseline.json",
+  "corpus": "/Users/jamie/Documents/Projects/active/mr-crabs-rust/verification/corpus/replay/payloads.json",
+  "warmup_runs": 1,
+  "repetitions": 5,
+  "provenance": {
+    "source_commit": "51c5299292950611d2062b2cbd5934c65cbe71d4",
+    "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14) (Homebrew)\nbinary: rustc\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\ncommit-date: 2026-07-14\nhost: aarch64-apple-darwin\nrelease: 1.97.1\nLLVM version: 22.1.8",
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30) (Homebrew)",
+    "platform": "macOS-26.5-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "processor": "arm",
+    "logical_cpus": 12,
+    "bench_sha256": "148070dac49de84ecf35eb48c9c2ac48ac97052412b30c4d191aabd9dbd1c094"
+  },
+  "workloads": {
+    "ascii_10mb": {
+      "verdict": "FAIL",
+      "status": "failed",
+      "runs": [
+        {
+          "status": "measured",
+          "payload_fnv1a64": "69822425ae3d3bd5",
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": "69822425ae3d3bd5",
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": "69822425ae3d3bd5",
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": "69822425ae3d3bd5",
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": "69822425ae3d3bd5",
+          "reason": null
+        }
+      ],
+      "aggregate": {
+        "allocated_bytes": {
+          "median": 1952208
+        },
+        "allocations": {
+          "median": 1004
+        },
+        "current_rss_bytes": {
+          "median": 8962048
+        },
+        "max_rss_bytes": {
+          "median": 8962048
+        },
+        "payload_bytes": {
+          "median": 10485760
+        },
+        "peak_footprint_bytes": {
+          "median": 4047184
+        },
+        "throughput_mib_s": {
+          "median": 196.91904014334446
+        },
+        "wall_ns": {
+          "median": 50782291,
+          "p50": 50782291,
+          "p95": 51647083,
+          "p99": 51647083
+        }
+      },
+      "oracle": {
+        "compared": true,
+        "checks": {
+          "throughput_mib_s": {
+            "ok": false,
+            "ours": 196.91904014334446,
+            "baseline": 316.5571247116362,
+            "reason": "196.91904014334446 is not >= oracle 316.5571247116362"
+          },
+          "max_rss_bytes": {
+            "ok": true,
+            "ours": 8962048,
+            "baseline": 10092544
+          },
+          "peak_footprint_bytes": {
+            "ok": true,
+            "ours": 4047184,
+            "baseline": 8634800
+          }
+        },
+        "ineligible_reason": null
+      },
+      "reason": "oracle comparison failed closed: throughput_mib_s: 196.91904014334446 is not >= oracle 316.5571247116362"
+    },
+    "unicode_10mb": {
+      "verdict": "FAIL",
+      "status": "failed",
+      "runs": [
+        {
+          "status": "measured",
+          "payload_fnv1a64": "1c42a1a0dd376cec",
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": "1c42a1a0dd376cec",
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": "1c42a1a0dd376cec",
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": "1c42a1a0dd376cec",
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": "1c42a1a0dd376cec",
+          "reason": null
+        }
+      ],
+      "aggregate": {
+        "allocated_bytes": {
+          "median": 1952208
+        },
+        "allocations": {
+          "median": 1004
+        },
+        "current_rss_bytes": {
+          "median": 9011200
+        },
+        "max_rss_bytes": {
+          "median": 9011200
+        },
+        "payload_bytes": {
+          "median": 10485760
+        },
+        "peak_footprint_bytes": {
+          "median": 4096336
+        },
+        "throughput_mib_s": {
+          "median": 200.56660064682728
+        },
+        "wall_ns": {
+          "median": 49858750,
+          "p50": 49858750,
+          "p95": 50252625,
+          "p99": 50252625
+        }
+      },
+      "oracle": {
+        "compared": true,
+        "checks": {
+          "throughput_mib_s": {
+            "ok": false,
+            "ours": 200.56660064682728,
+            "baseline": 230.08185944428052,
+            "reason": "200.56660064682728 is not >= oracle 230.08185944428052"
+          },
+          "max_rss_bytes": {
+            "ok": true,
+            "ours": 9011200,
+            "baseline": 10125312
+          },
+          "peak_footprint_bytes": {
+            "ok": true,
+            "ours": 4096336,
+            "baseline": 8651184
+          }
+        },
+        "ineligible_reason": null
+      },
+      "reason": "oracle comparison failed closed: throughput_mib_s: 200.56660064682728 is not >= oracle 230.08185944428052"
+    },
+    "scrollback_1m": {
+      "verdict": "FAIL",
+      "status": "failed",
+      "runs": [
+        {
+          "status": "measured",
+          "payload_fnv1a64": "562435e19e354a25",
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": "562435e19e354a25",
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": "562435e19e354a25",
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": "562435e19e354a25",
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": "562435e19e354a25",
+          "reason": null
+        }
+      ],
+      "aggregate": {
+        "allocated_bytes": {
+          "median": 812965916
+        },
+        "allocations": {
+          "median": 25674
+        },
+        "compressed_bytes": {
+          "median": 8276
+        },
+        "current_rss_bytes": {
+          "median": 15400960
+        },
+        "hot_resident_bytes": {
+          "median": 0
+        },
+        "logical_lines": {
+          "median": 1000000
+        },
+        "max_rss_bytes": {
+          "median": 15400960
+        },
+        "payload_bytes": {
+          "median": 5000000
+        },
+        "peak_footprint_bytes": {
+          "median": 10502528
+        },
+        "throughput_mib_s": {
+          "median": 13.69618736454401
+        },
+        "wall_ns": {
+          "median": 348153209,
+          "p50": 348153209,
+          "p95": 349910708,
+          "p99": 349910708
+        }
+      },
+      "oracle": {
+        "compared": true,
+        "checks": {
+          "throughput_mib_s": {
+            "ok": false,
+            "ours": 13.69618736454401,
+            "baseline": 123.93710271594871,
+            "reason": "13.69618736454401 is not >= oracle 123.93710271594871"
+          },
+          "max_rss_bytes": {
+            "ok": false,
+            "ours": 15400960,
+            "baseline": 10059776,
+            "reason": "15400960 is not <= oracle 10059776"
+          },
+          "peak_footprint_bytes": {
+            "ok": false,
+            "ours": 10502528,
+            "baseline": 8618416,
+            "reason": "10502528 is not <= oracle 8618416"
+          }
+        },
+        "ineligible_reason": null
+      },
+      "reason": "oracle comparison failed closed: throughput_mib_s: 13.69618736454401 is not >= oracle 123.93710271594871; max_rss_bytes: 15400960 is not <= oracle 10059776; peak_footprint_bytes: 10502528 is not <= oracle 8618416"
+    },
+    "resize_storm": {
+      "verdict": "PASS",
+      "status": "unknown",
+      "runs": [
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        }
+      ],
+      "aggregate": {
+        "allocated_bytes": {
+          "median": 1066067919
+        },
+        "allocations": {
+          "median": 402359
+        },
+        "current_rss_bytes": {
+          "median": 56279040
+        },
+        "dirty_rows": {
+          "median": 24
+        },
+        "frames_built": {
+          "median": 1
+        },
+        "max_rss_bytes": {
+          "median": 56279040
+        },
+        "peak_footprint_bytes": {
+          "median": 51282328
+        },
+        "redraw_requests": {
+          "median": 1
+        },
+        "resizes": {
+          "median": 256
+        },
+        "wall_ns": {
+          "median": 106182000,
+          "p50": 106182000,
+          "p95": 108291834,
+          "p99": 108291834
+        }
+      }
+    },
+    "redraw_replay": {
+      "verdict": "PASS",
+      "status": "unknown",
+      "runs": [
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        }
+      ],
+      "aggregate": {
+        "allocated_bytes": {
+          "median": 82605025
+        },
+        "allocations": {
+          "median": 57224
+        },
+        "current_rss_bytes": {
+          "median": 27623424
+        },
+        "dirty_rows": {
+          "median": 16741
+        },
+        "frame_build_mean_ns": {
+          "median": 80716,
+          "p50": 80716,
+          "p95": 81431,
+          "p99": 81431
+        },
+        "frame_build_p50_ns": {
+          "median": 53083,
+          "p50": 53083,
+          "p95": 53417,
+          "p99": 53417
+        },
+        "frame_build_p95_ns": {
+          "median": 220791,
+          "p50": 220791,
+          "p95": 223292,
+          "p99": 223292
+        },
+        "frame_build_p99_ns": {
+          "median": 232333,
+          "p50": 232333,
+          "p95": 245375,
+          "p99": 245375
+        },
+        "frames_built": {
+          "median": 512
+        },
+        "max_rss_bytes": {
+          "median": 27623424
+        },
+        "peak_footprint_bytes": {
+          "median": 22643072
+        },
+        "redraw_requests": {
+          "median": 512
+        },
+        "wall_ns": {
+          "median": 111135292,
+          "p50": 111135292,
+          "p95": 111538959,
+          "p99": 111538959
+        }
+      }
+    },
+    "engines_1": {
+      "verdict": "PASS",
+      "status": "unknown",
+      "runs": [
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        }
+      ],
+      "aggregate": {
+        "allocated_bytes": {
+          "median": 25044169
+        },
+        "allocations": {
+          "median": 2114
+        },
+        "current_rss_bytes": {
+          "median": 10764288
+        },
+        "engines": {
+          "median": 1
+        },
+        "max_rss_bytes": {
+          "median": 10764288
+        },
+        "payload_bytes": {
+          "median": 1048576
+        },
+        "peak_footprint_bytes": {
+          "median": 5882216
+        },
+        "wall_ns": {
+          "median": 12276333,
+          "p50": 12276333,
+          "p95": 12421167,
+          "p99": 12421167
+        }
+      }
+    },
+    "engines_10": {
+      "verdict": "PASS",
+      "status": "unknown",
+      "runs": [
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        }
+      ],
+      "aggregate": {
+        "allocated_bytes": {
+          "median": 250441690
+        },
+        "allocations": {
+          "median": 21131
+        },
+        "current_rss_bytes": {
+          "median": 36405248
+        },
+        "engines": {
+          "median": 10
+        },
+        "max_rss_bytes": {
+          "median": 36405248
+        },
+        "payload_bytes": {
+          "median": 1048576
+        },
+        "peak_footprint_bytes": {
+          "median": 31556016
+        },
+        "wall_ns": {
+          "median": 119951833,
+          "p50": 119951833,
+          "p95": 122940667,
+          "p99": 122940667
+        }
+      }
+    },
+    "engines_50": {
+      "verdict": "PASS",
+      "status": "unknown",
+      "runs": [
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        }
+      ],
+      "aggregate": {
+        "allocated_bytes": {
+          "median": 1252212354
+        },
+        "allocations": {
+          "median": 105658
+        },
+        "current_rss_bytes": {
+          "median": 150274048
+        },
+        "engines": {
+          "median": 50
+        },
+        "max_rss_bytes": {
+          "median": 150274048
+        },
+        "payload_bytes": {
+          "median": 1048576
+        },
+        "peak_footprint_bytes": {
+          "median": 145588872
+        },
+        "wall_ns": {
+          "median": 601800042,
+          "p50": 601800042,
+          "p95": 603781334,
+          "p99": 603781334
+        }
+      }
+    },
+    "headless_idle": {
+      "verdict": "PASS",
+      "status": "unknown",
+      "runs": [
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        }
+      ],
+      "aggregate": {
+        "allocated_bytes": {
+          "median": 7385082
+        },
+        "allocations": {
+          "median": 7182
+        },
+        "cache_ok": {
+          "median": true
+        },
+        "capacity_growth_bytes": {
+          "median": 0
+        },
+        "current_rss_bytes": {
+          "median": 9732096
+        },
+        "frames_built": {
+          "median": 601
+        },
+        "idle_animation_requests": {
+          "median": 0
+        },
+        "idle_redraw_requests": {
+          "median": 0
+        },
+        "max_rss_bytes": {
+          "median": 9732096
+        },
+        "peak_footprint_bytes": {
+          "median": 4800872
+        },
+        "redraw_requests": {
+          "median": 501
+        },
+        "wall_ns": {
+          "median": 4133042,
+          "p50": 4133042,
+          "p95": 4324541,
+          "p99": 4324541
+        }
+      }
+    },
+    "headless_cache": {
+      "verdict": "PASS",
+      "status": "unknown",
+      "runs": [
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        }
+      ],
+      "aggregate": {
+        "allocated_bytes": {
+          "median": 838
+        },
+        "allocations": {
+          "median": 9
+        },
+        "cache_ok": {
+          "median": true
+        },
+        "capacity_growth_bytes": {
+          "median": 0
+        },
+        "current_rss_bytes": {
+          "median": 6111232
+        },
+        "frames_built": {
+          "median": 2
+        },
+        "idle_animation_requests": {
+          "median": 0
+        },
+        "idle_redraw_requests": {
+          "median": 0
+        },
+        "max_rss_bytes": {
+          "median": 6111232
+        },
+        "peak_footprint_bytes": {
+          "median": 1524048
+        },
+        "wall_ns": {
+          "median": 4542,
+          "p50": 4542,
+          "p95": 5250,
+          "p99": 5250
+        }
+      }
+    },
+    "pty_launch_to_prompt": {
+      "verdict": "PASS",
+      "status": "unknown",
+      "runs": [
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        }
+      ],
+      "aggregate": {
+        "allocated_bytes": {
+          "median": 8936
+        },
+        "allocations": {
+          "median": 14
+        },
+        "child_alive_after_reap": {
+          "median": false
+        },
+        "child_reaped": {
+          "median": true
+        },
+        "current_rss_bytes": {
+          "median": 6422528
+        },
+        "exit_code": {
+          "median": 1
+        },
+        "launch_to_prompt_ns": {
+          "median": 6440125,
+          "p50": 6440125,
+          "p95": 6805541,
+          "p99": 6805541
+        },
+        "max_rss_bytes": {
+          "median": 6471680
+        },
+        "peak_footprint_bytes": {
+          "median": 1605968
+        },
+        "prompt_bytes": {
+          "median": 138
+        },
+        "wall_ns": {
+          "median": 18065292,
+          "p50": 18065292,
+          "p95": 19371833,
+          "p99": 19371833
+        }
+      }
+    },
+    "pty_echo": {
+      "verdict": "PASS",
+      "status": "unknown",
+      "runs": [
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        }
+      ],
+      "aggregate": {
+        "allocated_bytes": {
+          "median": 8388896
+        },
+        "allocations": {
+          "median": 5429
+        },
+        "child_alive_after_reap": {
+          "median": false
+        },
+        "child_reaped": {
+          "median": true
+        },
+        "current_rss_bytes": {
+          "median": 10993664
+        },
+        "echo_bytes": {
+          "median": 4194304
+        },
+        "echo_mib_s": {
+          "median": 18.30636386415305
+        },
+        "max_rss_bytes": {
+          "median": 11059200
+        },
+        "peak_footprint_bytes": {
+          "median": 6209896
+        },
+        "wall_ns": {
+          "median": 218503250,
+          "p50": 218503250,
+          "p95": 227257291,
+          "p99": 227257291
+        }
+      }
+    },
+    "image_decode_stress": {
+      "verdict": "PASS",
+      "status": "unknown",
+      "runs": [
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        }
+      ],
+      "aggregate": {
+        "allocated_bytes": {
+          "median": 271008032
+        },
+        "allocations": {
+          "median": 26638
+        },
+        "current_rss_bytes": {
+          "median": 6766592
+        },
+        "decode_mib_s": {
+          "median": 2459.71639248702
+        },
+        "decoded_bytes": {
+          "median": 31181664
+        },
+        "images_decoded": {
+          "median": 2049
+        },
+        "max_rss_bytes": {
+          "median": 6766592
+        },
+        "peak_footprint_bytes": {
+          "median": 1966416
+        },
+        "wall_ns": {
+          "median": 12089667,
+          "p50": 12089667,
+          "p95": 12250542,
+          "p99": 12250542
+        }
+      }
+    },
+    "effects": {
+      "verdict": "PASS",
+      "status": "unknown",
+      "runs": [
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        }
+      ],
+      "aggregate": {
+        "allocated_bytes": {
+          "median": 6348920
+        },
+        "allocations": {
+          "median": 5770
+        },
+        "current_rss_bytes": {
+          "median": 10158080
+        },
+        "effects_disabled_retained_capacity": {
+          "median": 0
+        },
+        "effects_frames": {
+          "median": 64
+        },
+        "effects_retained_capacity": {
+          "median": 95520
+        },
+        "frame_build_mean_ns": {
+          "median": 31332,
+          "p50": 31332,
+          "p95": 32497,
+          "p99": 32497
+        },
+        "frame_build_p50_ns": {
+          "median": 30542,
+          "p50": 30542,
+          "p95": 31083,
+          "p99": 31083
+        },
+        "frame_build_p95_ns": {
+          "median": 35333,
+          "p50": 35333,
+          "p95": 39583,
+          "p99": 39583
+        },
+        "frame_build_p99_ns": {
+          "median": 39875,
+          "p50": 39875,
+          "p95": 49625,
+          "p99": 49625
+        },
+        "frames_after_expiry": {
+          "median": 0
+        },
+        "frames_until_idle": {
+          "median": 17
+        },
+        "idle_animation_requests": {
+          "median": 0
+        },
+        "max_rss_bytes": {
+          "median": 10158080
+        },
+        "peak_footprint_bytes": {
+          "median": 5161320
+        },
+        "redraw_requests": {
+          "median": 64
+        },
+        "wall_ns": {
+          "median": 12996875,
+          "p50": 12996875,
+          "p95": 13073833,
+          "p99": 13073833
+        }
+      }
+    },
+    "search": {
+      "verdict": "PASS",
+      "status": "unknown",
+      "runs": [
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        },
+        {
+          "status": "measured",
+          "payload_fnv1a64": null,
+          "reason": null
+        }
+      ],
+      "aggregate": {
+        "allocated_bytes": {
+          "median": 465764022
+        },
+        "allocations": {
+          "median": 6000469
+        },
+        "current_rss_bytes": {
+          "median": 12828672
+        },
+        "max_rss_bytes": {
+          "median": 12845056
+        },
+        "peak_footprint_bytes": {
+          "median": 7766400
+        },
+        "search_lines_scanned": {
+          "median": 200000
+        },
+        "search_matches": {
+          "median": 201
+        },
+        "wall_ns": {
+          "median": 377255084,
+          "p50": 377255084,
+          "p95": 380538625,
+          "p99": 380538625
+        },
+        "worker_cancelled": {
+          "median": true
+        },
+        "worker_matches": {
+          "median": 201
+        },
+        "worker_round_trip_ns": {
+          "median": 190386250
+        }
+      }
+    },
+    "gui_frame_time": {
+      "verdict": "BLOCKED",
+      "status": "blocked",
+      "runs": [
+        {
+          "status": "blocked",
+          "payload_fnv1a64": null,
+          "reason": "not_measured: requires an authorized GUI render surface; the S12 release bench is headless and never launches a GUI instance"
+        },
+        {
+          "status": "blocked",
+          "payload_fnv1a64": null,
+          "reason": "not_measured: requires an authorized GUI render surface; the S12 release bench is headless and never launches a GUI instance"
+        },
+        {
+          "status": "blocked",
+          "payload_fnv1a64": null,
+          "reason": "not_measured: requires an authorized GUI render surface; the S12 release bench is headless and never launches a GUI instance"
+        },
+        {
+          "status": "blocked",
+          "payload_fnv1a64": null,
+          "reason": "not_measured: requires an authorized GUI render surface; the S12 release bench is headless and never launches a GUI instance"
+        },
+        {
+          "status": "blocked",
+          "payload_fnv1a64": null,
+          "reason": "not_measured: requires an authorized GUI render surface; the S12 release bench is headless and never launches a GUI instance"
+        }
+      ],
+      "reason": "not_measured: requires an authorized GUI render surface; the S12 release bench is headless and never launches a GUI instance"
+    },
+    "window_redraw": {
+      "verdict": "BLOCKED",
+      "status": "blocked",
+      "runs": [
+        {
+          "status": "blocked",
+          "payload_fnv1a64": null,
+          "reason": "not_measured: requires an authorized GUI render surface; the S12 release bench is headless and never launches a GUI instance"
+        },
+        {
+          "status": "blocked",
+          "payload_fnv1a64": null,
+          "reason": "not_measured: requires an authorized GUI render surface; the S12 release bench is headless and never launches a GUI instance"
+        },
+        {
+          "status": "blocked",
+          "payload_fnv1a64": null,
+          "reason": "not_measured: requires an authorized GUI render surface; the S12 release bench is headless and never launches a GUI instance"
+        },
+        {
+          "status": "blocked",
+          "payload_fnv1a64": null,
+          "reason": "not_measured: requires an authorized GUI render surface; the S12 release bench is headless and never launches a GUI instance"
+        },
+        {
+          "status": "blocked",
+          "payload_fnv1a64": null,
+          "reason": "not_measured: requires an authorized GUI render surface; the S12 release bench is headless and never launches a GUI instance"
+        }
+      ],
+      "reason": "not_measured: requires an authorized GUI render surface; the S12 release bench is headless and never launches a GUI instance"
+    },
+    "strict_gui_idle": {
+      "verdict": "BLOCKED",
+      "status": "blocked",
+      "runs": [
+        {
+          "status": "blocked",
+          "payload_fnv1a64": null,
+          "reason": "not_measured: requires an authorized GUI render surface; the S12 release bench is headless and never launches a GUI instance"
+        },
+        {
+          "status": "blocked",
+          "payload_fnv1a64": null,
+          "reason": "not_measured: requires an authorized GUI render surface; the S12 release bench is headless and never launches a GUI instance"
+        },
+        {
+          "status": "blocked",
+          "payload_fnv1a64": null,
+          "reason": "not_measured: requires an authorized GUI render surface; the S12 release bench is headless and never launches a GUI instance"
+        },
+        {
+          "status": "blocked",
+          "payload_fnv1a64": null,
+          "reason": "not_measured: requires an authorized GUI render surface; the S12 release bench is headless and never launches a GUI instance"
+        },
+        {
+          "status": "blocked",
+          "payload_fnv1a64": null,
+          "reason": "not_measured: requires an authorized GUI render surface; the S12 release bench is headless and never launches a GUI instance"
+        }
+      ],
+      "reason": "not_measured: requires an authorized GUI render surface; the S12 release bench is headless and never launches a GUI instance"
+    },
+    "energy": {
+      "verdict": "BLOCKED",
+      "status": "blocked",
+      "runs": [
+        {
+          "status": "blocked",
+          "payload_fnv1a64": null,
+          "reason": "not_measured: powermetrics requires root authorization and is not invoked by the S12 release bench"
+        },
+        {
+          "status": "blocked",
+          "payload_fnv1a64": null,
+          "reason": "not_measured: powermetrics requires root authorization and is not invoked by the S12 release bench"
+        },
+        {
+          "status": "blocked",
+          "payload_fnv1a64": null,
+          "reason": "not_measured: powermetrics requires root authorization and is not invoked by the S12 release bench"
+        },
+        {
+          "status": "blocked",
+          "payload_fnv1a64": null,
+          "reason": "not_measured: powermetrics requires root authorization and is not invoked by the S12 release bench"
+        },
+        {
+          "status": "blocked",
+          "payload_fnv1a64": null,
+          "reason": "not_measured: powermetrics requires root authorization and is not invoked by the S12 release bench"
+        }
+      ],
+      "reason": "not_measured: powermetrics requires root authorization and is not invoked by the S12 release bench"
+    }
+  },
+  "overall": "FAIL",
+  "summary": {
+    "pass": 12,
+    "fail": 3,
+    "blocked": 4
+  },
+  "reason": "one or more workloads failed"
+}

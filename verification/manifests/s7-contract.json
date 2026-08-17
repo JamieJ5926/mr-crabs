@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "slice": "S7",
+  "title": "Kitty/iTerm2/Ghostty graphics",
+  "base_commit": "a56687bfa",
+  "scope": [
+    "rust/Cargo.toml",
+    "rust/Cargo.lock",
+    "rust/crates/mr-crabs-graphics/**",
+    "rust/verification/graphics-corpus/**",
+    "rust/verification/manifests/s7-*.json"
+  ],
+  "required_api": {
+    "kitty_command": [
+      "CommandParser::new(max_bytes) + feed/feed_slice/complete + parse_string; ParseError{InvalidFormat,Overflow,OutOfMemory,InvalidData}",
+      "Command{control,quiet,data}; Control::{Query,Transmit,TransmitAndDisplay,Display,Delete,TransmitAnimationFrame,ControlAnimation,ComposeAnimation}",
+      "Transmission{format,medium,width,height,size,offset,image_id,image_number,placement_id,compression,more_chunks,transient}",
+      "Display{cursor_movement,virtual_placement,z,columns,rows,parent_id,offsets}; Delete::{All,Id,Newest,IntersectCursor,AnimationFrames,IntersectCell,IntersectCellZ,Range,Column,Row,Z}",
+      "Quiet{No,Ok,Failures}; Response{id,image_number,placement_id,message}::encode/ok/empty",
+      "Oracle semantics: 'm' honored only for direct medium; z/H/V parsed as i32 bitcast; single-char non-digit values stored as ASCII; unknown keys ignored; signed/unsigned overflow errors; delete range requires x<=y and both present; unknown action -> InvalidFormat"
+    ],
+    "kitty_load": [
+      "Limits{file,temporary_file,shared_memory} + direct() + all_with_temp_dir(path)",
+      "LoadingImage::init(cmd,&limits,max_size,max_dimension)/add_data/complete -> Image",
+      "Direct, file, temporary-file (tempdir+naming validation, delete-after-load), shared-memory (shm_open/fstat/range-validation/unlink) transports",
+      "Bounds: per-image max_size=400MB, max_dimension=10000, chunked accumulation capped at max_size",
+      "File blocklist: /proc, /sys, /dev except /dev/shm; POSIX NUL rejection; regular-file requirement; offset/size bounded reads"
+    ],
+    "image": [
+      "ImageFormat{Rgb,Rgba,Gray,GrayAlpha,Png} + bpp + from_code; Compression{None,ZlibDeflate}; Medium{Direct,File,TemporaryFile,SharedMemory}",
+      "Image{id,number,width,height,format,compression,data,transient,implicit_id,placement_count,generation}; ImageData::{Complete(Vec<u8>),Pending(usize)}",
+      "decode_png_to_rgba(&[u8],max_size,max_dimension) -> DecodedImage{width,height,rgba}; zlib_decompress(&[u8],max_size)",
+      "ImageError{InvalidData,DecompressionFailed,DimensionsRequired,DimensionsTooLarge,FilePathTooLong,TemporaryFileNotInTempDir,TemporaryFileNotNamedCorrectly,UnsupportedFormat,UnsupportedMedium,UnsupportedDepth,OutOfMemory} + message() with oracle response strings"
+    ],
+    "placement": [
+      "TerminalContext{viewport_first_row,cursor,cols,rows,width_px,height_px}",
+      "Placement{location,x_offset,y_offset,source_*,columns,rows,z} + pixel_size/grid_size/rect (saturating math, aspect-ratio scaling)",
+      "Location::{Pin{row,col},Virtual}; PlacementKey{image_id,placement_id}; PlacementId::{Internal,External}; Rect::contains",
+      "Scroll semantics: placements anchor to absolute rows; viewport scroll is host-side; prune_history(boundary_row) removes scrolled-out placements; resize is geometry-parameter-only"
+    ],
+    "store": [
+      "StoreConfig{total_limit=320MB, max_image_size=400MB, max_dimension=10000, max_placements=2^18, limits}",
+      "ImageStore::new/execute(ctx,&Command,&mut GraphicsHost)/add_image/add_pending_image+PendingImage::complete/image_by_id/image_by_number/add_placement/delete/prune_history/set_limit/enabled/total_bytes",
+      "Deterministic eviction: priority (transient+unused < unused < transient+used < used), then generation, then image id; byte budget and count budget",
+      "Generation stamps: process-global monotonic u64; every content mutation marks dirty + bumps; retransmit replaces image and deletes its placements",
+      "Execute semantics: quiet filtering (q=0 all non-empty, q=1 errors only, q=2 never), chunked quiet inheritance, implicit ids never reply, delete never replies, animation actions -> 'ERROR: unimplemented action', disabled storage (limit 0) refuses everything",
+      "Cursor movement after placement C=0: rows bounded by terminal height, col = pin.col + cols + 1 (saturating)"
+    ],
+    "iterm": [
+      "parse_file_value(value,max_header,max_chunk,max_name) -> Option<ItermFileArgs{name,size,inline,width,height,preserve_aspect_ratio,payload}>",
+      "ItermUploads{feed -> Option<CompletedUpload>} with DEFAULT_MAX_IN_FLIGHT=16 and per-upload max bytes",
+      "load_upload(&CompletedUpload,max_size,max_dimension) -> DecodedImage (PNG only; other formats UnsupportedFormat)",
+      "Sixel explicitly not implemented"
+    ],
+    "glyph": [
+      "IDENTIFIER=\"25a1\"; MAX_PAYLOAD_SIZE=64KiB; MAX_GLOSSARY_ENTRIES=1024; DEFAULT_MAX_COMMAND_BYTES=1MiB",
+      "RequestParser + Request::{Support,Query,Register,Clear}; Register options cp/fmt/reply/upm/aw/lh/width/size/align/pad with defaults and last-value-wins",
+      "Response::{Support,Query,Register,Clear}::encode with exact wire bytes; Coverage; Reason codes",
+      "GlyphEntry::from_register (fmt validation, nonzero metrics, constraint normalization) + validate_simple_glyf (no composites, no hinting, monotonic endpoints, checked deltas)",
+      "Glossary::register/delete/clear_and_free/contains with FIFO eviction at 1024 and PUA-only namespaces",
+      "execute(glossary,req,system_coverage) with reply verbosity 0/1/2"
+    ],
+    "texture": [
+      "TextureKey{image_id,generation}; TextureHandle{id}; TextureCache::new(max_bytes,max_entries)/get/insert/remove",
+      "Deterministic LRU eviction (last_used, then sequence, then handle id); single-entry over-budget rejection",
+      "Consumable by GPUI without another renderer: handles are opaque; host maps them to GPU textures"
+    ],
+    "host": [
+      "GraphicsHost::{write_response, cursor_after_placement, storage_changed}",
+      "NoopHost and RecordingHost (tests); S6 mr-crabs-protocols dispatcher implements GraphicsHost at integration"
+    ]
+  },
+  "acceptance": [
+    "All S7 manifest entries are covered by production code in mr-crabs-graphics and focused behavioral tests",
+    "s7-graphics.json contains provenance-cited oracle cases and fixture hashes for reply bytes, placement metadata, decoded pixel hashes, malformed/oversized rejection, transport cleanup, iTerm2 parsing, and glyph APC replies",
+    "Every allocation and file-size path is bounded: command buffers (kitty 65MiB default, glyph 1MiB), image data (400MB), decode output (400MB), storage bytes (320MB) and placements (2^18), iterm uploads (16 in flight), glyph payload (64KiB) and glossary (1024 entries), texture cache (bytes+count)",
+    "Temporary-file transport deletes the file after loading; rejection happens before cleanup is armed; shared-memory objects are unlinked",
+    "Cache eviction is deterministic (documented priority/age/id order) and tested for byte and count budgets",
+    "Reply bytes match the frozen corpus byte-for-byte; decoded pixel hashes match the independently computed corpus hashes",
+    "No Sixel implementation exists anywhere in the crate",
+    "No GUI launch and no Zig runtime linkage; parent runs all builds/tests/lint/corpus validation"
+  ],
+  "constraints": [
+    "Read the source Ghostty worktree only; do not modify it",
+    "Do not run formatting, builds, tests, lint, benchmarks, or the oracle in this slice; parent runs gates once",
+    "Do not touch mr-crabs-terminal osc/dcs/apc dispatch (owned by S6); mr-crabs-graphics is self-contained and exposes GraphicsHost as the integration seam",
+    "Cargo.lock regeneration (flate2/libc/png fetches) is a parent gate step",
+    "Divergences from the oracle (documented in code): max_placements count bound; Rust allocation failure aborts instead of returning ENOMEM responses (all bounds make OOM unreachable except try_reserve paths which map to OutOfMemory); iterm File= implemented beyond the oracle's unimplemented key"
+  ]
+}

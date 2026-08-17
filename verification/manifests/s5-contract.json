@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "slice": "S5",
+  "title": "Input and clipboard",
+  "base_commit": "b7d1aa2ed82e236b9d1060aed659dd7c8fabaca2",
+  "scope": [
+    "rust/Cargo.toml",
+    "rust/Cargo.lock",
+    "rust/crates/mr-crabs-input/**",
+    "rust/crates/mr-crabs-bench/**",
+    "rust/verification/input-corpus/s5-input.json",
+    "rust/verification/manifests/s5-*.json"
+  ],
+  "required_api": {
+    "keyboard": [
+      "Key, Modifiers, KeyAction, KeyEvent, KeyboardMode, KeyboardProtocol",
+      "encode_key(event: &KeyEvent, mode: &KeyboardMode, out: &mut Vec<u8>)",
+      "legacy, CSI-u, kitty press/repeat/release, modifyOtherKeys, DECBKM, and alt-prefix behavior"
+    ],
+    "mouse": [
+      "MouseButton, MouseAction, MouseEvent, MouseEncoding, MouseMode",
+      "encode_mouse(event: &MouseEvent, mode: &MouseMode, out: &mut Vec<u8>)",
+      "X10, UTF-8, SGR, and urxvt encodings with motion and wheel"
+    ],
+    "text": [
+      "encode_focus(focused: bool, enabled: bool, out: &mut Vec<u8>)",
+      "sanitize_paste(text: &str) -> String",
+      "encode_paste(text: &str, bracketed: bool, out: &mut Vec<u8>)",
+      "encode_ime_commit(text: &str, out: &mut Vec<u8>)",
+      "encode_drop_paths(paths: &[PathBuf], out: &mut Vec<u8>)"
+    ],
+    "permissions": [
+      "ClipboardPermission with read/write/osc52-read/osc52-write decisions",
+      "ClipboardBackend trait and ClipboardController that fails closed before backend access",
+      "OSC 52 base64 decode/encode with explicit size bound and denied/error outcomes",
+      "UrlPolicy and UrlOpener trait; only explicit http/https/mailto/file schemes may open"
+    ],
+    "selection": [
+      "selection_text(snapshot: &NormalizedSnapshot, selection: &SelectionState) -> String"
+    ]
+  },
+  "acceptance": [
+    "All S5 callable-parity IDs implemented exactly once",
+    "s5-input.json contains provenance-cited Ghostty expected bytes and split cases for every keyboard/mouse mode",
+    "Focused tests compare encoder output byte-for-byte with the frozen corpus",
+    "Real mr-crabs-pty /bin/cat smoke observes encoded keyboard, focus, paste, and IME bytes",
+    "Denied clipboard and OSC 52 operations never invoke the backend",
+    "No shell command execution for URL opening or drag/drop",
+    "No GUI launch; lead owns all builds, tests, lint, corpus validation, integration, and evidence"
+  ],
+  "constraints": [
+    "Read the source Ghostty worktree only; do not modify it",
+    "Do not run formatting, builds, tests, lint, benchmarks, or the oracle",
+    "Do not edit callable-parity.json; lead updates acceptance state",
+    "Commit exactly once and report the commit SHA"
+  ]
+}

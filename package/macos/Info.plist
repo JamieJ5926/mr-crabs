@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key><string>en</string>
+  <key>CFBundleDisplayName</key><string>Mr Crabs</string>
+  <key>CFBundleExecutable</key><string>mr-crabs</string>
+  <key>CFBundleIconFile</key><string>MrCrabs</string>
+  <key>CFBundleIdentifier</key><string>dev.jamie.mr-crabs</string>
+  <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+  <key>CFBundleName</key><string>Mr Crabs</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>0.1.0</string>
+  <key>CFBundleVersion</key><string>1</string>
+  <key>LSApplicationCategoryType</key><string>public.app-category.developer-tools</string>
+  <key>LSMinimumSystemVersion</key><string>13.0</string>
+  <key>NSHighResolutionCapable</key><true/>
+  <key>NSSupportsAutomaticGraphicsSwitching</key><true/>
+  <key>NSPrincipalClass</key><string>NSApplication</string>
+  <key>LSEnvironment</key>
+  <dict><key>GHOSTTY_MAC_LAUNCH_SOURCE</key><string>app</string></dict>
+  <key>NSAppleEventsUsageDescription</key>
+  <string>A program running within Mr Crabs would like to use AppleScript.</string>
+  <key>NSBluetoothAlwaysUsageDescription</key>
+  <string>A program running within Mr Crabs would like to use Bluetooth.</string>
+  <key>NSCalendarsUsageDescription</key>
+  <string>A program running within Mr Crabs would like to access your Calendar.</string>
+  <key>NSCameraUsageDescription</key>
+  <string>A program running within Mr Crabs would like to use the camera.</string>
+  <key>NSContactsUsageDescription</key>
+  <string>A program running within Mr Crabs would like to access your Contacts.</string>
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>A program running within Mr Crabs would like to access the local network.</string>
+  <key>NSLocationUsageDescription</key>
+  <string>A program running within Mr Crabs would like to access your location.</string>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>A program running within Mr Crabs would like to use the microphone.</string>
+  <key>NSPhotoLibraryUsageDescription</key>
+  <string>A program running within Mr Crabs would like to access your Photo Library.</string>
+  <key>CFBundleDocumentTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleTypeName</key><string>Terminal scripts</string>
+      <key>CFBundleTypeRole</key><string>Editor</string>
+      <key>LSItemContentTypes</key>
+      <array><string>public.shell-script</string><string>public.unix-executable</string></array>
+    </dict>
+    <dict>
+      <key>CFBundleTypeName</key><string>Folders</string>
+      <key>CFBundleTypeRole</key><string>Editor</string>
+      <key>LSHandlerRank</key><string>Alternate</string>
+      <key>LSItemContentTypes</key><array><string>public.directory</string></array>
+    </dict>
+  </array>
+</dict>
+</plist>

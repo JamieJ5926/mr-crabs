@@ -1,0 +1,23 @@
+[package]
+name = "mr-crabs-graphics"
+description = "Kitty/iTerm2/Ghostty image protocols, decoded image storage, and bounded texture cache (S7)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+base64.workspace = true
+flate2.workspace = true
+libc = { workspace = true, optional = true }
+png.workspace = true
+
+[features]
+default = ["shm"]
+# POSIX shared-memory transport (shm_open/mmap semantics on unix). The
+# crate builds without it on any target; the transport then reports
+# UnsupportedMedium exactly like the oracle's non-POSIX builds.
+shm = ["dep:libc"]
+
+[dev-dependencies]

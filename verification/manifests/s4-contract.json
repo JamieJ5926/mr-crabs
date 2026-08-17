@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "slice": "S4",
+  "base_commit": "bba063c12fb5d1d0e60c6162d101942c77b827f5",
+  "title": "Custom GPUI terminal element",
+  "scope": [
+    "rust/Cargo.toml",
+    "rust/Cargo.lock",
+    "rust/crates/mr-crabs-terminal/**",
+    "rust/crates/mr-crabs-element/**",
+    "rust/crates/mr-crabs-app/**",
+    "rust/crates/mr-crabs-bench/**",
+    "rust/verification/manifests/s4-*.json"
+  ],
+  "requirements": [
+    "Pin gpui and gpui_platform exactly to zed commit 03e5ad8a630c84c3990055905d0444ea0a519b7f; no floating revision and no second renderer.",
+    "Expose the planned pooled RowDelta and FrameDelta boundary with sequence, GridSize, DamageKind, changed rows with generations/cells/runs, cursor state, selection state, styles, and an image-delta placeholder owned by the terminal engine side.",
+    "TerminalElement paint consumes an owned or shared FrameDelta and never locks Terminal or the engine.",
+    "Implement GPUI Element layout, exact font resolution and shaping through GPUI/CoreText, run batching, backgrounds, glyphs and emoji, underline and strikethrough, cursor block/bar/underline/hollow shapes and blink scheduling, selection, focus, IME registration, damage application, atlas/font invalidation, and resize deduplication.",
+    "Render cache reuses retained vectors/batches and performs no allocation for an unchanged same-capacity frame after warm-up.",
+    "Clean damage schedules no redraw; idle state without cursor blink or an active transition requests zero animation frames.",
+    "Resize derives nonzero rows/columns from pixel bounds and cell metrics and emits each distinct GridSize at most once.",
+    "Add focused deterministic tests for damage/cache reuse, run batching and decoration geometry, cursor blink/shape, selection overlay, resize dedupe, frame pooling, and headless render-cache smoke.",
+    "Do not launch a GUI app; Jamie has not authorized a GUI launch for this gate.",
+    "Do not add libghostty-vt, ghostty-vt-sys, Zig linkage, wgpu, or another terminal renderer."
+  ],
+  "acceptance": [
+    "cargo fmt --all -- --check",
+    "cargo check --workspace --all-targets",
+    "cargo test -p mr-crabs-terminal -- --test-threads=1",
+    "cargo test -p mr-crabs-element -- --test-threads=1",
+    "cargo clippy --workspace --all-targets -- -D warnings",
+    "cargo tree -p mr-crabs-app contains the exact GPUI git source and no forbidden renderer/runtime",
+    "headless render-cache smoke proves stable allocation capacities after warm-up",
+    "focused idle test proves clean non-blinking frames request no redraw or animation"
+  ],
+  "candidate_rules": [
+    "Implement only in the isolated candidate worktree and commit exactly once.",
+    "Do not inspect or copy sibling candidate worktrees.",
+    "Do not launch GUI processes.",
+    "Do not run project-wide formatting, builds, tests, clippy, or benchmarks; the lead owns validation.",
+    "Do not weaken S0-S3 tests, compact storage, differential corpus, or PTY contracts."
+  ]
+}

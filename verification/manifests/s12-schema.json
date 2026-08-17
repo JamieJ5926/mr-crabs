@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mr-crabs.local/schemas/s12-release-v1.json",
+  "title": "S12 release benchmark results schema",
+  "description": "Single-run and aggregate results produced by mr-crabs-bench --suite release. Every workload result carries one of measured | failed | blocked. Blocked metrics serialize not_measured with an exact reason and can never satisfy a release gate.",
+  "type": "object",
+  "oneOf": [
+    { "$ref": "#/$defs/runResult" },
+    { "$ref": "#/$defs/aggregateResult" }
+  ],
+  "$defs": {
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "wall_ns": { "type": "integer", "minimum": 0 },
+        "max_rss_bytes": { "type": "integer", "minimum": 0 },
+        "peak_footprint_bytes": { "type": "integer", "minimum": 0 },
+        "current_rss_bytes": { "type": "integer", "minimum": 0 },
+        "allocations": { "type": "integer", "minimum": 0 },
+        "allocated_bytes": { "type": "integer", "minimum": 0 },
+        "throughput_mib_s": { "type": "number", "exclusiveMinimum": 0 },
+        "payload_bytes": { "type": "integer", "minimum": 0 },
+        "logical_lines": { "type": "integer", "minimum": 0 },
+        "hot_resident_bytes": { "type": "integer", "minimum": 0 },
+        "compressed_bytes": { "type": "integer", "minimum": 0 },
+        "engines": { "type": "integer", "minimum": 1 },
+        "resizes": { "type": "integer", "minimum": 0 },
+        "frames_built": { "type": "integer", "minimum": 0 },
+        "dirty_rows": { "type": "integer", "minimum": 0 },
+        "redraw_requests": { "type": "integer", "minimum": 0 },
+        "idle_redraw_requests": { "type": "integer", "minimum": 0 },
+        "idle_animation_requests": { "type": "integer", "minimum": 0 },
+        "capacity_growth_bytes": { "type": "integer", "minimum": 0 },
+        "cache_ok": { "type": "boolean" },
+        "frame_build_mean_ns": { "type": "integer", "minimum": 0 },
+        "frame_build_p50_ns": { "type": "integer", "minimum": 0 },
+        "frame_build_p95_ns": { "type": "integer", "minimum": 0 },
+        "frame_build_p99_ns": { "type": "integer", "minimum": 0 },
+        "launch_to_prompt_ns": { "type": "integer", "minimum": 0 },
+        "prompt_bytes": { "type": "integer", "minimum": 0 },
+        "echo_bytes": { "type": "integer", "minimum": 0 },
+        "echo_mib_s": { "type": "number", "exclusiveMinimum": 0 },
+        "child_reaped": { "type": "boolean" },
+        "child_alive_after_reap": { "type": "boolean" },
+        "exit_code": { "type": "integer" },
+        "images_decoded": { "type": "integer", "minimum": 0 },
+        "decoded_bytes": { "type": "integer", "minimum": 0 },
+        "decode_mib_s": { "type": "number", "exclusiveMinimum": 0 },
+        "effects_disabled_retained_capacity": { "type": "integer", "minimum": 0 },
+        "effects_retained_capacity": { "type": "integer", "minimum": 0 },
+        "frames_after_expiry": { "type": "integer", "minimum": 0 },
+        "frames_until_idle": { "type": "integer", "minimum": 0 },
+        "effects_frames": { "type": "integer", "minimum": 0 },
+        "worker_cancelled": { "type": "boolean" },
+        "worker_round_trip_ns": { "type": "integer", "minimum": 0 },
+        "worker_matches": { "type": "integer", "minimum": 0 },
+        "search_lines_scanned": { "type": "integer", "minimum": 0 },
+        "search_matches": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "payloadRef": {
+      "type": "object",
+      "required": ["id", "bytes"],
+      "properties": {
+        "id": { "type": "string" },
+        "bytes": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "runResult": {
+      "type": "object",
+      "required": ["schema_version", "suite", "workload", "status"],
+      "properties": {
+        "schema_version": { "const": 1 },
+        "suite": { "const": "release" },
+        "workload": { "type": "string" },
+        "status": { "enum": ["measured", "failed", "blocked"] },
+        "reason": { "type": "string" },
+        "payload": { "$ref": "#/$defs/payloadRef" },
+        "payload_fnv1a64": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{16}$"
+        },
+        "spec": { "type": "object" },
+        "metrics": { "$ref": "#/$defs/metrics" }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "measured" } } },
+          "then": { "required": ["metrics"] }
+        },
+        {
+          "if": { "properties": { "status": { "enum": ["failed", "blocked"] } } },
+          "then": { "required": ["reason"] }
+        }
+      ]
+    },
+    "aggregateResult": {
+      "type": "object",
+      "required": ["schema_version", "suite", "mode", "workloads"],
+      "properties": {
+        "schema_version": { "const": 1 },
+        "suite": { "const": "release" },
+        "mode": { "const": "aggregate" },
+        "workloads": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/runResult" }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

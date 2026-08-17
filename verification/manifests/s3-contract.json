@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "slice": "S3",
+  "base_commit": "78357cd97649e175b1db2b1431f139d74c92613a",
+  "title": "Core terminal state and compact paged storage",
+  "scope": [
+    "rust/crates/mr-crabs-terminal/**",
+    "rust/crates/mr-crabs-oracle/**",
+    "rust/crates/mr-crabs-bench/**",
+    "rust/verification/corpus/**",
+    "rust/verification/manifests/s3-*.json",
+    "rust/Cargo.toml",
+    "rust/Cargo.lock"
+  ],
+  "constraints": [
+    "Start exactly at base_commit and edit only the isolated candidate worktree.",
+    "Keep alacritty_terminal vendored source byte-frozen; use it only as behavioral reference or private parser/transition engine where appropriate.",
+    "Preserve the S1 public normalized snapshot and differential-corpus behavior; cleanly migrate every local caller for intentional API changes.",
+    "Common resident cell representation must have size_of::<Cell>() == 8; rare graphemes, styles, hyperlinks, and semantic metadata live in interned side tables.",
+    "History storage must be page-based rather than Vec<Row>; hot pages have a fixed capacity, cold pages compress in the background with LZ4, and cold resident allocations are released/decommitted after compression.",
+    "Compression work and completion queues are bounded; terminal mutation cannot block on compression and stale completion results cannot replace newer page generations.",
+    "No lossy eviction within configured history limits; decompression restores byte-identical cells and side-table identities.",
+    "Avoid per-cell heap allocation, per-feed whole-screen clones, and global locks in the mutation hot path.",
+    "No unsafe without a local SAFETY comment naming ownership, lifetime, alignment, bounds, and thread invariants.",
+    "No GUI launch. Skip formatting, builds, tests, lint, and benchmarks; lead owns validation. Commit once and report SHA."
+  ],
+  "behavior": [
+    "Primary and alternate screens, cursor and saved cursor, origin/wrap/insert modes, scroll margins, tab stops, colors and styles.",
+    "Unicode width, double-width cells, grapheme clusters and combining marks without corrupting neighboring cells.",
+    "Index/reverse-index, scrolling, insert/delete chars and lines, erase operations, resize and reflow with cursor stability.",
+    "OSC 8 hyperlink identities, semantic prompt/output regions, and stable selection anchors across scroll and reflow.",
+    "DEC/ANSI modes represented deterministically in normalized snapshots.",
+    "Existing ANSI/DEC differential corpus remains byte-chunk invariant at every split point."
+  ],
+  "storage_api": [
+    "Expose an 8-byte common Cell with content/style/flags encoded by compact IDs or equivalent checked representation.",
+    "Expose paged scrollback configuration and observable statistics: logical lines, hot resident bytes, compressed bytes, queued jobs, restored pages, and stale completions discarded.",
+    "Expose deterministic synchronous hooks for tests to drain compression and force page restoration without sleeps.",
+    "Bound every background channel explicitly and define overload behavior without losing terminal history.",
+    "Drop joins or cancels background compression workers without panic, leak, or detached work."
+  ],
+  "tests": [
+    "All core terminal operations and primary/alternate screen transitions.",
+    "Wide, combining, emoji/grapheme, style interning, hyperlink and semantic-region round trips.",
+    "Resize/reflow and selection-anchor stability.",
+    "Page boundary scrolling, compression round trip, stale-generation rejection, bounded-queue overload, and clean worker shutdown.",
+    "Compile-time or runtime assertion that common Cell is exactly 8 bytes.",
+    "One-million-line deterministic stress fixture with bounded resident memory accounting and no logical-line loss.",
+    "Differential normalized snapshots against the checked-in Ghostty oracle corpus."
+  ],
+  "acceptance": [
+    "cargo fmt --all -- --check",
+    "cargo check --workspace --all-targets",
+    "cargo test -p mr-crabs-terminal -- --test-threads=1",
+    "cargo test -p mr-crabs-oracle",
+    "cargo clippy -p mr-crabs-terminal --all-targets -- -D warnings",
+    "cargo run -p mr-crabs-oracle -- corpus verification/corpus",
+    "cargo run --release -p mr-crabs-bench -- --suite s3 --json verification/s3-results.json",
+    "size_of::<mr_crabs_terminal::Cell>() == 8",
+    "one-million-line resident memory is bounded and no worse than the S0 oracle baseline"
+  ]
+}

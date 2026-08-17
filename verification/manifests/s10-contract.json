@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "slice": "S10",
+  "title": "GPUI product shell",
+  "base_commit": "a56687bfad4e243d6930b9f6803b081bfb08d266",
+  "scope": [
+    "rust/Cargo.toml",
+    "rust/Cargo.lock",
+    "rust/crates/mr-crabs-app/**",
+    "rust/verification/manifests/s10-*.json",
+    "rust/verification/shell-corpus/**"
+  ],
+  "required_api": {
+    "shell-model": [
+      "AppModel (windows/tabs/panes, focus, dispatch, pump, shutdown_all) with headless construction",
+      "WindowModel (tab_order, active_tab, close_tab cascade, resize, cycle_tab)",
+      "TabModel (split tree, close_pane cascade, goto_split, cycle_pane, resize_all, close_all)",
+      "SplitTree recursive splits (split/remove collapse/resize/rects/neighbor/next) with PaneId",
+      "PaneModel + PaneSession (bounded mr-crabs-pty lifecycle, deterministic shutdown, Arc<FrameDelta> handoff)"
+    ],
+    "command-palette": [
+      "CommandRegistry (register/unregister/search/dispatch) with one shell.<action> command per AppAction",
+      "PaletteState (open/query/navigate/activate) headless"
+    ],
+    "settings": [
+      "AppSettings typed JSON with Ghostty-compatible defaults",
+      "SettingsStore atomic reload (parse fully, then swap; generation bump; errors never half-apply)"
+    ],
+    "quick-terminal": [
+      "QuickTerminalState + AppModel show/hide/toggle; hidden windows keep live sessions"
+    ],
+    "menus": [
+      "MenuModel/MenuDef/MenuItemDef default_shell structure; GPUI conversion in ui::menus"
+    ],
+    "secure-input": [
+      "SecureInputState (toggle/track/clear) + SecureInputBackend trait + explicit DisabledSecureInputBackend"
+    ],
+    "accessibility": [
+      "AccessibilitySnapshot/Node from model (window/tab/pane/grid/palette) + perform(action) routing"
+    ],
+    "app-intents": [
+      "AppIntent::parse_url (ghostty://open, ghostty://open-url) + bounded IntentRouter records"
+    ],
+    "dock-behavior": [
+      "DockBehavior (items, recent_documents bounded, activation_policy, reopen_action) + AppModel::handle_reopen"
+    ],
+    "updates": [
+      "UpdateService trait + DisabledUpdateService + LocalManifestUpdateService; no network I/O"
+    ],
+    "crash-reporting": [
+      "CrashReporter trait + DisabledCrashReporter + LocalFileCrashReporter (JSON, bounded rotation)"
+    ],
+    "platform-integrations": [
+      "PlatformCapabilities (kind, menu_bar, dock, accessibility, pty_spawn, ...) with macos()/headless()/current()"
+    ],
+    "restore": [
+      "ShellStateV1 versioned persistence (snapshot/save/load/apply) with tree/pane/focus validation"
+    ],
+    "keyboard-only-operation": [
+      "KeyBindingDef + KeymapResolver + default_keybindings; every shell action keyboard-dispatachable"
+    ],
+    "binary": [
+      "bin target ghostty: gpui_platform::application, one window, focus, keybindings, menus, accessibility roles, TerminalElement rendering"
+    ]
+  },
+  "parity_map": [
+    { "id": "windows", "status": "implemented", "symbols": ["AppModel::new_window/new_window_with/close_window", "AppAction::NewWindow/CloseWindow"], "tests": ["headless_shell_starts_with_one_window_one_tab_one_pane", "close_tab_cascades_to_window_close_and_quit"] },
+    { "id": "tabs", "status": "implemented", "symbols": ["WindowModel::add_tab/close_tab/cycle_tab", "TabModel", "AppAction::NewTab/CloseTab/NextTab/PreviousTab"], "tests": ["add_and_cycle_tabs", "close_tab_moves_active_and_shuts_down_sessions", "keyboard_only_workflow_through_the_default_keymap"] },
+    { "id": "splits", "status": "implemented", "symbols": ["SplitTree::split/remove/resize/rects", "TabModel::insert_split_pane", "AppAction::NewSplitRight/NewSplitDown/ClosePane"], "tests": ["nested_splits_preserve_their_own_axes", "removing_middle_leaf_keeps_sibling_subtree", "resize_adjusts_the_nearest_matching_ancestor_and_clamps", "close_pane_middle_of_three_collapses_to_sibling_subtree"] },
+    { "id": "pane-focus", "status": "implemented", "symbols": ["TabModel::focus_pane/cycle_pane", "WindowModel::focus_pane", "AppModel::focus_pane", "AppAction::NextPane/PreviousPane"], "tests": ["focus_order_cycles", "goto_split_and_cycle_pane_move_focus", "focus_pane_activates_its_tab"] },
+    { "id": "pane-navigation", "status": "implemented", "symbols": ["SplitTree::neighbor", "TabModel::goto_split", "AppAction::GotoSplitUp/Down/Left/Right"], "tests": ["directional_neighbor_prefers_overlap_then_gap", "neighbor_requires_strict_direction", "split_navigation_and_cycle_work_through_window"] },
+    { "id": "command-palette", "status": "implemented", "symbols": ["CommandRegistry::install_shell_commands/search/dispatch", "PaletteState", "AppAction::TogglePalette"], "tests": ["shell_commands_cover_every_action_exactly_once", "palette_open_query_navigate_and_activate", "palette_activation_dispatches_shell_commands"] },
+    { "id": "settings", "status": "implemented", "symbols": ["AppSettings::from_json/animation_defaults", "SettingsStore::reload_json/reload_path/reload_from_source"], "tests": ["defaults_are_ghostty_compatible", "reload_is_atomic_on_error", "successful_reload_swaps_snapshot_and_bumps_generation"] },
+    { "id": "config-reload", "status": "implemented", "symbols": ["AppAction::ReloadConfig", "SettingsStore", "AppCore::set_animation_defaults"], "tests": ["reload_from_source_without_source_errors_cleanly", "dispatch_reload_config_without_source_is_ignored"] },
+    { "id": "quick-terminal", "status": "implemented", "symbols": ["QuickTerminalState", "AppModel::show_quick_terminal/hide_quick_terminal/toggle_quick_terminal", "AppAction::ToggleQuickTerminal"], "tests": ["quick_terminal_toggle_persists_session_and_window", "hidden_quick_terminal_is_not_in_the_tree"] },
+    { "id": "menus", "status": "implemented", "symbols": ["MenuModel::default_shell/action_items/set_checked", "ui::menus::gpui_menus"], "tests": ["default_shell_menus_cover_the_action_surface", "submenu_actions_flatten_in_order", "set_checked_touches_only_matching_items"] },
+    { "id": "secure-input", "status": "implemented", "symbols": ["SecureInputState", "SecureInputBackend", "DisabledSecureInputBackend", "AppAction::ToggleSecureInput"], "tests": ["toggle_flips_state_and_counts", "panes_are_tracked_and_cleared", "disabled_backend_reports_unsupported", "secure_input_tracks_the_focused_pane"] },
+    { "id": "accessibility", "status": "implemented", "symbols": ["AccessibilitySnapshot::from_model/perform", "AccessibilityNode", "AccessibleAction"], "tests": ["snapshot_mirrors_windows_tabs_panes_and_grids", "activating_a_pane_node_focuses_it", "closing_a_pane_node_cascades", "palette_item_activation_dispatches"] },
+    { "id": "app-intents", "status": "implemented", "symbols": ["AppIntent::parse_url", "IntentRouter::push/records", "AppModel::dispatch_intent/handle_open_url"], "tests": ["parses_open_intent_urls", "parses_open_url_intent", "rejects_bad_intent_urls", "router_bounds_records", "dispatch_open_url_creates_tab_and_records"] },
+    { "id": "dock-behavior", "status": "implemented", "symbols": ["DockBehavior", "AppModel::handle_reopen", "DockOutcome"], "tests": ["default_shell_has_new_window_item", "recent_documents_dedupe_and_stay_bounded", "activate_only_policy_does_not_create_windows", "dock_reopen_creates_a_window_when_none_exists"] },
+    { "id": "updates", "status": "implemented", "symbols": ["UpdateService", "DisabledUpdateService", "LocalManifestUpdateService", "compare_versions"], "tests": ["disabled_service_never_checks", "local_manifest_reports_available_update", "local_manifest_reports_up_to_date_when_equal_or_newer", "missing_manifest_is_up_to_date_not_an_error", "version_comparison_is_numeric_per_segment"] },
+    { "id": "crash-reporting", "status": "implemented", "symbols": ["CrashReporter", "DisabledCrashReporter", "LocalFileCrashReporter"], "tests": ["disabled_reporter_rejects_reports", "local_reporter_writes_files_and_rotates", "report_ids_are_unique_and_contain_timestamps"] },
+    { "id": "platform-integrations", "status": "implemented", "symbols": ["PlatformCapabilities::macos/headless/current", "PlatformKind"], "tests": ["headless_profile_has_no_services", "macos_profile_has_product_services_but_no_network_updates"] },
+    { "id": "keyboard-only-operation", "status": "implemented", "symbols": ["KeyBindingDef", "ShellKeystroke::parse", "KeymapResolver::resolve", "default_keybindings", "AppModel::palette_key"], "tests": ["keyboard_only_workflow_through_the_default_keymap", "parse_plain_and_modified_keystrokes", "defaults_cover_the_shell_action_surface", "later_bindings_override_earlier_ones"] },
+    { "id": "shell-state-restore", "status": "implemented", "symbols": ["ShellStateV1", "RestoreStore::snapshot/save/load/apply", "SplitTreeStateV1", "AppModel::apply_restore_state"], "tests": ["round_trip_preserves_windows_tabs_tree_and_focus", "save_and_load_round_trip_through_disk", "unsupported_versions_are_rejected", "invalid_trees_are_rejected", "restore_round_trip_preserves_structure_and_focus"] }
+  ],
+  "acceptance": [
+    "Every S10 callable-parity ID maps exactly once to production symbols and tests (see parity_map)",
+    "cargo build -p mr-crabs-app --bin ghostty compiles after parent formatting",
+    "Headless behavioral tests cover tab/split resize, close cascade, and restore round trips",
+    "Keyboard-only operation verified through the default keymap end-to-end",
+    "PTY ownership bounded (mr-crabs-pty queues) and shut down deterministically (close paths + Drop)",
+    "Update/crash reporting interfaces ship explicit disabled/local implementations; no network telemetry",
+    "No GUI launch; parent owns all builds, tests, lint, and integration",
+    "Current AppCore API preserved source compatible (additive methods only)"
+  ],
+  "constraints": [
+    "Do not run formatting, builds, tests, lint, benchmarks, or the oracle",
+    "Do not launch any GUI",
+    "Do not edit callable-parity.json; lead updates acceptance state",
+    "Do not commit",
+    "No direct dependency on S6-S9 crates",
+    "Preserve inherited Ghostty product behaviors as modeled production state; nothing deleted"
+  ]
+}

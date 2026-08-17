@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mr-crabs.local/schemas/baseline-v1.json",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "source_head",
+    "machine",
+    "warmup",
+    "repetitions",
+    "workloads"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "source_head": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "machine": {
+      "type": "object"
+    },
+    "warmup": {
+      "type": "object"
+    },
+    "repetitions": {
+      "type": "integer",
+      "minimum": 5
+    },
+    "workloads": {
+      "type": "object",
+      "required": [
+        "ascii_10mb",
+        "unicode_10mb",
+        "scrollback_1m_lines",
+        "cli_startup_version",
+        "idle_60s",
+        "frame_metrics"
+      ]
+    }
+  },
+  "additionalProperties": false
+}

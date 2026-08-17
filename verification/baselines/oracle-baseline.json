@@ -1,0 +1,157 @@
+{
+  "schema_version": 1,
+  "source_head": "d2c70a8c7b9b6893c13640c02d7b6f9a1624f3f0",
+  "machine": {
+    "zig": "0.16.0",
+    "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14) (Homebrew)",
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30) (Homebrew)",
+    "clang": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
+    "macos": "26.5",
+    "arch": "arm64"
+  },
+  "warmup": {
+    "runs": 1
+  },
+  "repetitions": 5,
+  "workloads": {
+    "ascii_10mb": {
+      "runs": [
+        {
+          "wall_ns": 33178416,
+          "max_rss_bytes": 10207232,
+          "peak_footprint_bytes": 8618416
+        },
+        {
+          "wall_ns": 31182666,
+          "max_rss_bytes": 10059776,
+          "peak_footprint_bytes": 8634800
+        },
+        {
+          "wall_ns": 31725042,
+          "max_rss_bytes": 10092544,
+          "peak_footprint_bytes": 8667568
+        },
+        {
+          "wall_ns": 30922375,
+          "max_rss_bytes": 10174464,
+          "peak_footprint_bytes": 8667568
+        },
+        {
+          "wall_ns": 31589875,
+          "max_rss_bytes": 10059776,
+          "peak_footprint_bytes": 8634800
+        }
+      ],
+      "median_wall_ns": 31589875,
+      "median_max_rss_bytes": 10092544,
+      "median_peak_footprint_bytes": 8634800,
+      "throughput_mib_s": 316.5571247116362
+    },
+    "unicode_10mb": {
+      "runs": [
+        {
+          "wall_ns": 43462792,
+          "max_rss_bytes": 10125312,
+          "peak_footprint_bytes": 8651184
+        },
+        {
+          "wall_ns": 43165459,
+          "max_rss_bytes": 10125312,
+          "peak_footprint_bytes": 8618416
+        },
+        {
+          "wall_ns": 43406750,
+          "max_rss_bytes": 10158080,
+          "peak_footprint_bytes": 8634800
+        },
+        {
+          "wall_ns": 43643250,
+          "max_rss_bytes": 10108928,
+          "peak_footprint_bytes": 8651184
+        },
+        {
+          "wall_ns": 44034958,
+          "max_rss_bytes": 10125312,
+          "peak_footprint_bytes": 8651184
+        }
+      ],
+      "median_wall_ns": 43462792,
+      "median_max_rss_bytes": 10125312,
+      "median_peak_footprint_bytes": 8651184,
+      "throughput_mib_s": 230.08185944428052
+    },
+    "scrollback_1m": {
+      "runs": [
+        {
+          "wall_ns": 39160542,
+          "max_rss_bytes": 9977856,
+          "peak_footprint_bytes": 8618416
+        },
+        {
+          "wall_ns": 38706958,
+          "max_rss_bytes": 10076160,
+          "peak_footprint_bytes": 8618416
+        },
+        {
+          "wall_ns": 38018958,
+          "max_rss_bytes": 9977856,
+          "peak_footprint_bytes": 8667568
+        },
+        {
+          "wall_ns": 38474125,
+          "max_rss_bytes": 10059776,
+          "peak_footprint_bytes": 8618416
+        },
+        {
+          "wall_ns": 38243709,
+          "max_rss_bytes": 10059776,
+          "peak_footprint_bytes": 8618416
+        }
+      ],
+      "median_wall_ns": 38474125,
+      "median_max_rss_bytes": 10059776,
+      "median_peak_footprint_bytes": 8618416,
+      "throughput_mib_s": 123.93710271594871
+    },
+    "cli_startup_version": {
+      "runs": [
+        {
+          "wall_ns": 12436125,
+          "max_rss_bytes": 12632064,
+          "peak_footprint_bytes": 2736584
+        },
+        {
+          "wall_ns": 12346292,
+          "max_rss_bytes": 12648448,
+          "peak_footprint_bytes": 2785760
+        },
+        {
+          "wall_ns": 11575083,
+          "max_rss_bytes": 12632064,
+          "peak_footprint_bytes": 2752992
+        },
+        {
+          "wall_ns": 11590833,
+          "max_rss_bytes": 12615680,
+          "peak_footprint_bytes": 2752992
+        },
+        {
+          "wall_ns": 11565000,
+          "max_rss_bytes": 12599296,
+          "peak_footprint_bytes": 2720224
+        }
+      ],
+      "median_wall_ns": 11590833,
+      "median_max_rss_bytes": 12632064,
+      "median_peak_footprint_bytes": 2752992
+    },
+    "idle_60s": {
+      "status": "not_measured",
+      "reason": "Requires a GUI terminal instance; Jamie did not explicitly authorize visual/GUI launch."
+    },
+    "frame_metrics": {
+      "status": "not_measured",
+      "reason": "Requires an authorized GUI render surface; no extra GUI instance launched."
+    }
+  }
+}

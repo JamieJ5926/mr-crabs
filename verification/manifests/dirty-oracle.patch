@@ -1,0 +1,2275 @@
+diff --git a/macos/Ghostty-Info.plist b/macos/Ghostty-Info.plist
+index 7ffe12c39..29f5bc613 100644
+--- a/macos/Ghostty-Info.plist
++++ b/macos/Ghostty-Info.plist
+@@ -106,8 +106,6 @@
+ 	</array>
+ 	<key>SUEnableAutomaticChecks</key>
+ 	<false/>
+-	<key>SUPublicEDKey</key>
+-	<string>wsNcGf5hirwtdXMVnYoxRIX/SqZQLMOsYlD3q3imeok=</string>
+ 	<key>UTExportedTypeDeclarations</key>
+ 	<array>
+ 		<dict>
+diff --git a/macos/Ghostty.xcodeproj/project.pbxproj b/macos/Ghostty.xcodeproj/project.pbxproj
+index 96cbaca0a..092ea9c4e 100644
+--- a/macos/Ghostty.xcodeproj/project.pbxproj
++++ b/macos/Ghostty.xcodeproj/project.pbxproj
+@@ -83,7 +83,7 @@
+ 		A586167B2B7703CC009BDB1D /* fish */ = {isa = PBXFileReference; lastKnownFileType = folder; name = fish; path = "../zig-out/share/fish"; sourceTree = "<group>"; };
+ 		A5985CE52C33060F00C57AD3 /* man */ = {isa = PBXFileReference; lastKnownFileType = folder; name = man; path = "../zig-out/share/man"; sourceTree = "<group>"; };
+ 		A5A1F8842A489D6800D1E8BC /* terminfo */ = {isa = PBXFileReference; lastKnownFileType = folder; name = terminfo; path = "../zig-out/share/terminfo"; sourceTree = "<group>"; };
+-		A5B30531299BEAAA0047F10C /* Ghostty.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Ghostty.app; sourceTree = BUILT_PRODUCTS_DIR; };
++		A5B30531299BEAAA0047F10C /* Mr Crabs.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Mr Crabs.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+ 		A5B30538299BEAAB0047F10C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+ 		A5B3053D299BEAAB0047F10C /* Ghostty.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Ghostty.entitlements; sourceTree = "<group>"; };
+ 		A5D495A1299BEC7E00DD1313 /* GhosttyKit.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = GhosttyKit.xcframework; sourceTree = "<group>"; };
+@@ -197,7 +197,7 @@
+ 		A5B30532299BEAAA0047F10C /* Products */ = {
+ 			isa = PBXGroup;
+ 			children = (
+-				A5B30531299BEAAA0047F10C /* Ghostty.app */,
++				A5B30531299BEAAA0047F10C /* Mr Crabs.app */,
+ 				A54F45F32E1F047A0046BD5C /* GhosttyTests.xctest */,
+ 				810ACC9F2E9D3301004F8F92 /* GhosttyUITests.xctest */,
+ 				8193244D2F24E6C000A9ED8F /* DockTilePlugin.plugin */,
+@@ -305,7 +305,7 @@
+ 				A51BFC262B30F1B800E92F16 /* Sparkle */,
+ 			);
+ 			productName = Ghostty;
+-			productReference = A5B30531299BEAAA0047F10C /* Ghostty.app */;
++			productReference = A5B30531299BEAAA0047F10C /* Mr Crabs.app */;
+ 			productType = "com.apple.product-type.application";
+ 		};
+ /* End PBXNativeTarget section */
+@@ -552,7 +552,7 @@
+ 				GCC_OPTIMIZATION_LEVEL = fast;
+ 				GENERATE_INFOPLIST_FILE = YES;
+ 				INFOPLIST_FILE = "Ghostty-Info.plist";
+-				INFOPLIST_KEY_CFBundleDisplayName = Ghostty;
++				INFOPLIST_KEY_CFBundleDisplayName = "Mr Crabs";
+ 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+ 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "A program running within Ghostty would like to use AppleScript.";
+ 				INFOPLIST_KEY_NSAudioCaptureUsageDescription = "A program running within Ghostty would like to access your system's audio.";
+@@ -579,8 +579,8 @@
+ 				MACOSX_DEPLOYMENT_TARGET = 13.0;
+ 				MARKETING_VERSION = 0.1;
+ 				"OTHER_LDFLAGS[arch=*]" = "-lstdc++";
+-				PRODUCT_BUNDLE_IDENTIFIER = com.mitchellh.ghostty;
+-				PRODUCT_NAME = "$(TARGET_NAME)";
++				PRODUCT_BUNDLE_IDENTIFIER = dev.jamie.mr-crabs;
++				PRODUCT_NAME = "Mr Crabs";
+ 				SWIFT_EMIT_LOC_STRINGS = YES;
+ 				SWIFT_OBJC_BRIDGING_HEADER = "Sources/App/ghostty-bridging-header.h";
+ 				SWIFT_VERSION = 5.0;
+@@ -598,7 +598,7 @@
+ 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+ 				MACOSX_DEPLOYMENT_TARGET = 13.0;
+ 				MARKETING_VERSION = 1.0;
+-				PRODUCT_BUNDLE_IDENTIFIER = com.mitchellh.GhosttyUITests;
++				PRODUCT_BUNDLE_IDENTIFIER = dev.jamie.mr-crabs-ui-tests;
+ 				PRODUCT_NAME = "$(TARGET_NAME)";
+ 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+ 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+@@ -621,7 +621,7 @@
+ 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+ 				MACOSX_DEPLOYMENT_TARGET = 13.0;
+ 				MARKETING_VERSION = 1.0;
+-				PRODUCT_BUNDLE_IDENTIFIER = com.mitchellh.GhosttyUITests;
++				PRODUCT_BUNDLE_IDENTIFIER = dev.jamie.mr-crabs-ui-tests;
+ 				PRODUCT_NAME = "$(TARGET_NAME)";
+ 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+ 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
+@@ -644,7 +644,7 @@
+ 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+ 				MACOSX_DEPLOYMENT_TARGET = 13.0;
+ 				MARKETING_VERSION = 1.0;
+-				PRODUCT_BUNDLE_IDENTIFIER = com.mitchellh.GhosttyUITests;
++				PRODUCT_BUNDLE_IDENTIFIER = dev.jamie.mr-crabs-ui-tests;
+ 				PRODUCT_NAME = "$(TARGET_NAME)";
+ 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+ 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
+@@ -666,14 +666,14 @@
+ 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+ 				GCC_C_LANGUAGE_STANDARD = gnu17;
+ 				GENERATE_INFOPLIST_FILE = YES;
+-				INFOPLIST_KEY_CFBundleDisplayName = "Ghostty Dock Tile Plugin";
++				INFOPLIST_KEY_CFBundleDisplayName = "Mr Crabs Dock Tile Plugin";
+ 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+ 				INFOPLIST_KEY_NSPrincipalClass = "";
+ 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Bundles";
+ 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+ 				MACOSX_DEPLOYMENT_TARGET = 13.0;
+ 				MARKETING_VERSION = 0.1;
+-				PRODUCT_BUNDLE_IDENTIFIER = "com.mitchellh.ghostty-dock-tile";
++				PRODUCT_BUNDLE_IDENTIFIER = "dev.jamie.mr-crabs-dock-tile";
+ 				PRODUCT_NAME = "$(TARGET_NAME)";
+ 				PROVISIONING_PROFILE_SPECIFIER = "";
+ 				SKIP_INSTALL = YES;
+@@ -695,14 +695,14 @@
+ 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+ 				GCC_C_LANGUAGE_STANDARD = gnu17;
+ 				GENERATE_INFOPLIST_FILE = YES;
+-				INFOPLIST_KEY_CFBundleDisplayName = "Ghostty Dock Tile Plugin";
++				INFOPLIST_KEY_CFBundleDisplayName = "Mr Crabs Dock Tile Plugin";
+ 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+ 				INFOPLIST_KEY_NSPrincipalClass = "";
+ 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Bundles";
+ 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+ 				MACOSX_DEPLOYMENT_TARGET = 13.0;
+ 				MARKETING_VERSION = 0.1;
+-				PRODUCT_BUNDLE_IDENTIFIER = "com.mitchellh.ghostty-dock-tile";
++				PRODUCT_BUNDLE_IDENTIFIER = "dev.jamie.mr-crabs-dock-tile";
+ 				PRODUCT_NAME = "$(TARGET_NAME)";
+ 				PROVISIONING_PROFILE_SPECIFIER = "";
+ 				SKIP_INSTALL = YES;
+@@ -724,14 +724,14 @@
+ 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+ 				GCC_C_LANGUAGE_STANDARD = gnu17;
+ 				GENERATE_INFOPLIST_FILE = YES;
+-				INFOPLIST_KEY_CFBundleDisplayName = "Ghostty Dock Tile Plugin";
++				INFOPLIST_KEY_CFBundleDisplayName = "Mr Crabs Dock Tile Plugin";
+ 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+ 				INFOPLIST_KEY_NSPrincipalClass = "";
+ 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Bundles";
+ 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+ 				MACOSX_DEPLOYMENT_TARGET = 13.0;
+ 				MARKETING_VERSION = 0.1;
+-				PRODUCT_BUNDLE_IDENTIFIER = "com.mitchellh.ghostty-dock-tile";
++				PRODUCT_BUNDLE_IDENTIFIER = "dev.jamie.mr-crabs-dock-tile";
+ 				PRODUCT_NAME = "$(TARGET_NAME)";
+ 				PROVISIONING_PROFILE_SPECIFIER = "";
+ 				SKIP_INSTALL = YES;
+@@ -755,7 +755,7 @@
+ 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+ 				MACOSX_DEPLOYMENT_TARGET = 15.5;
+ 				MARKETING_VERSION = 1.0;
+-				PRODUCT_BUNDLE_IDENTIFIER = com.mitchellh.GhosttyTests;
++				PRODUCT_BUNDLE_IDENTIFIER = dev.jamie.mr-crabs-tests;
+ 				PRODUCT_NAME = "$(TARGET_NAME)";
+ 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+ 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+@@ -763,7 +763,7 @@
+ 				SWIFT_EMIT_LOC_STRINGS = NO;
+ 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+ 				SWIFT_VERSION = 5.0;
+-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Ghostty.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ghostty";
++				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Mr Crabs.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ghostty";
+ 			};
+ 			name = Debug;
+ 		};
+@@ -779,14 +779,14 @@
+ 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+ 				MACOSX_DEPLOYMENT_TARGET = 15.5;
+ 				MARKETING_VERSION = 1.0;
+-				PRODUCT_BUNDLE_IDENTIFIER = com.mitchellh.GhosttyTests;
++				PRODUCT_BUNDLE_IDENTIFIER = dev.jamie.mr-crabs-tests;
+ 				PRODUCT_NAME = "$(TARGET_NAME)";
+ 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+ 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+ 				SWIFT_EMIT_LOC_STRINGS = NO;
+ 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+ 				SWIFT_VERSION = 5.0;
+-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Ghostty.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ghostty";
++				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Mr Crabs.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ghostty";
+ 			};
+ 			name = Release;
+ 		};
+@@ -802,14 +802,14 @@
+ 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+ 				MACOSX_DEPLOYMENT_TARGET = 15.5;
+ 				MARKETING_VERSION = 1.0;
+-				PRODUCT_BUNDLE_IDENTIFIER = com.mitchellh.GhosttyTests;
++				PRODUCT_BUNDLE_IDENTIFIER = dev.jamie.mr-crabs-tests;
+ 				PRODUCT_NAME = "$(TARGET_NAME)";
+ 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+ 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+ 				SWIFT_EMIT_LOC_STRINGS = NO;
+ 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+ 				SWIFT_VERSION = 5.0;
+-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Ghostty.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ghostty";
++				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Mr Crabs.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ghostty";
+ 			};
+ 			name = ReleaseLocal;
+ 		};
+@@ -950,7 +950,7 @@
+ 				EXECUTABLE_NAME = ghostty;
+ 				GENERATE_INFOPLIST_FILE = YES;
+ 				INFOPLIST_FILE = "Ghostty-Info.plist";
+-				INFOPLIST_KEY_CFBundleDisplayName = "Ghostty[DEBUG]";
++				INFOPLIST_KEY_CFBundleDisplayName = "Mr Crabs[DEBUG]";
+ 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+ 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "A program running within Ghostty would like to use AppleScript.";
+ 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "A program running within Ghostty would like to use Bluetooth.";
+@@ -976,8 +976,8 @@
+ 				MACOSX_DEPLOYMENT_TARGET = 13.0;
+ 				MARKETING_VERSION = 0.1;
+ 				"OTHER_LDFLAGS[arch=*]" = "-lstdc++";
+-				PRODUCT_BUNDLE_IDENTIFIER = com.mitchellh.ghostty.debug;
+-				PRODUCT_NAME = "$(TARGET_NAME)";
++				PRODUCT_BUNDLE_IDENTIFIER = dev.jamie.mr-crabs.debug;
++				PRODUCT_NAME = "Mr Crabs";
+ 				SWIFT_EMIT_LOC_STRINGS = YES;
+ 				SWIFT_OBJC_BRIDGING_HEADER = "Sources/App/ghostty-bridging-header.h";
+ 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+@@ -1005,7 +1005,7 @@
+ 				GCC_OPTIMIZATION_LEVEL = fast;
+ 				GENERATE_INFOPLIST_FILE = YES;
+ 				INFOPLIST_FILE = "Ghostty-Info.plist";
+-				INFOPLIST_KEY_CFBundleDisplayName = Ghostty;
++				INFOPLIST_KEY_CFBundleDisplayName = "Mr Crabs";
+ 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+ 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "A program running within Ghostty would like to use AppleScript.";
+ 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "A program running within Ghostty would like to use Bluetooth.";
+@@ -1031,8 +1031,8 @@
+ 				MACOSX_DEPLOYMENT_TARGET = 13.0;
+ 				MARKETING_VERSION = 0.1;
+ 				"OTHER_LDFLAGS[arch=*]" = "-lstdc++";
+-				PRODUCT_BUNDLE_IDENTIFIER = com.mitchellh.ghostty;
+-				PRODUCT_NAME = "$(TARGET_NAME)";
++				PRODUCT_BUNDLE_IDENTIFIER = dev.jamie.mr-crabs;
++				PRODUCT_NAME = "Mr Crabs";
+ 				SWIFT_EMIT_LOC_STRINGS = YES;
+ 				SWIFT_OBJC_BRIDGING_HEADER = "Sources/App/ghostty-bridging-header.h";
+ 				SWIFT_VERSION = 5.0;
+diff --git a/macos/Ghostty.xcodeproj/xcshareddata/xcschemes/Ghostty.xcscheme b/macos/Ghostty.xcodeproj/xcshareddata/xcschemes/Ghostty.xcscheme
+index 16be46d67..1dd634d26 100644
+--- a/macos/Ghostty.xcodeproj/xcshareddata/xcschemes/Ghostty.xcscheme
++++ b/macos/Ghostty.xcodeproj/xcshareddata/xcschemes/Ghostty.xcscheme
+@@ -15,7 +15,7 @@
+             <BuildableReference
+                BuildableIdentifier = "primary"
+                BlueprintIdentifier = "A5B30530299BEAAA0047F10C"
+-               BuildableName = "Ghostty.app"
++               BuildableName = "Mr Crabs.app"
+                BlueprintName = "Ghostty"
+                ReferencedContainer = "container:Ghostty.xcodeproj">
+             </BuildableReference>
+@@ -73,7 +73,7 @@
+          <BuildableReference
+             BuildableIdentifier = "primary"
+             BlueprintIdentifier = "A5B30530299BEAAA0047F10C"
+-            BuildableName = "Ghostty.app"
++            BuildableName = "Mr Crabs.app"
+             BlueprintName = "Ghostty"
+             ReferencedContainer = "container:Ghostty.xcodeproj">
+          </BuildableReference>
+@@ -103,7 +103,7 @@
+          <BuildableReference
+             BuildableIdentifier = "primary"
+             BlueprintIdentifier = "A5B30530299BEAAA0047F10C"
+-            BuildableName = "Ghostty.app"
++            BuildableName = "Mr Crabs.app"
+             BlueprintName = "Ghostty"
+             ReferencedContainer = "container:Ghostty.xcodeproj">
+          </BuildableReference>
+diff --git a/macos/Sources/Features/App Intents/IntentPermission.swift b/macos/Sources/Features/App Intents/IntentPermission.swift
+index 26a21e70b..36f323be6 100644
+--- a/macos/Sources/Features/App Intents/IntentPermission.swift	
++++ b/macos/Sources/Features/App Intents/IntentPermission.swift	
+@@ -44,7 +44,7 @@ func requestIntentPermission() async -> Bool {
+             }
+ 
+             PermissionRequest.show(
+-                "com.mitchellh.ghostty.shortcutsPermission",
++                "dev.jamie.mr-crabs.shortcutsPermission",
+                 message: "Allow Shortcuts to interact with Ghostty?",
+                 allowDuration: .forever,
+                 rememberDuration: nil,
+diff --git a/macos/Sources/Features/Custom App Icon/DockTilePlugin.swift b/macos/Sources/Features/Custom App Icon/DockTilePlugin.swift
+index 0b2d528e7..6999216b9 100644
+--- a/macos/Sources/Features/Custom App Icon/DockTilePlugin.swift	
++++ b/macos/Sources/Features/Custom App Icon/DockTilePlugin.swift	
+@@ -8,11 +8,13 @@ class DockTilePlugin: NSObject, NSDockTilePlugIn {
+     private let pluginBundle = Bundle(for: DockTilePlugin.self)
+ 
+     // Separate defaults based on debug vs release builds so we can test icons
+-    // without messing up releases.
++    // without messing up releases. This must match the app bundle identifier
++    // (dev.jamie.mr-crabs / dev.jamie.mr-crabs.debug) so the plugin shares the
++    // Mr Crabs defaults domain, not upstream Ghostty's.
+     #if DEBUG
+-    private let ghosttyUserDefaults = UserDefaults(suiteName: "com.mitchellh.ghostty.debug")
++    private let ghosttyUserDefaults = UserDefaults(suiteName: "dev.jamie.mr-crabs.debug")
+     #else
+-    private let ghosttyUserDefaults = UserDefaults(suiteName: "com.mitchellh.ghostty")
++    private let ghosttyUserDefaults = UserDefaults(suiteName: "dev.jamie.mr-crabs")
+     #endif
+ 
+     private var iconChangeObserver: Any?
+diff --git a/macos/Sources/Features/Terminal/Window Styles/TerminalWindow.swift b/macos/Sources/Features/Terminal/Window Styles/TerminalWindow.swift
+index ac1d2b881..fda0e87ab 100644
+--- a/macos/Sources/Features/Terminal/Window Styles/TerminalWindow.swift	
++++ b/macos/Sources/Features/Terminal/Window Styles/TerminalWindow.swift	
+@@ -24,6 +24,9 @@ class TerminalWindow: NSWindow {
+     /// Update notification UI in titlebar
+     private let updateAccessory = NSTitlebarAccessoryViewController()
+ 
++    /// Fork marker that keeps development windows visually distinct from Ghostty.
++    private let mrCrabsAccessory = NSTitlebarAccessoryViewController()
++
+     /// Visual indicator that mirrors the selected tab color.
+     private lazy var tabColorIndicator: NSHostingView<TabColorIndicatorView> = {
+         let view = NSHostingView(rootView: TabColorIndicatorView(tabColor: tabColor))
+@@ -153,6 +156,20 @@ class TerminalWindow: NSWindow {
+                 addTitlebarAccessoryViewController(updateAccessory)
+                 updateAccessory.view.translatesAutoresizingMaskIntoConstraints = false
+             }
++
++            mrCrabsAccessory.layoutAttribute = .right
++            mrCrabsAccessory.view = NonDraggableHostingView(rootView:
++                Text("MR CRABS")
++                    .font(.system(size: 10, weight: .bold, design: .rounded))
++                    .foregroundStyle(.black)
++                    .padding(.horizontal, 8)
++                    .padding(.vertical, 3)
++                    .background(Color.orange)
++                    .clipShape(Capsule())
++                    .padding(.horizontal, 6)
++            )
++            addTitlebarAccessoryViewController(mrCrabsAccessory)
++            mrCrabsAccessory.view.translatesAutoresizingMaskIntoConstraints = false
+         }
+ 
+         // Setup the accessory view for tabs that shows our keyboard shortcuts,
+diff --git a/macos/Sources/Features/Update/UpdateDelegate.swift b/macos/Sources/Features/Update/UpdateDelegate.swift
+index fbd436d92..4ea483ba8 100644
+--- a/macos/Sources/Features/Update/UpdateDelegate.swift
++++ b/macos/Sources/Features/Update/UpdateDelegate.swift
+@@ -3,17 +3,13 @@ import Cocoa
+ 
+ extension UpdateDriver: SPUUpdaterDelegate {
+     func feedURLString(for updater: SPUUpdater) -> String? {
+-        guard let appDelegate = NSApplication.shared.delegate as? AppDelegate else {
+-            return nil
+-        }
+-
+-        // Sparkle supports a native concept of "channels" but it requires that
+-        // you share a single appcast file. We don't want to do that so we
+-        // do this instead.
+-        switch appDelegate.ghostty.config.autoUpdateChannel {
+-        case .tip: return "https://tip.files.ghostty.org/appcast.xml"
+-        case .stable: return "https://release.files.ghostty.org/appcast.xml"
+-        }
++        // Mr Crabs is a fork without its own Sparkle infrastructure. We must
++        // never point Sparkle at Ghostty's upstream appcasts (or the fork
++        // would offer to install upstream Ghostty releases), so we return
++        // nil: Sparkle then has no feed and never queries any server.
++        // Automatic checks are additionally disabled via
++        // SUEnableAutomaticChecks=false in Ghostty-Info.plist.
++        return nil
+     }
+ 
+     /// Called when an update is scheduled to install silently,
+diff --git a/src/build/GhosttyXcodebuild.zig b/src/build/GhosttyXcodebuild.zig
+index 6f7e18dc3..e361e6551 100644
+--- a/src/build/GhosttyXcodebuild.zig
++++ b/src/build/GhosttyXcodebuild.zig
+@@ -49,7 +49,10 @@ pub fn init(
+     };
+ 
+     const env = b.graph.environ_map;
+-    const app_path = b.fmt("macos/build/{s}/Ghostty.app", .{xc_config});
++    // NOTE: The Xcode project builds the app product under the name
++    // "Mr Crabs" (PRODUCT_NAME in the Ghostty target), so the output
++    // bundle is "Mr Crabs.app". The internal executable stays "ghostty".
++    const app_path = b.fmt("macos/build/{s}/Mr Crabs.app", .{xc_config});
+ 
+     // Our step to build the Ghostty macOS app.
+     const build = build: {
+@@ -124,7 +127,7 @@ pub fn init(
+         break :xctest step;
+     };
+ 
+-    // Our step to open the resulting Ghostty app.
++    // Our step to open the resulting Mr Crabs app.
+     const open = open: {
+         const disable_save_state = RunStep.create(b, "disable save state");
+         disable_save_state.has_side_effects = true;
+@@ -139,7 +142,7 @@ pub fn init(
+         disable_save_state.expectExitCode(0);
+         disable_save_state.step.dependOn(&build.step);
+ 
+-        const open = RunStep.create(b, "run Ghostty app");
++        const open = RunStep.create(b, "run Mr Crabs app");
+         open.has_side_effects = true;
+         open.cwd = b.path("");
+         open.addArgs(&.{b.fmt(
+diff --git a/src/build_config.zig b/src/build_config.zig
+index c19f7372b..47bd18343 100644
+--- a/src/build_config.zig
++++ b/src/build_config.zig
+@@ -45,7 +45,10 @@ pub const i18n: bool = config.i18n;
+ 
+ /// The bundle ID for the app. This is used in many places and is currently
+ /// hardcoded here. We could make this configurable in the future if there
+-/// is a reason to do so.
++/// is a reason to do so. On macOS this drives the app bundle ID and the
++/// config/cache/log directory names (see src/os/macos.zig and
++/// src/main_ghostty.zig); it must match the Info.plist bundle identifier
++/// (macos/Ghostty.xcodeproj PRODUCT_BUNDLE_IDENTIFIER).
+ ///
+ /// On macOS, this must match the App bundle ID. We can get that dynamically
+ /// via an API but I don't want to pay the cost of that at runtime.
+@@ -55,7 +58,7 @@ pub const i18n: bool = config.i18n;
+ /// There are many places that don't use this variable so simply swapping
+ /// this variable is NOT ENOUGH to change the bundle ID. I just wanted to
+ /// avoid it in Zig coe as much as possible.
+-pub const bundle_id = "com.mitchellh.ghostty";
++pub const bundle_id = "dev.jamie.mr-crabs";
+ 
+ /// True if we should have "slow" runtime safety checks. The initial motivation
+ /// for this was terminal page/pagelist integrity checks. These were VERY
+diff --git a/src/cli/Pager.zig b/src/cli/Pager.zig
+index 1523c8858..20281b8e4 100644
+--- a/src/cli/Pager.zig
++++ b/src/cli/Pager.zig
+@@ -16,8 +16,9 @@ const global = @import("../global.zig");
+ child: ?std.process.Child = null,
+ 
+ /// The buffered file writer used for both the pager pipe and direct
+-/// stdout paths.
+-file_writer: std.Io.File.Writer = undefined,
++/// stdout paths. This is only initialized by `writer`; `deinit` flushes
++/// it only when it has been initialized.
++file_writer: ?std.Io.File.Writer = null,
+ 
+ /// Initialize the pager. If stdout is a TTY, this spawns the pager
+ /// process. Otherwise, output goes directly to stdout.
+@@ -32,15 +33,17 @@ pub fn writer(self: *Pager, buffer: []u8) *std.Io.Writer {
+     } else {
+         self.file_writer = std.Io.File.stdout().writer(global.io(), buffer);
+     }
+-    return &self.file_writer.interface;
++    return &self.file_writer.?.interface;
+ }
+ 
+ /// Deinitialize the pager. Waits for the spawned process to exit.
+ pub fn deinit(self: *Pager) void {
+     if (self.child) |*child| {
+-        // Flush any remaining buffered data, close the pipe so the
+-        // pager sees EOF, then wait for it to exit.
+-        self.file_writer.interface.flush() catch {};
++        // Flush any remaining buffered data if a writer was obtained,
++        // close the pipe so the pager sees EOF, then wait for it to exit.
++        if (self.file_writer) |*fw| {
++            fw.interface.flush() catch {};
++        }
+         if (child.stdin) |stdin| {
+             stdin.close(global.io());
+             child.stdin = null;
+@@ -79,6 +82,13 @@ fn initPager() ?std.process.Child {
+ }
+ 
+ test "pager: non-tty" {
++    // If stdout is a TTY, init() spawns a real pager (resolved from the
++    // environment), so this test is only valid when stdout is not a TTY.
++    const stdout_file: std.Io.File = .stdout();
++    if (stdout_file.isTty(global.io()) catch return error.SkipZigTest) {
++        return error.SkipZigTest;
++    }
++
+     var pager: Pager = .init();
+     defer pager.deinit();
+     try std.testing.expect(pager.child == null);
+@@ -92,3 +102,22 @@ test "pager: default writer" {
+     const w = pager.writer(&buf);
+     try w.writeAll("hello");
+ }
++
++test "pager: deinit before writer" {
++    // A pager child may be selected (e.g. stdout is a TTY) before
++    // writer() is ever called. deinit must not flush an uninitialized
++    // buffered writer; it must still close stdin and wait for the child.
++    if (builtin.os.tag == .windows) return error.SkipZigTest;
++
++    // Don't depend on a specific external pager: spawn a plain child
++    // that exits when its stdin closes.
++    const child = std.process.spawn(global.io(), .{
++        .argv = &.{"/bin/cat"},
++        .stdin = .pipe,
++        .stdout = .inherit,
++        .stderr = .inherit,
++    }) catch return error.SkipZigTest;
++
++    var pager: Pager = .{ .child = child };
++    pager.deinit();
++}
+diff --git a/src/config/Config.zig b/src/config/Config.zig
+index 00b305486..df5f7f451 100644
+--- a/src/config/Config.zig
++++ b/src/config/Config.zig
+@@ -861,6 +861,96 @@ palette: Palette = .{},
+ /// make it difficult to find the cursor.
+ @"cursor-opacity": f64 = 1.0,
+ 
++/// If `true`, enables a built-in cursor glow and motion trail effect.
++///
++/// The effect is rendered as a post-processing pass that runs before any
++/// `custom-shader` files. It draws a soft glow around the cursor and a
++/// trail connecting the previous and current cursor positions. The trail
++/// fades out over `cursor-trail-duration` after each cursor movement, and
++/// animation frames are only scheduled while a cursor transition is still
++/// fading out (unless user custom shaders are present, which animate
++/// perpetually per `custom-shader-animation`).
++///
++/// The effect is purely visual: it does not modify terminal semantics,
++/// selection, accessibility, or input handling. When disabled, the
++/// rendering path is unchanged.
++///
++/// This can be changed at runtime and will affect all open terminals.
++@"cursor-trail": bool = true,
++
++/// The opacity (opposite of transparency) of the built-in cursor glow and
++/// motion trail (`cursor-trail`). A value of 1 is fully opaque and a value
++/// of 0 is fully transparent. A value less than 0 or greater than 1 will be
++/// clamped to the nearest valid value.
++///
++/// This can be changed at runtime and will affect all open terminals.
++@"cursor-trail-opacity": f64 = 0.35,
++
++/// The duration of the built-in cursor glow and motion trail (`cursor-trail`).
++/// This is how long the effect takes to fade out after each cursor movement;
++/// once this duration elapses the effect is fully transparent.
++///
++/// The value must be positive. Very small and very large values are clamped
++/// to a safe finite range so the effect always has a bounded animation
++/// window.
++///
++/// This can be changed at runtime and will affect all open terminals.
++@"cursor-trail-duration": Duration = .{ .duration = 250 * std.time.ns_per_ms },
++
++/// Controls the built-in text animation applied to newly output glyphs.
++///
++/// The valid values are:
++///
++///   * `none` - No text animation. Newly output glyphs are rendered
++///     immediately and no animation state is allocated.
++///   * `streaming` - (default) Newly changed glyph output is revealed
++///     left-to-right over `text-animation-duration` after it is written,
++///     like streaming text. The effect is a post-processing pass that
++///     runs before the built-in cursor trail and any `custom-shader`
++///     files.
++///   * `typewriter` - Newly changed glyph output is revealed one
++///     character at a time in terminal reading order: each changed cell
++///     is timestamped with a short fixed stagger derived from
++///     `text-animation-duration` (one eighth of the duration per
++///     character) so characters pop in quickly, one after another,
++///     rather than all together. Unchanged cells are never retimed, so
++///     existing text is not delayed.
++///
++/// The animation is purely visual: it never delays, drops, or reorders
++/// PTY bytes, and it does not modify terminal state, selection,
++/// accessibility, or input handling. Only cells whose rendered content
++/// actually changed are animated; unchanged screen content is stable.
++/// Animation frames are only scheduled while a reveal is in progress, so
++/// the effect alone never forces perpetual redraws (unless user custom
++/// shaders are present, which animate perpetually per
++/// `custom-shader-animation`).
++///
++/// This can be changed at runtime and will affect all open terminals.
++@"text-animation": TextAnimation = .streaming,
++
++/// The duration of the built-in text animation (`text-animation`).
++/// For `streaming`, this is how long newly changed glyphs take to reveal
++/// left-to-right after they are written. For `typewriter`, this is each
++/// character's reveal window; characters are additionally staggered by
++/// one eighth of this duration. Once the reveal completes, animation
++/// frames stop being scheduled.
++///
++/// The value must be positive. Very small and very large values are clamped
++/// to a safe finite range so the effect always has a bounded animation
++/// window.
++///
++/// This can be changed at runtime and will affect all open terminals.
++@"text-animation-duration": Duration = .{ .duration = 120 * std.time.ns_per_ms },
++
++/// The intensity of the built-in text animation (`text-animation`).
++/// A value of 1 fully hides newly changed glyphs until their reveal
++/// passes them, and a value of 0 disables the visual effect entirely
++/// (newly changed glyphs are shown immediately). A value less than 0 or
++/// greater than 1 will be clamped to the nearest valid value.
++///
++/// This can be changed at runtime and will affect all open terminals.
++@"text-animation-intensity": f64 = 1.0,
++
+ /// The style of the cursor. This sets the default style. A running program can
+ /// still request an explicit cursor style using escape sequences (such as `CSI
+ /// q`). Shell configurations will often request specific cursor styles.
+@@ -4818,6 +4908,31 @@ pub fn finalize(self: *Config) !void {
+ 
+     self.@"faint-opacity" = std.math.clamp(self.@"faint-opacity", 0.0, 1.0);
+ 
++    // Clamp our cursor trail configuration. The opacity must be in [0, 1]
++    // and the duration must be a positive, finite value so that the
++    // built-in cursor trail effect always has a bounded animation window.
++    self.@"cursor-trail-opacity" = std.math.clamp(self.@"cursor-trail-opacity", 0.0, 1.0);
++    self.@"cursor-trail-duration".duration = std.math.clamp(
++        self.@"cursor-trail-duration".duration,
++        std.time.ns_per_ms, // 1ms minimum
++        60 * std.time.ns_per_s, // 60s maximum
++    );
++
++    // Clamp our streaming text animation configuration. The intensity
++    // must be in [0, 1] and the duration must be a positive, finite value
++    // so that the built-in text animation always has a bounded animation
++    // window.
++    self.@"text-animation-duration".duration = std.math.clamp(
++        self.@"text-animation-duration".duration,
++        std.time.ns_per_ms, // 1ms minimum
++        5 * std.time.ns_per_s, // 5s maximum
++    );
++    self.@"text-animation-intensity" = std.math.clamp(
++        self.@"text-animation-intensity",
++        0.0,
++        1.0,
++    );
++
+     // Finalize key remapping set for efficient lookups
+     self.@"key-remap".finalize();
+ }
+@@ -5361,6 +5476,14 @@ pub const CustomShaderAnimation = enum(c_int) {
+     always,
+ };
+ 
++/// Valid values for text-animation
++/// c_int because it needs to be extern compatible
++pub const TextAnimation = enum(c_int) {
++    none,
++    streaming,
++    typewriter,
++};
++
+ /// Valid values for macos-non-native-fullscreen
+ /// c_int because it needs to be extern compatible
+ /// If this is changed, you must also update ghostty.h
+@@ -10983,6 +11106,129 @@ test "scrollback limits" {
+     );
+ }
+ 
++test "cursor trail config" {
++    const testing = std.testing;
++    const alloc = testing.allocator;
++
++    // Defaults: enabled, 0.35 opacity, 250ms duration.
++    var cfg = try Config.default(alloc);
++    defer cfg.deinit();
++    try testing.expect(cfg.@"cursor-trail");
++    try testing.expectEqual(@as(f64, 0.35), cfg.@"cursor-trail-opacity");
++    try testing.expectEqual(
++        @as(u64, 250 * std.time.ns_per_ms),
++        cfg.@"cursor-trail-duration".duration,
++    );
++
++    // Parsing.
++    var it: TestIterator = .{ .data = &.{
++        "--cursor-trail=false",
++        "--cursor-trail-opacity=0.5",
++        "--cursor-trail-duration=1s",
++    } };
++    try cfg.loadIter(alloc, &it);
++    try cfg.finalize();
++    try testing.expect(!cfg.@"cursor-trail");
++    try testing.expectEqual(@as(f64, 0.5), cfg.@"cursor-trail-opacity");
++    try testing.expectEqual(@as(u64, std.time.ns_per_s), cfg.@"cursor-trail-duration".duration);
++
++    // Clamping in finalize: opacity to [0, 1], duration to a safe range.
++    var clamp_cfg = try Config.default(alloc);
++    defer clamp_cfg.deinit();
++    var clamp_it: TestIterator = .{ .data = &.{
++        "--cursor-trail-opacity=2.5",
++        "--cursor-trail-duration=0ms",
++    } };
++    try clamp_cfg.loadIter(alloc, &clamp_it);
++    try clamp_cfg.finalize();
++    try testing.expectEqual(@as(f64, 1.0), clamp_cfg.@"cursor-trail-opacity");
++    try testing.expectEqual(
++        @as(u64, std.time.ns_per_ms),
++        clamp_cfg.@"cursor-trail-duration".duration,
++    );
++
++    var clamp_cfg2 = try Config.default(alloc);
++    defer clamp_cfg2.deinit();
++    var clamp_it2: TestIterator = .{ .data = &.{
++        "--cursor-trail-opacity=-1",
++        "--cursor-trail-duration=600y",
++    } };
++    try clamp_cfg2.loadIter(alloc, &clamp_it2);
++    try clamp_cfg2.finalize();
++    try testing.expectEqual(@as(f64, 0.0), clamp_cfg2.@"cursor-trail-opacity");
++    try testing.expectEqual(
++        @as(u64, 60 * std.time.ns_per_s),
++        clamp_cfg2.@"cursor-trail-duration".duration,
++    );
++}
++
++test "text animation config" {
++    const testing = std.testing;
++    const alloc = testing.allocator;
++
++    // Defaults: streaming, 120ms duration, full intensity.
++    var cfg = try Config.default(alloc);
++    defer cfg.deinit();
++    try testing.expectEqual(Config.TextAnimation.streaming, cfg.@"text-animation");
++    try testing.expectEqual(
++        @as(u64, 120 * std.time.ns_per_ms),
++        cfg.@"text-animation-duration".duration,
++    );
++    try testing.expectEqual(@as(f64, 1.0), cfg.@"text-animation-intensity");
++
++    // Parsing.
++    var it: TestIterator = .{ .data = &.{
++        "--text-animation=none",
++        "--text-animation-duration=1s",
++        "--text-animation-intensity=0.5",
++    } };
++    try cfg.loadIter(alloc, &it);
++    try cfg.finalize();
++    try testing.expectEqual(Config.TextAnimation.none, cfg.@"text-animation");
++    try testing.expectEqual(@as(u64, std.time.ns_per_s), cfg.@"text-animation-duration".duration);
++    try testing.expectEqual(@as(f64, 0.5), cfg.@"text-animation-intensity");
++
++    // The typewriter mode parses as an independent selection alongside
++    // `none` and `streaming`.
++    var typewriter_cfg = try Config.default(alloc);
++    defer typewriter_cfg.deinit();
++    var tw_it: TestIterator = .{ .data = &.{
++        "--text-animation=typewriter",
++    } };
++    try typewriter_cfg.loadIter(alloc, &tw_it);
++    try typewriter_cfg.finalize();
++    try testing.expectEqual(Config.TextAnimation.typewriter, typewriter_cfg.@"text-animation");
++
++    // Clamping in finalize: duration to [1ms, 5s], intensity to [0, 1].
++    var clamp_cfg = try Config.default(alloc);
++    defer clamp_cfg.deinit();
++    var clamp_it: TestIterator = .{ .data = &.{
++        "--text-animation-duration=0ms",
++        "--text-animation-intensity=2.5",
++    } };
++    try clamp_cfg.loadIter(alloc, &clamp_it);
++    try clamp_cfg.finalize();
++    try testing.expectEqual(
++        @as(u64, std.time.ns_per_ms),
++        clamp_cfg.@"text-animation-duration".duration,
++    );
++    try testing.expectEqual(@as(f64, 1.0), clamp_cfg.@"text-animation-intensity");
++
++    var clamp_cfg2 = try Config.default(alloc);
++    defer clamp_cfg2.deinit();
++    var clamp_it2: TestIterator = .{ .data = &.{
++        "--text-animation-duration=600y",
++        "--text-animation-intensity=-1",
++    } };
++    try clamp_cfg2.loadIter(alloc, &clamp_it2);
++    try clamp_cfg2.finalize();
++    try testing.expectEqual(
++        @as(u64, 5 * std.time.ns_per_s),
++        clamp_cfg2.@"text-animation-duration".duration,
++    );
++    try testing.expectEqual(@as(f64, 0.0), clamp_cfg2.@"text-animation-intensity");
++}
++
+ test "compatibility: scrollback-limit renamed to bytes" {
+     const testing = std.testing;
+     const alloc = testing.allocator;
+diff --git a/src/renderer/Metal.zig b/src/renderer/Metal.zig
+index 9247454db..186e41fb7 100644
+--- a/src/renderer/Metal.zig
++++ b/src/renderer/Metal.zig
+@@ -322,6 +322,39 @@ pub inline fn samplerOptions(self: Metal) Sampler.Options {
+     };
+ }
+ 
++/// Returns the options to use when constructing the change texture for
++/// the built-in streaming text animation. The texture is non-sRGB rgba8
++/// so byte-exact bit patterns survive sampling, is written by the CPU
++/// each frame, and is only read by shaders.
++pub inline fn dataTextureOptions(self: Metal) Texture.Options {
++    return .{
++        .device = self.device,
++        .pixel_format = .rgba8unorm,
++        .resource_options = .{
++            // Indicate that the CPU writes to this resource but never reads it.
++            .cpu_cache_mode = .write_combined,
++            .storage_mode = self.default_storage_mode,
++        },
++        .usage = .{
++            // We only need to read from this texture from a shader.
++            .shader_read = true,
++        },
++    };
++}
++
++/// Returns the options to use when constructing a nearest-filter sampler
++/// for the built-in streaming text animation change texture. Cell values
++/// must be sampled point-exact, never interpolated between cells.
++pub inline fn samplerOptionsNearest(self: Metal) Sampler.Options {
++    return .{
++        .device = self.device,
++        .min_filter = .nearest,
++        .mag_filter = .nearest,
++        .s_address_mode = .clamp_to_edge,
++        .t_address_mode = .clamp_to_edge,
++    };
++}
++
+ /// Pixel format for image texture options.
+ pub const ImageTextureFormat = enum {
+     /// 1 byte per pixel grayscale.
+diff --git a/src/renderer/OpenGL.zig b/src/renderer/OpenGL.zig
+index 4b01da0c5..f933b34a2 100644
+--- a/src/renderer/OpenGL.zig
++++ b/src/renderer/OpenGL.zig
+@@ -376,6 +376,36 @@ pub inline fn samplerOptions(self: OpenGL) Sampler.Options {
+     };
+ }
+ 
++/// Returns the options to use when constructing the change texture for
++/// the built-in streaming text animation. The texture is plain RGBA (no
++/// sRGB so byte-exact bit patterns survive sampling), written by the CPU
++/// each frame, and only read by shaders.
++pub inline fn dataTextureOptions(self: OpenGL) Texture.Options {
++    _ = self;
++    return .{
++        .format = .rgba,
++        .internal_format = .rgba,
++        .target = .@"2D",
++        .min_filter = .nearest,
++        .mag_filter = .nearest,
++        .wrap_s = .clamp_to_edge,
++        .wrap_t = .clamp_to_edge,
++    };
++}
++
++/// Returns the options to use when constructing a nearest-filter sampler
++/// for the built-in streaming text animation change texture. Cell values
++/// must be sampled point-exact, never interpolated between cells.
++pub inline fn samplerOptionsNearest(self: OpenGL) Sampler.Options {
++    _ = self;
++    return .{
++        .min_filter = .nearest,
++        .mag_filter = .nearest,
++        .wrap_s = .clamp_to_edge,
++        .wrap_t = .clamp_to_edge,
++    };
++}
++
+ /// Pixel format for image texture options.
+ pub const ImageTextureFormat = enum {
+     /// 1 byte per pixel grayscale.
+diff --git a/src/renderer/generic.zig b/src/renderer/generic.zig
+index 1337c5154..dd8ecce7c 100644
+--- a/src/renderer/generic.zig
++++ b/src/renderer/generic.zig
+@@ -45,6 +45,47 @@ const DisplayLink = switch (builtin.os.tag) {
+ 
+ const log = std.log.scoped(.generic_renderer);
+ 
++/// A hash of the rendered-relevant content of a terminal cell. This is
++/// used to detect which cells changed between rebuilds so the built-in
++/// text animation only animates newly changed glyph output.
++///
++/// The key covers the glyph (including grapheme clusters), the wide/
++/// spacer properties, and the denormalized style (colors and flags).
++/// Cursor, selection, and search-highlight state are not part of the key
++/// because they are not terminal content; changes to them never animate.
++fn cellRenderKey(cell: terminal.RenderState.Cell) u64 {
++    var hasher = std.hash.Wyhash.init(0);
++
++    // The raw page cell is a packed u64 covering the content tag, content,
++    // style id, wide/spacer property, protection, hyperlink, and semantic
++    // content, so its bytes are a complete and padding-free key component.
++    hasher.update(std.mem.asBytes(&cell.raw));
++
++    // The style is undefined unless the cell has styling.
++    const style: terminal.Style = if (cell.raw.hasStyling()) cell.style else .{};
++    hasher.update(std.mem.asBytes(&style.flags));
++    hashColor(&hasher, style.fg_color);
++    hashColor(&hasher, style.bg_color);
++    hashColor(&hasher, style.underline_color);
++
++    // The grapheme data is undefined unless the cell is a grapheme head.
++    if (cell.raw.hasGrapheme()) {
++        for (cell.grapheme) |cp| hasher.update(std.mem.asBytes(&cp));
++    }
++
++    return hasher.final();
++}
++
++/// Update a change-key hash with a style color. The tag is included so
++/// different color variants with identical payload bytes never collide.
++fn hashColor(hasher: *std.hash.Wyhash, color: terminal.Style.Color) void {
++    switch (color) {
++        .none => hasher.update(&[1]u8{0}),
++        .palette => |idx| hasher.update(&[2]u8{ 1, idx }),
++        .rgb => |rgb| hasher.update(&[4]u8{ 2, rgb.r, rgb.g, rgb.b }),
++    }
++}
++
+ /// Create a renderer type with the provided graphics API wrapper.
+ ///
+ /// The graphics API wrapper must provide the interface outlined below.
+@@ -219,8 +260,24 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
+         reinitialize_shaders: bool = false,
+ 
+         /// Whether or not we have custom shaders.
++        ///
++        /// This is true if there are any post-processing shaders to run,
++        /// including the built-in cursor trail effect.
+         has_custom_shaders: bool = false,
+ 
++        /// Whether or not we have user custom shaders (loaded from the
++        /// `custom-shader` configuration). This is distinct from
++        /// `has_custom_shaders` because user custom shaders animate
++        /// perpetually (per `custom-shader-animation`) while the built-in
++        /// cursor trail effect only animates during a cursor transition.
++        has_user_custom_shaders: bool = false,
++
++        /// State for the built-in text animation effect. This
++        /// is only allocated while `text-animation` is `streaming` or
++        /// `typewriter`; when it is `none` nothing is allocated, compiled,
++        /// or scheduled.
++        text_animation: TextAnimationState = .{},
++
+         /// Our shader pipelines.
+         shaders: Shaders,
+ 
+@@ -537,6 +594,88 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
+             }
+         };
+ 
++        /// State relevant to the built-in text animation
++        /// effect. This is only allocated while `text-animation` is
++        /// `streaming` or `typewriter`; with `none` no CPU buffers, GPU
++        /// texture, or sampler exist and nothing is uploaded or
++        /// scheduled.
++        const TextAnimationState = struct {
++            /// Per-cell render keys of the previous rebuild, used to
++            /// detect which cells changed. One entry per grid cell,
++            /// row-major, row 0 is the top row.
++            snapshot: []u64 = &.{},
++
++            /// Per-cell change times in shader time (seconds). One entry
++            /// per grid cell, row-major. Cells that never changed hold
++            /// `never` so they are always fully revealed.
++            change_times: []f32 = &.{},
++
++            /// Packed change times ready for GPU upload: each cell's
++            /// change time bit pattern split into 4 bytes (rgba8).
++            packed_bytes: []u8 = &.{},
++
++            /// GPU texture holding the change times (one texel per grid
++            /// cell). Null until the effect is allocated.
++            texture: ?Texture = null,
++
++            /// Nearest sampler for sampling the change texture without
++            /// interpolation between cells.
++            sampler: ?Sampler = null,
++
++            /// The grid size our CPU/GPU buffers were allocated for.
++            columns: usize = 0,
++            rows: usize = 0,
++
++            /// True if a built-in text animation shader is present in the
++            /// post pipeline (i.e. `text-animation` is `streaming` or
++            /// `typewriter` and shader generation succeeded). This drives
++            /// allocation, change detection, and animation scheduling.
++            active: bool = false,
++
++            /// True if the CPU/GPU buffers are allocated.
++            allocated: bool = false,
++
++            /// True if the change texture needs re-uploading.
++            upload_dirty: bool = false,
++
++            /// The shader time of the most recent cell change. Animation
++            /// frames are only scheduled while some change is still
++            /// within its reveal window (unless user custom shaders are
++            /// present, which animate perpetually).
++            last_change_time: f32 = never,
++
++            /// The per-cell timestamp stagger (seconds) applied to change
++            /// times when the typewriter effect is active: each newly
++            /// changed cell in a rebuild is timestamped one stagger later
++            /// than the previous one in reading order (row-major,
++            /// left-to-right, top-to-bottom across the whole rebuild), so
++            /// characters reveal one by one. The stagger is a fixed short
++            /// fraction of the configured duration. Zero for `streaming`
++            /// and `none`, where every change in a rebuild shares one
++            /// timestamp.
++            stagger: f32 = 0,
++
++            /// The number of cells changed so far in the current rebuild,
++            /// used to sequence typewriter timestamps in reading order.
++            /// Reset at the start of every rebuild; unused when `stagger`
++            /// is zero.
++            stagger_index: u32 = 0,
++
++            /// Sentinel change time for cells that never changed. It is
++            /// far enough in the past that the elapsed time is always
++            /// past any configured reveal duration.
++            const never: f32 = -1000;
++
++            pub fn deinit(self: *TextAnimationState, alloc: Allocator) void {
++                if (self.texture) |tex| tex.deinit();
++                if (self.sampler) |samp| samp.deinit();
++                if (self.snapshot.len > 0) alloc.free(self.snapshot);
++                if (self.change_times.len > 0) alloc.free(self.change_times);
++                if (self.packed_bytes.len > 0) alloc.free(self.packed_bytes);
++                self.* = .{};
++            }
++        };
++
+         /// The configuration for this renderer that is derived from the main
+         /// configuration. This must be exported so that we don't need to
+         /// pass around Config pointers which makes memory management a pain.
+@@ -551,6 +690,12 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
+             cursor_color: ?configpkg.Config.TerminalColor,
+             cursor_opacity: f64,
+             cursor_text: ?configpkg.Config.TerminalColor,
++            cursor_trail: bool,
++            cursor_trail_opacity: f64,
++            cursor_trail_duration: configpkg.Config.Duration,
++            text_animation: configpkg.Config.TextAnimation,
++            text_animation_duration: configpkg.Config.Duration,
++            text_animation_intensity: f64,
+             background: terminal.color.RGB,
+             background_opacity: f64,
+             background_opacity_cells: bool,
+@@ -623,6 +768,12 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
+                     .cursor_color = config.@"cursor-color",
+                     .cursor_text = config.@"cursor-text",
+                     .cursor_opacity = @max(0, @min(1, config.@"cursor-opacity")),
++                    .cursor_trail = config.@"cursor-trail",
++                    .cursor_trail_opacity = @max(0, @min(1, config.@"cursor-trail-opacity")),
++                    .cursor_trail_duration = config.@"cursor-trail-duration",
++                    .text_animation = config.@"text-animation",
++                    .text_animation_duration = config.@"text-animation-duration",
++                    .text_animation_intensity = @max(0, @min(1, config.@"text-animation-intensity")),
+ 
+                     .background = config.background.toTerminalRGB(),
+                     .foreground = config.foreground.toTerminalRGB(),
+@@ -669,7 +820,10 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
+             var api = try GraphicsAPI.init(alloc, options);
+             errdefer api.deinit();
+ 
+-            const has_custom_shaders = options.config.custom_shaders.value.items.len > 0;
++            const has_custom_shaders =
++                options.config.custom_shaders.value.items.len > 0 or
++                options.config.cursor_trail or
++                options.config.text_animation != .none;
+ 
+             // Prepare our swap chain
+             var swap_chain = try SwapChain.init(
+@@ -761,6 +915,7 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
+                     .cursor_change_time = 0,
+                     .time_focus = 0,
+                     .focus = 1, // assume focused initially
++                    .cell_metrics = @splat(0),
+                     .palette = @splat(@splat(0)),
+                     .background_color = @splat(0),
+                     .foreground_color = @splat(0),
+@@ -811,6 +966,8 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
+ 
+             self.cells.deinit(self.alloc);
+ 
++            self.text_animation.deinit(self.alloc);
++
+             self.font_shaper.deinit();
+             self.font_shaper_cache.deinit(self.alloc);
+ 
+@@ -836,6 +993,78 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
+             defer arena.deinit();
+             const arena_alloc = arena.allocator();
+ 
++            // Build the ordered list of post-processing shaders. The
++            // built-in text animation (streaming or typewriter), if
++            // enabled, always runs first, then the built-in cursor trail
++            // effect, then user custom shaders so they see the built-in
++            // effects' output and can layer on top of them (preserving
++            // user shader ordering).
++            var post_shaders: std.ArrayList([:0]const u8) = .empty;
++            defer post_shaders.deinit(arena_alloc);
++
++            var text_anim_active = false;
++            if (self.config.text_animation == .streaming) {
++                // The duration and intensity are specialized into the
++                // shader source deterministically at this point, so no
++                // per-frame uniform plumbing is needed. If the shader
++                // cannot be generated we fail soft and skip the effect,
++                // mirroring the behavior of user custom shader load
++                // failures.
++                const anim_shader = shadertoy.textAnimationShader(
++                    arena_alloc,
++                    self.config.text_animation_duration.duration,
++                    self.config.text_animation_intensity,
++                    GraphicsAPI.custom_shader_target,
++                ) catch |err| err: {
++                    log.warn("error generating text animation shader err={}", .{err});
++                    break :err null;
++                };
++                if (anim_shader) |shader| {
++                    try post_shaders.append(arena_alloc, shader);
++                    text_anim_active = true;
++                }
++            }
++
++            if (self.config.text_animation == .typewriter) {
++                // The typewriter effect shares the streaming effect's
++                // post-processing architecture and per-cell change
++                // texture, but keeps its own shader body and reveal
++                // behavior (staggered per-cell timestamps, quick pop-in).
++                const anim_shader = shadertoy.typewriterAnimationShader(
++                    arena_alloc,
++                    self.config.text_animation_duration.duration,
++                    self.config.text_animation_intensity,
++                    GraphicsAPI.custom_shader_target,
++                ) catch |err| err: {
++                    log.warn("error generating typewriter animation shader err={}", .{err});
++                    break :err null;
++                };
++                if (anim_shader) |shader| {
++                    try post_shaders.append(arena_alloc, shader);
++                    text_anim_active = true;
++                }
++            }
++
++            if (self.config.cursor_trail) {
++                // The opacity and duration are specialized into the shader
++                // source deterministically at this point, so no per-frame
++                // uniform plumbing is needed. If the shader cannot be
++                // generated we fail soft and skip the effect, mirroring
++                // the behavior of user custom shader load failures.
++                const trail_shader = shadertoy.cursorTrailShader(
++                    arena_alloc,
++                    self.config.cursor_trail_opacity,
++                    self.config.cursor_trail_duration.duration,
++                    GraphicsAPI.custom_shader_target,
++                ) catch |err| err: {
++                    log.warn("error generating cursor trail shader err={}", .{err});
++                    break :err null;
++                };
++                if (trail_shader) |shader| {
++                    try post_shaders.append(arena_alloc, shader);
++                }
++            }
++
+             // Load our custom shaders
+             const custom_shaders: []const [:0]const u8 = shadertoy.loadFromFiles(
+                 arena_alloc,
+@@ -845,17 +1074,34 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
+                 log.warn("error loading custom shaders err={}", .{err});
+                 break :err &.{};
+             };
++            try post_shaders.appendSlice(arena_alloc, custom_shaders);
+ 
+-            const has_custom_shaders = custom_shaders.len > 0;
++            const has_custom_shaders = post_shaders.items.len > 0;
+ 
+             var shaders = try self.api.initShaders(
+                 self.alloc,
+-                custom_shaders,
++                post_shaders.items,
+             );
+             errdefer shaders.deinit(self.alloc);
+ 
+             self.shaders = shaders;
+             self.has_custom_shaders = has_custom_shaders;
++            self.has_user_custom_shaders = custom_shaders.len > 0;
++            self.text_animation.active = text_anim_active;
++
++            // The typewriter effect staggers each changed cell's change
++            // timestamp across a rebuild in reading order. The stagger is
++            // a fixed short fraction (one eighth) of the configured
++            // duration, so characters reveal one by one and scale with
++            // the configured speed. Zero whenever the typewriter effect
++            // is not active, keeping the streaming timestamp semantics
++            // unchanged.
++            self.text_animation.stagger = if (text_anim_active and
++                self.config.text_animation == .typewriter)
++                @as(f32, @floatFromInt(self.config.text_animation_duration.duration)) /
++                    @as(f32, @floatFromInt(std.time.ns_per_s)) / 8
++            else
++                0;
+         }
+ 
+         /// This is called early right after surface creation.
+@@ -1000,7 +1246,57 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
+         /// True if our renderer has animations so that a higher frequency
+         /// timer is used.
+         pub fn hasAnimations(self: *const Self) bool {
+-            return self.has_custom_shaders;
++            // User custom shaders animate perpetually, subject to the
++            // `custom-shader-animation` configuration handled by the apprt.
++            if (self.has_user_custom_shaders) return true;
++
++            // The built-in cursor trail and text animation
++            // effects only need animation frames while an effect is
++            // still in progress.
++            return self.cursorTrailAnimating() or self.textAnimationAnimating();
++        }
++
++        /// True if the built-in text animation is enabled and
++        /// at least one cell change is still within its reveal window.
++        /// Animation demand ends once every reveal completes so that the
++        /// built-in effect alone never forces perpetual redraws.
++        fn textAnimationAnimating(self: *const Self) bool {
++            const ta = &self.text_animation;
++            if (!ta.active or !ta.allocated) return false;
++
++            // No cell has changed yet, so there is nothing to animate.
++            if (ta.last_change_time == TextAnimationState.never) return false;
++
++            const elapsed: f32 = self.custom_shader_uniforms.time - ta.last_change_time;
++            if (elapsed < 0) return true;
++
++            const duration_ns = self.config.text_animation_duration.duration;
++            const duration_secs: f32 =
++                @as(f32, @floatFromInt(duration_ns)) /
++                @as(f32, @floatFromInt(std.time.ns_per_s));
++            return elapsed < duration_secs;
++        }
++
++        /// True if the built-in cursor trail effect is enabled and we are
++        /// still within the configured fade duration of the most recent
++        /// cursor change. Animation demand ends once the fade completes so
++        /// that the built-in effect alone never forces perpetual redraws.
++        fn cursorTrailAnimating(self: *const Self) bool {
++            if (!self.config.cursor_trail) return false;
++
++            // The cursor is hidden when the surface is unfocused so there
++            // is nothing to animate.
++            if (!self.focused) return false;
++
++            const uniforms = &self.custom_shader_uniforms;
++            const elapsed: f32 = uniforms.time - uniforms.cursor_change_time;
++            if (elapsed < 0) return false;
++
++            const duration_ns = self.config.cursor_trail_duration.duration;
++            const duration_secs: f32 =
++                @as(f32, @floatFromInt(duration_ns)) /
++                @as(f32, @floatFromInt(std.time.ns_per_s));
++            return elapsed < duration_secs;
+         }
+ 
+         /// True if our renderer is using vsync. If true, the renderer or apprt
+@@ -1573,6 +1869,22 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
+             // Update per-frame custom shader uniforms.
+             try self.updateCustomShaderUniformsForFrame();
+ 
++            // Sync the built-in text animation state with the
++            // current config: allocate when the effect is active (the
++            // change detection above has already populated the change
++            // times), release everything when it is not so the `none`
++            // path has no streaming allocation.
++            if (self.text_animation.active) {
++                try self.textAnimationEnsureBuffers(
++                    self.cells.size.columns,
++                    self.cells.size.rows,
++                );
++                try self.textAnimationEnsureGpu();
++                try self.textAnimationUpload();
++            } else if (self.text_animation.allocated) {
++                self.text_animation.deinit(self.alloc);
++            }
++
+             // Setup our frame data
+             try frame.uniforms.sync(&.{self.uniforms});
+             try frame.cells_bg.sync(self.cells.bg_cells);
+@@ -1712,6 +2024,11 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
+                 // Sync our uniforms.
+                 try state.uniforms.sync(&.{self.custom_shader_uniforms});
+ 
++                // The built-in text animation always runs as the
++                // first post-processing pass; it additionally reads the
++                // per-cell change texture (iChannel1) with a nearest
++                // sampler so cell values never interpolate.
++                const text_anim_pass = self.text_animation.allocated;
+                 for (self.shaders.post_pipelines, 0..) |pipeline, i| {
+                     defer state.swap();
+ 
+@@ -1727,8 +2044,14 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
+                     pass.step(.{
+                         .pipeline = pipeline,
+                         .uniforms = state.uniforms.buffer,
+-                        .textures = &.{state.back_texture},
+-                        .samplers = &.{state.sampler},
++                        .textures = if (i == 0 and text_anim_pass)
++                            &.{ state.back_texture, self.text_animation.texture.? }
++                        else
++                            &.{state.back_texture},
++                        .samplers = if (i == 0 and text_anim_pass)
++                            &.{ state.sampler, self.text_animation.sampler.? }
++                        else
++                            &.{state.sampler},
+                         .draw = .{
+                             .type = .triangle,
+                             .vertex_count = 3,
+@@ -1908,6 +2231,14 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
+ 
+             const old_blending = self.config.blending;
+             const custom_shaders_changed = !self.config.custom_shaders.equal(config.custom_shaders);
++            const cursor_trail_changed =
++                self.config.cursor_trail != config.cursor_trail or
++                self.config.cursor_trail_opacity != config.cursor_trail_opacity or
++                !self.config.cursor_trail_duration.equal(config.cursor_trail_duration);
++            const text_animation_changed =
++                self.config.text_animation != config.text_animation or
++                !self.config.text_animation_duration.equal(config.text_animation_duration) or
++                self.config.text_animation_intensity != config.text_animation_intensity;
+ 
+             self.config.deinit();
+             self.config = config.*;
+@@ -1933,7 +2264,7 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
+                 self.target_config_modified +%= 1;
+             }
+ 
+-            if (custom_shaders_changed) {
++            if (custom_shaders_changed or cursor_trail_changed or text_animation_changed) {
+                 self.reinitialize_shaders = true;
+             }
+         }
+@@ -2160,6 +2491,33 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
+                 0,
+             };
+ 
++            if (self.text_animation.active) {
++                // Grid metrics for the built-in text animation:
++                // the cell size in pixels and the top-left of the grid in
++                // this shader's coordinate space (iCellMetrics), plus the
++                // grid size in cells (via iChannelResolution[1]) so the
++                // shader can map fragments to change-texture texels.
++                var origin_y: f32 = @floatFromInt(padding.top);
++                var cell_height: f32 = @floatFromInt(cell.height);
++                if (!GraphicsAPI.custom_shader_y_is_down) {
++                    origin_y = @as(f32, @floatFromInt(screen.height)) - origin_y -
++                        cell_height;
++                    cell_height = -cell_height;
++                }
++                uniforms.cell_metrics = .{
++                    @floatFromInt(cell.width),
++                    cell_height,
++                    @floatFromInt(padding.left),
++                    origin_y,
++                };
++                uniforms.channel_resolution[1] = .{
++                    @floatFromInt(self.cells.size.columns),
++                    @floatFromInt(self.cells.size.rows),
++                    1,
++                    0,
++                };
++            }
++
+             if (self.cells.getCursorGlyph()) |cursor| {
+                 const cursor_width: f32 = @floatFromInt(cursor.glyph_size[0]);
+                 const cursor_height: f32 = @floatFromInt(cursor.glyph_size[1]);
+@@ -2340,6 +2698,17 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
+                 self.uniforms.grid_size = .{ new_size.columns, new_size.rows };
+             }
+ 
++            // Ensure the built-in text animation state is sized
++            // for this grid so rebuilt rows can be diffed for changes.
++            // Allocation failures propagate (the caller logs and keeps the
++            // previous state), matching the resize behavior above.
++            if (self.text_animation.active) {
++                try self.textAnimationEnsureBuffers(
++                    self.cells.size.columns,
++                    self.cells.size.rows,
++                );
++            }
++
+             const rebuild = state.dirty == .full or grid_size_diff;
+             if (rebuild) {
+                 // If we are doing a full rebuild, then we clear the entire cell buffer.
+@@ -2408,6 +2777,17 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
+                 };
+             } else null;
+ 
++            // Shader time used to timestamp cell changes for the built-in
++            // text animation. Streaming timestamps every change detected
++            // in this rebuild identically so content written in a single
++            // frame reveals as one left-to-right sweep; typewriter resets
++            // its per-rebuild stagger counter so changed cells are
++            // sequenced in reading order instead.
++            const anim_time: f32 = if (self.text_animation.active) t: {
++                self.text_animation.stagger_index = 0;
++                break :t self.textAnimationTime();
++            } else 0;
++
+             for (
+                 0..,
+                 row_raws[0..row_len],
+@@ -2445,6 +2825,17 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
+                     log.warn("error building row y={} err={}", .{ y, err });
+                     self.cells.clear(y);
+                 };
++
++                // Detect changed cells for the built-in streaming text
++                // animation. Only rebuilt rows are diffed; rows that
++                // weren't rebuilt are unchanged by definition.
++                if (self.text_animation.active) {
++                    self.textAnimationUpdateRow(
++                        y,
++                        cells,
++                        anim_time,
++                    );
++                }
+             }
+ 
+             // Setup our cursor rendering information.
+@@ -2612,6 +3003,182 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
+             // });
+         }
+ 
++        /// The shader time (in seconds) used to timestamp cell changes for
++        /// the built-in text animation. This uses the same time
++        /// base as the custom shader uniforms: seconds since the first
++        /// rendered frame.
++        fn textAnimationTime(self: *const Self) f32 {
++            const now: std.Io.Timestamp = .now(global.io(), .awake);
++            const first = self.first_frame_time orelse now;
++            const since_ns: f32 = @floatFromInt(first.durationTo(now).nanoseconds);
++            return since_ns / std.time.ns_per_s;
++        }
++
++        /// Ensure the built-in text animation state has CPU
++        /// buffers and a GPU texture sized for the grid. Existing entries
++        /// are preserved across resizes; cells beyond the previous grid
++        /// size are marked as changed so they reveal like any other newly
++        /// changed content.
++        ///
++        /// Caller must hold the draw mutex.
++        fn textAnimationEnsureBuffers(
++            self: *Self,
++            columns: usize,
++            rows: usize,
++        ) Allocator.Error!void {
++            const ta = &self.text_animation;
++            if (columns == 0 or rows == 0) return;
++
++            const count = columns * rows;
++            if (ta.snapshot.len != count) {
++                const old_count = ta.snapshot.len;
++
++                // Allocate the new buffers first (never mutating the old
++                // ones until every allocation succeeded), copy the
++                // preserved prefix, then swap. The errdefers are scoped
++                // to this block so a later failure (e.g. texture creation)
++                // never frees the buffers we just installed.
++                const new_snapshot = try self.alloc.alloc(u64, count);
++                errdefer self.alloc.free(new_snapshot);
++                const new_change = try self.alloc.alloc(f32, count);
++                errdefer self.alloc.free(new_change);
++                const new_packed = try self.alloc.alloc(u8, count * 4);
++                errdefer self.alloc.free(new_packed);
++
++                const preserve = @min(old_count, count);
++                if (preserve > 0) {
++                    @memcpy(new_snapshot[0..preserve], ta.snapshot[0..preserve]);
++                    @memcpy(new_change[0..preserve], ta.change_times[0..preserve]);
++                }
++                if (count > preserve) {
++                    // New cells have never been seen: mark them changed so
++                    // they reveal like any other newly changed content.
++                    @memset(new_snapshot[preserve..], std.math.maxInt(u64));
++                    @memset(new_change[preserve..], self.textAnimationTime());
++                }
++
++                self.alloc.free(ta.snapshot);
++                self.alloc.free(ta.change_times);
++                self.alloc.free(ta.packed_bytes);
++                ta.snapshot = new_snapshot;
++                ta.change_times = new_change;
++                ta.packed_bytes = new_packed;
++                ta.columns = columns;
++                ta.rows = rows;
++                ta.upload_dirty = true;
++            } else {
++                ta.columns = columns;
++                ta.rows = rows;
++            }
++
++            if (!ta.allocated) {
++                ta.allocated = true;
++                ta.upload_dirty = true;
++            }
++        }
++
++        /// Ensure the GPU texture and sampler exist for the already-sized
++        /// text animation buffers. GPU failures propagate only from
++        /// the draw path, never from terminal cell rebuilding.
++        fn textAnimationEnsureGpu(self: *Self) !void {
++            const ta = &self.text_animation;
++            if (!ta.allocated or ta.columns == 0 or ta.rows == 0) return;
++
++            if (ta.texture) |tex| {
++                if (tex.width != ta.columns or tex.height != ta.rows) {
++                    const new_tex = try Texture.init(
++                        self.api.dataTextureOptions(),
++                        ta.columns,
++                        ta.rows,
++                        null,
++                    );
++                    tex.deinit();
++                    ta.texture = new_tex;
++                }
++            } else {
++                ta.texture = try Texture.init(
++                    self.api.dataTextureOptions(),
++                    ta.columns,
++                    ta.rows,
++                    null,
++                );
++            }
++
++            if (ta.sampler == null) {
++                ta.sampler = try Sampler.init(self.api.samplerOptionsNearest());
++            }
++        }
++
++        /// Detect cells in a rebuilt row whose rendered content changed
++        /// and timestamp them for the built-in text animation.
++        ///
++        /// With `text-animation` set to `typewriter` each changed cell is
++        /// timestamped one stagger later than the previous changed cell
++        /// in reading order (row-major across the whole rebuild), so
++        /// characters reveal one by one. With `streaming` every change in
++        /// a rebuild shares the same timestamp (stagger == 0).
++        ///
++        /// Caller must hold the draw mutex.
++        fn textAnimationUpdateRow(
++            self: *Self,
++            y: terminal.size.CellCountInt,
++            cells: *std.MultiArrayList(terminal.RenderState.Cell),
++            time: f32,
++        ) void {
++            const ta = &self.text_animation;
++            if (!ta.allocated) return;
++
++            const y_usize: usize = @intCast(y);
++            if (y_usize >= ta.rows) return;
++
++            const row = cells.slice();
++            const len = @min(row.len, ta.columns);
++            const base = y_usize * ta.columns;
++            var changed: bool = false;
++            var last: f32 = ta.last_change_time;
++            for (0..len) |x| {
++                const key = cellRenderKey(cells.get(x));
++                if (key == ta.snapshot[base + x]) continue;
++                ta.snapshot[base + x] = key;
++                const cell_time: f32 = if (ta.stagger > 0) t: {
++                    const offset = ta.stagger * @as(f32, @floatFromInt(ta.stagger_index));
++                    ta.stagger_index +%= 1;
++                    break :t time + offset;
++                } else time;
++                ta.change_times[base + x] = cell_time;
++                last = cell_time;
++                changed = true;
++            }
++            if (changed) {
++                // Track the latest timestamp so animation frames are
++                // scheduled until the final staggered character has
++                // revealed.
++                ta.last_change_time = last;
++                ta.upload_dirty = true;
++            }
++        }
++
++        /// Upload the per-cell change times to the GPU change texture,
++        /// packing each time's IEEE-754 bit pattern into an rgba8 texel.
++        ///
++        /// Caller must hold the draw mutex.
++        fn textAnimationUpload(self: *Self) !void {
++            const ta = &self.text_animation;
++            const tex = ta.texture orelse return;
++            if (!ta.upload_dirty) return;
++            defer ta.upload_dirty = false;
++
++            for (ta.change_times, 0..) |t, i| {
++                const bits: u32 = @bitCast(t);
++                const b = i * 4;
++                ta.packed_bytes[b] = @truncate(bits);
++                ta.packed_bytes[b + 1] = @truncate(bits >> 8);
++                ta.packed_bytes[b + 2] = @truncate(bits >> 16);
++                ta.packed_bytes[b + 3] = @truncate(bits >> 24);
++            }
++            try tex.replaceRegion(0, 0, ta.columns, ta.rows, ta.packed_bytes);
++        }
++
+         fn rebuildRow(
+             self: *Self,
+             y: terminal.size.CellCountInt,
+diff --git a/src/renderer/shaders/shadertoy_prefix.glsl b/src/renderer/shaders/shadertoy_prefix.glsl
+index 4b6d091b8..dd7c6484f 100644
+--- a/src/renderer/shaders/shadertoy_prefix.glsl
++++ b/src/renderer/shaders/shadertoy_prefix.glsl
+@@ -28,6 +28,12 @@ layout(binding = 1, std140) uniform Globals {
+     uniform vec3  iCursorText;
+     uniform vec3  iSelectionForegroundColor;
+     uniform vec3  iSelectionBackgroundColor;
++
++    // Grid metrics for the built-in text animation: (cell width, signed
++    // row step, grid row-zero origin x, grid row-zero origin y) in pixels,
++    // in this shader's coordinate space. The row step is negative for
++    // bottom-up APIs. Only set for `streaming` or `typewriter`.
++    uniform vec4  iCellMetrics;
+ };
+ 
+ #define CURSORSTYLE_BLOCK        0
+diff --git a/src/renderer/shadertoy.zig b/src/renderer/shadertoy.zig
+index 6dee18b04..0dbb41b70 100644
+--- a/src/renderer/shadertoy.zig
++++ b/src/renderer/shadertoy.zig
+@@ -39,6 +39,7 @@ pub const Uniforms = extern struct {
+     cursor_text: [4]f32 align(16),
+     selection_background_color: [4]f32 align(16),
+     selection_foreground_color: [4]f32 align(16),
++    cell_metrics: [4]f32 align(16),
+ };
+ 
+ /// The target to load shaders for.
+@@ -107,6 +108,24 @@ pub fn loadFromFile(
+         break :glsl stream.written()[0 .. stream.written().len - 1 :0];
+     };
+ 
++    // Convert to the target format
++    return try fromGlsl(alloc_gpa, glsl, target);
++}
++
++/// Convert a full GLSL shader (see `glslFromShader`) to the target format
++/// ready to be used with renderers.
++///
++/// The returned slice is allocated with `alloc_gpa` and is owned by the
++/// caller.
++fn fromGlsl(
++    alloc_gpa: Allocator,
++    glsl: [:0]const u8,
++    target: Target,
++) ![:0]const u8 {
++    var arena = ArenaAllocator.init(alloc_gpa);
++    defer arena.deinit();
++    const alloc = arena.allocator();
++
+     // Convert to SPIR-V
+     const spirv: []const u8 = spirv: {
+         var stream: std.Io.Writer.Allocating = .init(alloc);
+@@ -114,8 +133,7 @@ pub fn loadFromFile(
+         defer errlog.deinit();
+         spirvFromGlsl(&stream.writer, &errlog, glsl) catch |err| {
+             if (errlog.info.len > 0 or errlog.debug.len > 0) {
+-                log.warn("spirv error path={s} info={s} debug={s}", .{
+-                    path,
++                log.warn("spirv error info={s} debug={s}", .{
+                     errlog.info,
+                     errlog.debug,
+                 });
+@@ -131,7 +149,7 @@ pub fn loadFromFile(
+         break :spirv list.items;
+     };
+ 
+-    // Convert to MSL
++    // Convert to the target language.
+     return switch (target) {
+         // Important: using the alloc_gpa here on purpose because this
+         // is the final result that will be returned to the caller.
+@@ -140,6 +158,200 @@ pub fn loadFromFile(
+     };
+ }
+ 
++/// Build the GLSL source for the built-in cursor trail shader, with the
++/// given opacity and fade duration specialized directly into the source.
++///
++/// The output is deterministic: the same inputs always produce byte-
++/// identical source, so the same configuration always produces the same
++/// compiled shader. The returned slice is allocated with `alloc` and owned
++/// by the caller.
++fn cursorTrailSource(
++    alloc: Allocator,
++    opacity: f64,
++    duration_ns: u64,
++) ![]const u8 {
++    // The duration in seconds, as a decimal float literal.
++    const duration_secs: f64 =
++        @as(f64, @floatFromInt(duration_ns)) /
++        @as(f64, @floatFromInt(std.time.ns_per_s));
++
++    // The shader body expects CURSOR_TRAIL_OPACITY and
++    // CURSOR_TRAIL_DURATION to be defined; it provides defaults of its own
++    // so it also compiles standalone.
++    const body = @embedFile("shaders/cursor-trail.glsl");
++    var stream: std.Io.Writer.Allocating = .init(alloc);
++    try stream.writer.print(
++        "#define CURSOR_TRAIL_OPACITY {d}\n" ++
++            "#define CURSOR_TRAIL_DURATION {d}\n",
++        .{ opacity, duration_secs },
++    );
++    try stream.writer.writeAll(body);
++    return stream.written();
++}
++
++/// Generate the built-in cursor glow and motion trail shader for the given
++/// opacity and fade duration, converted to the target format ready to be
++/// used with renderers.
++///
++/// This is an alternative to `loadFromFile` for a shader that is compiled
++/// into Ghostty: the opacity and duration are specialized into the source
++/// deterministically at shader initialization so that no per-frame uniform
++/// plumbing or parallel renderer pipeline is needed. The returned slice is
++/// allocated with `alloc_gpa` and is owned by the caller.
++pub fn cursorTrailShader(
++    alloc_gpa: Allocator,
++    opacity: f64,
++    duration_ns: u64,
++    target: Target,
++) ![:0]const u8 {
++    var arena = ArenaAllocator.init(alloc_gpa);
++    defer arena.deinit();
++    const alloc = arena.allocator();
++
++    const src = try cursorTrailSource(alloc, opacity, duration_ns);
++
++    // Convert to full GLSL
++    const glsl: [:0]const u8 = glsl: {
++        var stream: std.Io.Writer.Allocating = .init(alloc);
++        try glslFromShader(&stream.writer, src);
++        try stream.writer.writeByte(0);
++        break :glsl stream.written()[0 .. stream.written().len - 1 :0];
++    };
++
++    // Convert to the target format
++    return try fromGlsl(alloc_gpa, glsl, target);
++}
++
++/// Build the GLSL source for the built-in streaming text animation shader,
++/// with the given reveal duration and intensity specialized directly into
++/// the source.
++///
++/// The output is deterministic: the same inputs always produce byte-
++/// identical source, so the same configuration always produces the same
++/// compiled shader. The returned slice is allocated with `alloc` and owned
++/// by the caller.
++fn textAnimationSource(
++    alloc: Allocator,
++    duration_ns: u64,
++    intensity: f64,
++) ![]const u8 {
++    // The duration in seconds, as a decimal float literal.
++    const duration_secs: f64 =
++        @as(f64, @floatFromInt(duration_ns)) /
++        @as(f64, @floatFromInt(std.time.ns_per_s));
++
++    // The shader body expects TEXT_ANIM_DURATION and TEXT_ANIM_INTENSITY
++    // to be defined; it provides defaults of its own so it also compiles
++    // standalone.
++    const body = @embedFile("shaders/streaming-text.glsl");
++    var stream: std.Io.Writer.Allocating = .init(alloc);
++    try stream.writer.print(
++        "#define TEXT_ANIM_DURATION {d}\n" ++
++            "#define TEXT_ANIM_INTENSITY {d}\n",
++        .{ duration_secs, intensity },
++    );
++    try stream.writer.writeAll(body);
++    return stream.written();
++}
++
++/// Generate the built-in streaming text reveal shader for the given reveal
++/// duration and intensity, converted to the target format ready to be used
++/// with renderers.
++///
++/// This is an alternative to `loadFromFile` for a shader that is compiled
++/// into Ghostty: the duration and intensity are specialized into the source
++/// deterministically at shader initialization so that no per-frame uniform
++/// plumbing or parallel renderer pipeline is needed. The returned slice is
++/// allocated with `alloc_gpa` and is owned by the caller.
++pub fn textAnimationShader(
++    alloc_gpa: Allocator,
++    duration_ns: u64,
++    intensity: f64,
++    target: Target,
++) ![:0]const u8 {
++    var arena = ArenaAllocator.init(alloc_gpa);
++    defer arena.deinit();
++    const alloc = arena.allocator();
++
++    const src = try textAnimationSource(alloc, duration_ns, intensity);
++
++    // Convert to full GLSL
++    const glsl: [:0]const u8 = glsl: {
++        var stream: std.Io.Writer.Allocating = .init(alloc);
++        try glslFromShader(&stream.writer, src);
++        try stream.writer.writeByte(0);
++        break :glsl stream.written()[0 .. stream.written().len - 1 :0];
++    };
++
++    // Convert to the target format
++    return try fromGlsl(alloc_gpa, glsl, target);
++}
++
++/// Build the GLSL source for the built-in typewriter text animation
++/// shader, with the given reveal duration and intensity specialized
++/// directly into the source.
++///
++/// The output is deterministic: the same inputs always produce byte-
++/// identical source, so the same configuration always produces the same
++/// compiled shader. The returned slice is allocated with `alloc` and owned
++/// by the caller.
++fn typewriterAnimationSource(
++    alloc: Allocator,
++    duration_ns: u64,
++    intensity: f64,
++) ![]const u8 {
++    // The duration in seconds, as a decimal float literal.
++    const duration_secs: f64 =
++        @as(f64, @floatFromInt(duration_ns)) /
++        @as(f64, @floatFromInt(std.time.ns_per_s));
++
++    // The shader body expects TEXT_ANIM_DURATION and TEXT_ANIM_INTENSITY
++    // to be defined; it provides defaults of its own so it also compiles
++    // standalone.
++    const body = @embedFile("shaders/typewriter-text.glsl");
++    var stream: std.Io.Writer.Allocating = .init(alloc);
++    try stream.writer.print(
++        "#define TEXT_ANIM_DURATION {d}\n" ++
++            "#define TEXT_ANIM_INTENSITY {d}\n",
++        .{ duration_secs, intensity },
++    );
++    try stream.writer.writeAll(body);
++    return stream.written();
++}
++
++/// Generate the built-in typewriter text reveal shader for the given
++/// reveal duration and intensity, converted to the target format ready to
++/// be used with renderers.
++///
++/// This is an alternative to `loadFromFile` for a shader that is compiled
++/// into Ghostty: the duration and intensity are specialized into the source
++/// deterministically at shader initialization so that no per-frame uniform
++/// plumbing or parallel renderer pipeline is needed. The returned slice is
++/// allocated with `alloc_gpa` and is owned by the caller.
++pub fn typewriterAnimationShader(
++    alloc_gpa: Allocator,
++    duration_ns: u64,
++    intensity: f64,
++    target: Target,
++) ![:0]const u8 {
++    var arena = ArenaAllocator.init(alloc_gpa);
++    defer arena.deinit();
++    const alloc = arena.allocator();
++
++    const src = try typewriterAnimationSource(alloc, duration_ns, intensity);
++
++    // Convert to full GLSL
++    const glsl: [:0]const u8 = glsl: {
++        var stream: std.Io.Writer.Allocating = .init(alloc);
++        try glslFromShader(&stream.writer, src);
++        try stream.writer.writeByte(0);
++        break :glsl stream.written()[0 .. stream.written().len - 1 :0];
++    };
++
++    // Convert to the target format
++    return try fromGlsl(alloc_gpa, glsl, target);
++}
++
+ /// Convert a ShaderToy shader into valid GLSL.
+ ///
+ /// ShaderToy shaders aren't full shaders, they're just implementing a
+@@ -366,6 +578,107 @@ test "spirv" {
+     try spirvFromGlsl(&writer, null, src);
+ }
+ 
++test "cursor trail shader" {
++    const testing = std.testing;
++    const alloc = testing.allocator;
++
++    // Source generation is deterministic and specializes the configured
++    // opacity and duration into the source.
++    var arena = ArenaAllocator.init(alloc);
++    defer arena.deinit();
++    const a = try cursorTrailSource(arena.allocator(), 0.35, 250 * std.time.ns_per_ms);
++    const b = try cursorTrailSource(arena.allocator(), 0.35, 250 * std.time.ns_per_ms);
++    try testing.expectEqualStrings(a, b);
++    try testing.expect(std.mem.indexOf(u8, a, "0.35") != null);
++    try testing.expect(std.mem.indexOf(u8, a, "0.25") != null);
++
++    // The specialized source compiles through the same SPIR-V pipeline
++    // used for user custom shaders.
++    const src = try testGlslZ(alloc, a);
++    defer alloc.free(src);
++    var buf: [4096 * 4]u8 = undefined;
++    var writer: std.Io.Writer = .fixed(&buf);
++    try spirvFromGlsl(&writer, null, src);
++
++    // And the full generator produces a shader in the target format.
++    const glsl_out = try cursorTrailShader(alloc, 0.35, 250 * std.time.ns_per_ms, .glsl);
++    defer alloc.free(glsl_out);
++    try testing.expect(glsl_out.len > 0);
++}
++
++test "text animation shader" {
++    const testing = std.testing;
++    const alloc = testing.allocator;
++
++    // Source generation is deterministic and specializes the configured
++    // duration and intensity into the source.
++    var arena = ArenaAllocator.init(alloc);
++    defer arena.deinit();
++    const a = try textAnimationSource(arena.allocator(), 120 * std.time.ns_per_ms, 1.0);
++    const b = try textAnimationSource(arena.allocator(), 120 * std.time.ns_per_ms, 1.0);
++    try testing.expectEqualStrings(a, b);
++    try testing.expect(std.mem.indexOf(u8, a, "TEXT_ANIM_DURATION 0.12") != null);
++    try testing.expect(std.mem.indexOf(u8, a, "TEXT_ANIM_INTENSITY 1") != null);
++
++    // Different configurations produce different sources.
++    const c = try textAnimationSource(arena.allocator(), 250 * std.time.ns_per_ms, 0.5);
++    try testing.expect(!std.mem.eql(u8, a, c));
++    try testing.expect(std.mem.indexOf(u8, c, "TEXT_ANIM_DURATION 0.25") != null);
++    try testing.expect(std.mem.indexOf(u8, c, "TEXT_ANIM_INTENSITY 0.5") != null);
++
++    // The specialized source compiles through the same SPIR-V pipeline
++    // used for user custom shaders.
++    const src = try testGlslZ(alloc, a);
++    defer alloc.free(src);
++    var buf: [4096 * 4]u8 = undefined;
++    var writer: std.Io.Writer = .fixed(&buf);
++    try spirvFromGlsl(&writer, null, src);
++
++    // And the full generator produces a shader in the target format.
++    const glsl_out = try textAnimationShader(alloc, 120 * std.time.ns_per_ms, 1.0, .glsl);
++    defer alloc.free(glsl_out);
++    try testing.expect(glsl_out.len > 0);
++}
++
++test "typewriter animation shader" {
++    const testing = std.testing;
++    const alloc = testing.allocator;
++
++    // Source generation is deterministic and specializes the configured
++    // duration and intensity into the source.
++    var arena = ArenaAllocator.init(alloc);
++    defer arena.deinit();
++    const a = try typewriterAnimationSource(arena.allocator(), 120 * std.time.ns_per_ms, 1.0);
++    const b = try typewriterAnimationSource(arena.allocator(), 120 * std.time.ns_per_ms, 1.0);
++    try testing.expectEqualStrings(a, b);
++    try testing.expect(std.mem.indexOf(u8, a, "TEXT_ANIM_DURATION 0.12") != null);
++    try testing.expect(std.mem.indexOf(u8, a, "TEXT_ANIM_INTENSITY 1") != null);
++
++    // Different configurations produce different sources.
++    const c = try typewriterAnimationSource(arena.allocator(), 250 * std.time.ns_per_ms, 0.5);
++    try testing.expect(!std.mem.eql(u8, a, c));
++    try testing.expect(std.mem.indexOf(u8, c, "TEXT_ANIM_DURATION 0.25") != null);
++    try testing.expect(std.mem.indexOf(u8, c, "TEXT_ANIM_INTENSITY 0.5") != null);
++
++    // The typewriter source is distinct from the streaming source: each
++    // effect keeps its own shader body.
++    const stream_src = try textAnimationSource(arena.allocator(), 120 * std.time.ns_per_ms, 1.0);
++    try testing.expect(!std.mem.eql(u8, a, stream_src));
++
++    // The specialized source compiles through the same SPIR-V pipeline
++    // used for user custom shaders.
++    const src = try testGlslZ(alloc, a);
++    defer alloc.free(src);
++    var buf: [4096 * 4]u8 = undefined;
++    var writer: std.Io.Writer = .fixed(&buf);
++    try spirvFromGlsl(&writer, null, src);
++
++    // And the full generator produces a shader in the target format.
++    const glsl_out = try typewriterAnimationShader(alloc, 120 * std.time.ns_per_ms, 1.0, .glsl);
++    defer alloc.free(glsl_out);
++    try testing.expect(glsl_out.len > 0);
++}
++
+ test "spirv invalid" {
+     const testing = std.testing;
+     const alloc = testing.allocator;
+diff --git a/src/renderer/shaders/cursor-trail.glsl b/src/renderer/shaders/cursor-trail.glsl
+new file mode 100644
+index 000000000..d24716703
+--- /dev/null
++++ b/src/renderer/shaders/cursor-trail.glsl
+@@ -0,0 +1,88 @@
++// Built-in cursor glow and motion trail effect.
++//
++// This shader is not meant to be loaded by users; it is prepended before
++// any user `custom-shader` files when the `cursor-trail` configuration is
++// enabled. It runs as the first post-processing pass.
++//
++// It draws a soft glow around the current cursor rectangle and a trail
++// connecting the previous and current cursor rectangles, fading out
++// linearly over the configured duration after each cursor movement.
++// Outside the cursor/transition region, when the cursor is hidden, or
++// when the surface is unfocused, iChannel0 is passed through unchanged.
++
++// The opacity of the effect. Specialized at shader generation time from
++// the `cursor-trail-opacity` configuration.
++#ifndef CURSOR_TRAIL_OPACITY
++#define CURSOR_TRAIL_OPACITY 0.35
++#endif
++
++// The fade duration in seconds. Specialized at shader generation time from
++// the `cursor-trail-duration` configuration.
++#ifndef CURSOR_TRAIL_DURATION
++#define CURSOR_TRAIL_DURATION 0.25
++#endif
++
++// Signed distance (in pixels) from a point to the rectangle
++// [rect.xy, rect.xy + rect.zw]. Zero inside the rectangle, positive
++// outside.
++float cursorTrailRectDistance(vec2 point, vec4 rect) {
++    vec2 d = abs(point - (rect.xy + 0.5 * rect.zw)) - 0.5 * rect.zw;
++    return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0);
++}
++
++// Distance (in pixels) from a point to the segment [a, b]. Degenerate
++// segments (a == b) reduce to the distance to the point.
++float cursorTrailSegmentDistance(vec2 point, vec2 a, vec2 b) {
++    vec2 ab = b - a;
++    float len2 = dot(ab, ab);
++    float t = len2 > 0.0 ? clamp(dot(point - a, ab) / len2, 0.0, 1.0) : 0.0;
++    return length(point - (a + t * ab));
++}
++
++void mainImage(out vec4 fragColor, in vec2 fragCoord) {
++    // Start with the terminal frame unchanged. All branches below only
++    // blend additional color over the cursor/transition region.
++    vec4 frame = texture2D(iChannel0, fragCoord / iResolution.xy);
++    fragColor = frame;
++
++    // The cursor is hidden when the surface is unfocused, so there is
++    // nothing to draw in either case.
++    if (iCursorVisible == 0 || iFocus == 0) return;
++
++    // A degenerate rectangle means we have no cursor position yet.
++    vec4 current = iCurrentCursor;
++    if (current.z <= 0.0 || current.w <= 0.0) return;
++
++    // Fade out linearly over the configured duration. Once the duration
++    // has elapsed the effect is fully transparent and we can stop.
++    float elapsed = max(iTime - iTimeCursorChange, 0.0);
++    if (elapsed >= CURSOR_TRAIL_DURATION) return;
++    float fade = 1.0 - (elapsed / CURSOR_TRAIL_DURATION);
++
++    // The glow radius scales with the cursor size so that the effect looks
++    // the same at any cell size or display scale factor.
++    float radius = 0.5 * max(current.z, current.w);
++
++    // Soft glow around the current cursor rectangle.
++    float d_current = cursorTrailRectDistance(fragCoord, current);
++    float glow = exp(-d_current / radius);
++
++    // Trail between the previous and current cursor rectangles. The trail
++    // is a glow along the segment connecting the two rectangle centers; if
++    // the cursor is stationary the segment is degenerate and the current
++    // cursor glow above fully covers it.
++    float trail = 0.0;
++    vec4 previous = iPreviousCursor;
++    if (previous.z > 0.0 && previous.w > 0.0) {
++        vec2 prev_center = previous.xy + 0.5 * previous.zw;
++        vec2 curr_center = current.xy + 0.5 * current.zw;
++        float d_trail = cursorTrailSegmentDistance(fragCoord, prev_center, curr_center);
++        trail = exp(-d_trail / radius);
++    }
++
++    // Blend the cursor color over the frame with the effect's alpha. The
++    // alpha is zero outside the glow/trail region, so those pixels are
++    // passed through unchanged.
++    float alpha = max(glow, trail) * fade * CURSOR_TRAIL_OPACITY;
++    fragColor = vec4(mix(frame.rgb, iCurrentCursorColor.rgb, alpha), frame.a);
++}
+diff --git a/src/renderer/shaders/streaming-text.glsl b/src/renderer/shaders/streaming-text.glsl
+new file mode 100644
+index 000000000..025be5ba3
+--- /dev/null
++++ b/src/renderer/shaders/streaming-text.glsl
+@@ -0,0 +1,81 @@
++// Built-in streaming text reveal effect.
++//
++// This shader is not meant to be loaded by users; it is prepended before
++// the built-in cursor trail effect and any user `custom-shader` files when
++// the `text-animation` configuration is `streaming`. It runs as the first
++// post-processing pass.
++//
++// It reveals newly changed glyph output left-to-right over the configured
++// duration. A per-cell change-time texture (iChannel1, one texel per grid
++// cell) records when each cell's rendered content last changed; cells that
++// never changed are sentinel and pass through unchanged, so only newly
++// changed glyph output animates and the rest of the screen stays stable.
++//
++// The effect is purely visual: the terminal state, accessibility, and
++// selection always expose the final text immediately.
++
++// The reveal duration in seconds. Specialized at shader generation time
++// from the `text-animation-duration` configuration.
++#ifndef TEXT_ANIM_DURATION
++#define TEXT_ANIM_DURATION 0.12
++#endif
++
++// The effect intensity in [0, 1]. Specialized at shader generation time
++// from the `text-animation-intensity` configuration. A value of 1 fully
++// hides newly changed glyphs until the reveal passes them; lower values
++// show them partially, and 0 disables the visual effect entirely.
++#ifndef TEXT_ANIM_INTENSITY
++#define TEXT_ANIM_INTENSITY 1.0
++#endif
++
++// The change-time texture: one texel per grid cell (rgba8), row 0 is the
++// top row of the grid. Each texel holds the IEEE-754 bit pattern of the
++// shader time at which the cell's content last changed, split into bytes.
++// iChannelResolution[1].xy is the grid size in cells and iCellMetrics is
++// (cell width, signed row step, row-zero origin x, row-zero origin y) in
++// pixels; the row step is negative for bottom-up shader coordinates.
++layout(binding = 1) uniform sampler2D iChannel1;
++
++void mainImage(out vec4 fragColor, in vec2 fragCoord) {
++    // Start with the terminal frame unchanged. All branches below only
++    // hide (blend toward the terminal background) the unrevealed portion
++    // of cells whose reveal is still in progress.
++    vec4 frame = texture2D(iChannel0, fragCoord / iResolution.xy);
++    fragColor = frame;
++
++    // Grid size in cells. Zero means the grid hasn't been set up yet.
++    vec2 grid = iChannelResolution[1].xy;
++    if (grid.x <= 0.0 || grid.y <= 0.0) return;
++
++    // The cell this fragment belongs to. iCellMetrics.zw is the top-left
++    // of the grid in this shader's coordinate space, so cell.y counts rows
++    // from the top and maps directly to the change texture rows.
++    vec2 cell = floor((fragCoord.xy - iCellMetrics.zw) / iCellMetrics.xy);
++    if (cell.x < 0.0 || cell.y < 0.0 || cell.x >= grid.x || cell.y >= grid.y) return;
++
++    // Reconstruct the change time for this cell. Cells that never changed
++    // hold a large negative sentinel so the elapsed time below is far past
++    // the duration and the cell passes through unchanged.
++    vec4 raw = texture2D(iChannel1, (cell + 0.5) / grid);
++    uvec4 bytes = uvec4(floor(raw * 255.0 + 0.5));
++    uint bits = bytes.r | (bytes.g << 8u) | (bytes.b << 16u) | (bytes.a << 24u);
++    float change_time = uintBitsToFloat(bits);
++
++    // Only cells whose change is still within the reveal window animate.
++    float elapsed = iTime - change_time;
++    if (elapsed < 0.0 || elapsed >= TEXT_ANIM_DURATION) return;
++
++    // Reveal left-to-right: the reveal boundary sweeps across the cell
++    // over the duration, starting at the cell's left edge at the change
++    // time. Pixels left of the boundary are fully revealed; pixels to the
++    // right are hidden with a soft edge, scaled by the intensity.
++    float reveal = elapsed / TEXT_ANIM_DURATION;
++    float cell_left = cell.x * iCellMetrics.x + iCellMetrics.z;
++    float local_x = fragCoord.x - cell_left;
++    float boundary = reveal * iCellMetrics.x;
++    float dist = local_x - boundary;
++    if (dist <= 0.0) return;
++
++    float hidden = TEXT_ANIM_INTENSITY * (1.0 - reveal) * smoothstep(0.0, 2.0, dist);
++    fragColor = vec4(mix(frame.rgb, iBackgroundColor, hidden), frame.a);
++}
+diff --git a/src/renderer/shaders/typewriter-text.glsl b/src/renderer/shaders/typewriter-text.glsl
+new file mode 100644
+index 000000000..c56f39433
+--- /dev/null
++++ b/src/renderer/shaders/typewriter-text.glsl
+@@ -0,0 +1,103 @@
++// Built-in typewriter text reveal effect.
++//
++// This shader is not meant to be loaded by users; it is prepended before
++// the built-in cursor trail effect and any user `custom-shader` files when
++// the `text-animation` configuration is `typewriter`. It runs as the first
++// post-processing pass.
++//
++// It reveals newly changed glyph output one character at a time: the
++// renderer timestamps each changed cell in terminal reading order with a
++// short fixed stagger derived from the configured duration (one eighth of
++// the duration per character), and this shader pops each cell in over a
++// quick window starting at its own timestamp. A per-cell change-time
++// texture (iChannel1, one texel per grid cell) records when each cell's
++// rendered content last changed; cells that never changed are sentinel
++// and pass through unchanged, so only newly changed glyph output animates
++// and the rest of the screen (including old text) stays stable.
++//
++// The effect is purely visual: the terminal state, accessibility, and
++// selection always expose the final text immediately.
++
++// The reveal duration in seconds. Specialized at shader generation time
++// from the `text-animation-duration` configuration.
++#ifndef TEXT_ANIM_DURATION
++#define TEXT_ANIM_DURATION 0.12
++#endif
++
++// The effect intensity in [0, 1]. Specialized at shader generation time
++// from the `text-animation-intensity` configuration. A value of 1 fully
++// hides newly changed glyphs until the reveal passes them; lower values
++// show them partially, and 0 disables the visual effect entirely.
++#ifndef TEXT_ANIM_INTENSITY
++#define TEXT_ANIM_INTENSITY 1.0
++#endif
++
++// The change-time texture: one texel per grid cell (rgba8), row 0 is the
++// top row of the grid. Each texel holds the IEEE-754 bit pattern of the
++// shader time at which the cell's content last changed, split into bytes.
++// iChannelResolution[1].xy is the grid size in cells and iCellMetrics is
++// (cell width, signed row step, row-zero origin x, row-zero origin y) in
++// pixels; the row step is negative for bottom-up shader coordinates.
++layout(binding = 1) uniform sampler2D iChannel1;
++
++void mainImage(out vec4 fragColor, in vec2 fragCoord) {
++    // Start with the terminal frame unchanged. All branches below only
++    // hide (blend toward the terminal background) the unrevealed portion
++    // of cells whose reveal is still in progress.
++    vec4 frame = texture2D(iChannel0, fragCoord / iResolution.xy);
++    fragColor = frame;
++
++    // Grid size in cells. Zero means the grid hasn't been set up yet.
++    vec2 grid = iChannelResolution[1].xy;
++    if (grid.x <= 0.0 || grid.y <= 0.0) return;
++
++    // The cell this fragment belongs to. iCellMetrics.zw is row zero's
++    // origin and the signed row step makes cell.y increase top-to-bottom
++    // on both top-down and bottom-up graphics APIs.
++    vec2 cell = floor((fragCoord.xy - iCellMetrics.zw) / iCellMetrics.xy);
++    if (cell.x < 0.0 || cell.y < 0.0 || cell.x >= grid.x || cell.y >= grid.y) return;
++
++    // Recover the already-composited background from a glyph-free corner
++    // of this cell. This preserves terminal opacity and per-cell colors
++    // instead of replacing hidden glyphs with the raw global config color.
++    vec2 cell_origin = iCellMetrics.zw + cell * iCellMetrics.xy;
++    vec3 cell_background = texture2D(
++        iChannel0,
++        (cell_origin + vec2(0.5)) / iResolution.xy
++    ).rgb;
++
++    // Reconstruct the change time for this cell. Cells that never changed
++    // hold a large negative sentinel so the elapsed time below is far past
++    // the reveal window and the cell passes through unchanged.
++    vec4 raw = texture2D(iChannel1, (cell + 0.5) / grid);
++    uvec4 bytes = uvec4(floor(raw * 255.0 + 0.5));
++    uint bits = bytes.r | (bytes.g << 8u) | (bytes.b << 16u) | (bytes.a << 24u);
++    float change_time = uintBitsToFloat(bits);
++
++    // Only cells whose change is still within the reveal window animate.
++    // The window is the configured duration, but the character itself
++    // strikes in over the first quarter of it so consecutive staggered
++    // characters pop in one after another rather than smearing across
++    // the whole duration.
++    float elapsed = iTime - change_time;
++    if (elapsed >= TEXT_ANIM_DURATION) return;
++    if (elapsed < 0.0) {
++        fragColor = vec4(mix(frame.rgb, cell_background, TEXT_ANIM_INTENSITY), frame.a);
++        return;
++    }
++
++    // The strike: the character appears over the first quarter of its
++    // window with a left-to-right sweep across the cell, like a
++    // typewriter's ink hitting the page. Once the strike completes the
++    // character stays fully visible for the rest of its window.
++    float strike = TEXT_ANIM_DURATION * 0.25;
++    float t = clamp(elapsed / strike, 0.0, 1.0);
++    float cell_left = cell.x * iCellMetrics.x + iCellMetrics.z;
++    float local_x = fragCoord.x - cell_left;
++    float boundary = t * iCellMetrics.x;
++    float dist = local_x - boundary;
++    if (dist <= 0.0) return;
++
++    float hidden = TEXT_ANIM_INTENSITY * (1.0 - t) * smoothstep(0.0, 2.0, dist);
++    fragColor = vec4(mix(frame.rgb, cell_background, hidden), frame.a);
++}
