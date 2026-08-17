@@ -1,9 +1,6 @@
 # Mr Crabs
 
-A native macOS terminal emulator written in Rust.
-
-This is not a Ghostty fork and does not link `libghostty`. It owns its PTY,
-VT/grid, input encoding, and GPUI window.
+A native macOS terminal emulator written in Rust
 
 ## Status
 
