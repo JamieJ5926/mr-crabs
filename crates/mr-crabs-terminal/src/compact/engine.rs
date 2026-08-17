@@ -911,19 +911,37 @@ impl CompactEngine {
             self.mark_full();
             return;
         }
-        for _ in 0..lines {
-            let removed = self
-                .screen_mut()
-                .active
-                .remove(usize::from(origin))
-                .expect("scroll origin is inside active grid");
-            if to_history {
-                self.primary.history.push_back(removed);
+        let full_screen = origin == 0 && usize::from(region_end) == self.screen().active.len();
+        if full_screen {
+            // Full-screen scroll: pop_front + push_back is O(1) per line.
+            // remove(0)+insert(end) would shift the whole 24-row deque.
+            for _ in 0..lines {
+                let removed = self
+                    .screen_mut()
+                    .active
+                    .pop_front()
+                    .expect("scroll origin is inside active grid");
+                if to_history {
+                    self.primary.history.push_back(removed);
+                }
+                let blank = self.blank_row();
+                self.screen_mut().active.push_back(blank);
             }
-            let blank = self.blank_row();
-            self.screen_mut()
-                .active
-                .insert(usize::from(region_end.saturating_sub(1)), blank);
+        } else {
+            for _ in 0..lines {
+                let removed = self
+                    .screen_mut()
+                    .active
+                    .remove(usize::from(origin))
+                    .expect("scroll origin is inside active grid");
+                if to_history {
+                    self.primary.history.push_back(removed);
+                }
+                let blank = self.blank_row();
+                self.screen_mut()
+                    .active
+                    .insert(usize::from(region_end.saturating_sub(1)), blank);
+            }
         }
         if to_history {
             self.trim_history();
