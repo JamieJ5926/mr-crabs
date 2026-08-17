@@ -20,6 +20,7 @@ use mr_crabs_graphics::{
     store::{ImageStore, StoreConfig},
     texture::{TextureCache, TextureKey},
 };
+use mr_crabs_effects::{CellPx, EffectsConfig, EffectsModel, RevealMath, TextAnimation};
 use mr_crabs_terminal::{CursorShape, FrameDelta};
 use parking_lot::{Mutex, MutexGuard};
 use std::collections::HashMap;
@@ -94,8 +95,9 @@ pub struct TerminalElement {
     /// Optional main-thread hook invoked at the start of paint so the app
     /// can drain PTY output on frames that already run (cursor blink).
     on_paint: Option<Arc<dyn Fn(&mut App)>>,
-    /// When true, `focus` belongs to the window view. Do not rebind it.
     borrowed_focus: bool,
+    /// Live text/trail effects. `None` keeps the disabled fast path.
+    effects: Option<EffectsConfig>,
 }
 
 /// The shaping identity that determines whether retained glyph batches must
@@ -137,6 +139,8 @@ struct PaintState {
     deduper: ResizeDeduper,
     painted_font: Option<FontIdentity>,
     cursor_blink: cursor::BlinkState,
+    effects: Option<EffectsModel>,
+    effects_origin: Option<Instant>,
 }
 
 impl PaintState {
@@ -194,6 +198,7 @@ impl TerminalElement {
             element_id: None,
             on_paint: None,
             borrowed_focus: false,
+            effects: None,
         }
     }
 
@@ -213,6 +218,7 @@ impl TerminalElement {
             element_id: None,
             on_paint: None,
             borrowed_focus: false,
+            effects: None,
         }
     }
 
@@ -338,6 +344,13 @@ impl TerminalElement {
     pub fn with_focus(mut self, focus: FocusHandle) -> Self {
         self.focus = Some(focus);
         self.borrowed_focus = true;
+        self
+    }
+
+    /// Builder: attach the live effects config. Disabled configs allocate
+    /// nothing in paint state.
+    pub fn with_effects(mut self, config: EffectsConfig) -> Self {
+        self.effects = Some(config);
         self
     }
 
@@ -535,13 +548,89 @@ impl TerminalElement {
             window.handle_input(focus, input.clone(), cx);
         }
 
-        // Animation scheduling: the element requests animation frames only
-        // while the cursor blinks. Damage repaints and output-pump frames are
-        // the application's responsibility (window.refresh /
-        // request_animation_frame from the PTY pump).
-        if cursor::should_request_animation(frame) {
+        // Animation scheduling: cursor blink plus live text/trail effects.
+        let effects_busy = self.paint_effects(state, frame, origin, window);
+        if cursor::should_request_animation(frame) || effects_busy {
             window.request_animation_frame();
         }
+    }
+
+    fn paint_effects(
+        &self,
+        state: &mut PaintState,
+        frame: &FrameDelta,
+        origin: Point<Pixels>,
+        window: &mut Window,
+    ) -> bool {
+        let Some(config) = self.effects else {
+            return false;
+        };
+        if config.text_animation == TextAnimation::Disabled && !config.cursor_trail {
+            state.effects = None;
+            return false;
+        }
+        let cell = CellPx::new(f64::from(self.metrics.width), f64::from(self.metrics.height));
+        let model = state.effects.get_or_insert_with(|| {
+            EffectsModel::new(config, frame.size, cell)
+        });
+        if model.config() != &config || model.cell() != cell {
+            model.set_config(config);
+        }
+        let origin_clock = state.effects_origin.get_or_insert_with(Instant::now);
+        let now_ms = origin_clock.elapsed().as_millis() as u64;
+        let fx = model.apply_frame(frame, now_ms, true);
+        let math = RevealMath::new(
+            config.text_animation,
+            config.text_animation_duration_ms,
+            config.text_animation_intensity,
+            cell.width,
+        );
+        let bg = self.palette.background_color();
+        let cw = px(self.metrics.width);
+        let ch = px(self.metrics.height);
+        for pending in &fx.pending {
+            let rect = gpui::Bounds {
+                origin: point(
+                    origin.x + px(f32::from(pending.col) * self.metrics.width),
+                    origin.y + px(f32::from(pending.row) * self.metrics.height),
+                ),
+                size: size(cw, ch),
+            };
+            window.paint_quad(fill(rect, bg));
+        }
+        for reveal in &fx.revealing {
+            let hidden = reveal.hidden_fraction_at(&math, cell.width);
+            if hidden <= 0.0 {
+                continue;
+            }
+            let frac = reveal.boundary_fraction(&math) as f32;
+            let shown = cw * frac;
+            let remain = cw - shown;
+            if remain <= px(0.0) {
+                continue;
+            }
+            let mut color = bg;
+            color.a = hidden as f32;
+            let rect = gpui::Bounds {
+                origin: point(
+                    origin.x + px(f32::from(reveal.pos.col) * self.metrics.width) + shown,
+                    origin.y + px(f32::from(reveal.pos.row) * self.metrics.height),
+                ),
+                size: size(remain, ch),
+            };
+            window.paint_quad(fill(rect, color));
+        }
+        if fx.trail.active && fx.trail.alpha > 0.0 {
+            let mut glow = self.palette.cursor_color();
+            glow.a = fx.trail.alpha as f32;
+            let r = fx.trail.glow_rect;
+            let rect = gpui::Bounds {
+                origin: point(origin.x + px(r.x as f32), origin.y + px(r.y as f32)),
+                size: size(px(r.w as f32), px(r.h as f32)),
+            };
+            window.paint_quad(fill(rect, glow));
+        }
+        fx.needs_frame
     }
 
     /// Paint one shaped run with every glyph anchored to its terminal cell.

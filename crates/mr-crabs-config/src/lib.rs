@@ -19,10 +19,10 @@ pub const DEFAULT_GRID_ROWS: u16 = 24;
 pub const DEFAULT_THEME: &str = "auto";
 pub const DEFAULT_BACKGROUND_OPACITY: f32 = 1.0;
 pub const DEFAULT_CURSOR_BLINK: bool = false;
-pub const DEFAULT_CURSOR_TRAIL: bool = false;
+pub const DEFAULT_CURSOR_TRAIL: bool = true;
 pub const DEFAULT_CURSOR_TRAIL_OPACITY: f32 = 0.35;
 pub const DEFAULT_CURSOR_TRAIL_DURATION_MS: u64 = 250;
-pub const DEFAULT_TEXT_ANIMATION: &str = "none";
+pub const DEFAULT_TEXT_ANIMATION: &str = "streaming";
 pub const DEFAULT_TEXT_ANIMATION_DURATION_MS: u64 = 120;
 pub const DEFAULT_TEXT_ANIMATION_INTENSITY: f32 = 1.0;
 
@@ -75,7 +75,7 @@ impl Default for AnimationDefaults {
             cursor_trail: DEFAULT_CURSOR_TRAIL,
             cursor_trail_opacity: DEFAULT_CURSOR_TRAIL_OPACITY,
             cursor_trail_duration: Duration::from_millis(DEFAULT_CURSOR_TRAIL_DURATION_MS),
-            text_animation: TextAnimation::Disabled,
+            text_animation: TextAnimation::parse(DEFAULT_TEXT_ANIMATION),
             text_animation_duration: Duration::from_millis(DEFAULT_TEXT_ANIMATION_DURATION_MS),
             text_animation_intensity: DEFAULT_TEXT_ANIMATION_INTENSITY,
         }

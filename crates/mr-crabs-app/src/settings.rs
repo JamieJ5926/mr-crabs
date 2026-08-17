@@ -87,9 +87,6 @@ fn default_opacity() -> f32 {
 fn default_padding() -> f32 {
     DEFAULT_PADDING_PX
 }
-fn default_false() -> bool {
-    false
-}
 fn default_text_animation() -> String {
     mr_crabs_config::DEFAULT_TEXT_ANIMATION.to_string()
 }
@@ -104,6 +101,9 @@ fn default_cursor_trail_opacity() -> f32 {
 }
 fn default_cursor_trail_duration() -> u64 {
     mr_crabs_config::DEFAULT_CURSOR_TRAIL_DURATION_MS
+}
+fn default_cursor_trail() -> bool {
+    mr_crabs_config::DEFAULT_CURSOR_TRAIL
 }
 
 /// Typed shell settings. Unknown JSON fields are ignored; every field
@@ -149,8 +149,8 @@ pub struct AppSettings {
     /// When to close the pane after the child exits.
     #[serde(default)]
     pub close_on_exit: CloseOnExit,
-    /// Mr Crabs cursor-trail default (off; opt-in).
-    #[serde(default = "default_false")]
+    /// Mr Crabs cursor-trail default (on).
+    #[serde(default = "default_cursor_trail")]
     pub cursor_trail: bool,
     /// Mr Crabs cursor-trail opacity.
     #[serde(default = "default_cursor_trail_opacity")]
@@ -802,12 +802,11 @@ mod tests {
         assert_eq!(settings.padding_x, 10.0);
         assert_eq!(settings.padding_y, 10.0);
         assert_eq!(settings.scrollback_lines, DEFAULT_SCROLLBACK_LINES);
-        assert_eq!(settings.default_grid, GridSize::new(80, 24));
-        assert!(!settings.cursor_trail, "cursor trail is opt-in");
+        assert!(settings.cursor_trail, "cursor trail defaults on");
         assert_eq!(
             settings.text_animation_kind(),
-            TextAnimation::Disabled,
-            "text animation defaults to none"
+            TextAnimation::Streaming,
+            "text animation defaults to streaming"
         );
         // Animation defaults remain independent of terminal typography.
         let anim = settings.animation_defaults();

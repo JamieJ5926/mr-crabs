@@ -34,7 +34,7 @@ use gpui::{
 use parking_lot::Mutex;
 
 use mr_crabs_element::{
-    CellMetrics, GraphicsOverlay, PixelExtent, TerminalElement, TerminalPalette,
+    CellMetrics, EffectsConfig, GraphicsOverlay, PixelExtent, TerminalElement, TerminalPalette,
 };
 use mr_crabs_history::SelectionGesture;
 #[cfg(test)]
@@ -415,6 +415,7 @@ impl Render for WindowView {
                 )
                 .with_font_size(px(settings.font_size))
                 .with_palette(terminal_palette)
+                .with_effects(EffectsConfig::from(settings.animation_defaults()))
                 .with_graphics(bundle.graphics)
                 .with_on_paint(|cx| {
                     let _ = super::wake::pump_output(cx);

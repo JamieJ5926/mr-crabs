@@ -74,9 +74,8 @@ pub const DEFAULT_MAX_TRACKED_CELLS: usize = 1 << 20;
 /// All durations and intensities are clamped to the oracle's safe finite
 /// ranges at construction (see the `*_MIN_MS`/`*_MAX_MS` constants), so the
 /// animation window is always bounded. [`Default`] reproduces the exact
-/// Mr Crabs defaults: plain terminal — text animation `Disabled`, 120 ms
-/// duration, intensity 1.0; cursor trail off, 250 ms fade, opacity 0.35
-/// (tuning values retained for explicit opt-in).
+/// Mr Crabs defaults: streaming text reveal and cursor trail on, matching
+/// the live product. Tuning values are 120 ms / 1.0 and 250 ms / 0.35.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct EffectsConfig {
     /// Text reveal mode; `Disabled` allocates no text-animation state.
@@ -151,14 +150,11 @@ mod tests {
 
     #[test]
     fn defaults_match_mr_crabs() {
-        // Mr Crabs product defaults: plain terminal — text animation none,
-        // cursor trail off; tuning values (120ms/1.0, 250ms/0.35) retained
-        // for explicit opt-in.
         let cfg = EffectsConfig::default();
-        assert_eq!(cfg.text_animation, TextAnimation::Disabled);
+        assert_eq!(cfg.text_animation, TextAnimation::Streaming);
         assert_eq!(cfg.text_animation_duration_ms, 120);
         assert_eq!(cfg.text_animation_intensity, 1.0);
-        assert!(!cfg.cursor_trail);
+        assert!(cfg.cursor_trail);
         assert_eq!(cfg.cursor_trail_duration_ms, 250);
         assert!((cfg.cursor_trail_opacity - 0.35).abs() < f64::from(f32::EPSILON));
     }
