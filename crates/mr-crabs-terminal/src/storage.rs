@@ -205,9 +205,11 @@ pub struct ScrollbackStorage {
     enqueue_cursor: usize,
     /// Bounded single-page decompression cache for `read_line` over cold pages.
     cold_cache: Option<ColdReadCache>,
-    /// Reused only when queue pressure forces lossless inline compression.
+    /// Kept for `force_compress_all` scratch reuse; unused on the feed path.
+    #[allow(dead_code)]
     compression_scratch: Vec<u8>,
     recycled_rows: Vec<Arc<[Cell]>>,
+    #[allow(dead_code)]
     encoded_scratch: Vec<u8>,
     job_tx: Option<SyncSender<Job>>,
     completion_rx: Receiver<Completion>,
@@ -809,21 +811,15 @@ impl ScrollbackStorage {
                 true
             }
             Err(TrySendError::Full(job) | TrySendError::Disconnected(job)) => {
+                // Documented overload: keep the page hot and retry later.
+                // Inline LZ4 here would steal the feed thread.
                 self.queued_jobs.fetch_sub(1, Ordering::AcqRel);
-                let (compressed, sparse, recycled_rows) = compress_payload(
-                    job.payload,
-                    job.cols,
-                    &mut self.compression_scratch,
-                    &mut self.encoded_scratch,
-                );
-                self.history[idx].compressed = Some(Self::intern_compressed(
-                    &mut self.compressed_pool,
-                    compressed,
-                ));
-                self.history[idx].sparse = sparse;
-                self.retain_recycled_rows(recycled_rows);
+                self.history[idx].resident = Some(match job.payload {
+                    JobPayload::Flat(cells) => Resident::Flat(cells),
+                    JobPayload::Segmented(rows) => Resident::Segmented(rows),
+                });
                 self.history[idx].pending = false;
-                true
+                false
             }
         }
     }
@@ -1568,6 +1564,15 @@ mod owned_ingest_tests {
         }
         assert_eq!(s.total_lines(), 6);
         s.poll_compression();
+        let leftover_hot = s
+            .history
+            .iter()
+            .filter(|page| page.resident.is_some())
+            .count();
+        assert!(
+            leftover_hot >= 4,
+            "queue Full must keep overflow pages hot, leftover_hot={leftover_hot}"
+        );
         s.drain_compression();
         s.force_compress_all();
         assert_eq!(s.total_lines(), 6);

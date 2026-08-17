@@ -31,6 +31,21 @@ sh package/macos/package.sh
 
 That writes `dist/Mr Crabs.app` (or `$1/Mr Crabs.app`).
 
+## Config
+
+```bash
+./target/release/mr-crabs --config-file /path/to/config.json
+```
+
+The file is JSON. A minimal example:
+
+```json
+{"font_size": 16.0, "theme": "dark"}
+```
+
+Reload with `Cmd+Shift+R` or View → Reload Configuration. CLI flags beat the
+file. A missing `--config-file` path is a startup error.
+
 ## License
 
 MIT for original Mr Crabs code. Vendored Alacritty terminal sources, VTE, GPUI,
