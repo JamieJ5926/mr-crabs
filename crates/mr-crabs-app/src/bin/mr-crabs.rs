@@ -17,7 +17,7 @@
 
 use std::borrow::Cow;
 
-use gpui::{App, AppContext as _};
+use gpui::{App, AppContext as _, QuitMode};
 use gpui_platform::application;
 
 use mr_crabs_app::model::app_model::AppModel;
@@ -79,6 +79,7 @@ fn main() {
     };
 
     application().run(|cx: &mut App| {
+        cx.set_quit_mode(QuitMode::LastWindowClosed);
         cx.set_app_identity("dev.jamie.mr-crabs", "Mr Crabs");
         cx.text_system()
             .add_fonts(embedded_terminal_fonts())

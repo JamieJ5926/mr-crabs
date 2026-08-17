@@ -73,8 +73,17 @@ impl AppShell {
             let should_quit = weak
                 .update(cx, |this, cx| this.handle_native_close(closed_gpui_id, cx))
                 .unwrap_or(false);
-            if should_quit {
+            // macOS GPUI Default quit mode keeps the process alive with no
+            // windows. A terminal must exit. `cx.quit()` posts `terminate:`
+            // asynchronously and has been observed not to reap this binary.
+            if should_quit || cx.windows().is_empty() {
+                if !should_quit {
+                    let _ = weak.update(cx, |this, cx| {
+                        this.model.update(cx, |model, _| model.shutdown_all());
+                    });
+                }
                 cx.quit();
+                std::process::exit(0);
             }
         }));
     }
@@ -162,6 +171,7 @@ impl AppShell {
                                 .unwrap_or(false);
                             if should_quit {
                                 cx.quit();
+                                std::process::exit(0);
                             }
                         });
                     }
@@ -319,6 +329,28 @@ mod tests {
             let remaining = shell.read(cx).windows_snapshot();
             assert!(!remaining.contains_key(&closing));
             assert!(remaining.contains_key(&survivor));
+        });
+    }
+
+    #[gpui::test]
+    fn last_native_close_requests_quit(cx: &mut TestAppContext) {
+        let (model, shell) = cx.update(|cx| {
+            let model = cx.new(|_| AppModel::headless());
+            let shell = cx.new(|_| AppShell::new(model.clone()));
+            shell.update(cx, |shell, cx| shell.sync_windows(cx));
+            (model, shell)
+        });
+
+        cx.update(|cx| {
+            let bindings = shell.read(cx).windows_snapshot();
+            assert_eq!(bindings.len(), 1);
+            let closing = *bindings.keys().next().expect("seeded window");
+            let closed_native = bindings[&closing];
+            let should_quit =
+                shell.update(cx, |shell, cx| shell.handle_native_close(closed_native, cx));
+            assert!(should_quit);
+            assert!(model.read(cx).windows.is_empty());
+            assert!(shell.read(cx).windows_snapshot().is_empty());
         });
     }
 }
