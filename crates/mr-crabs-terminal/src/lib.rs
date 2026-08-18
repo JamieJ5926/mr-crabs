@@ -47,6 +47,91 @@ impl GridSize {
     }
 }
 
+/// The display role of a cell in the terminal grid.
+///
+/// Consumers should use this type instead of depending on the compact
+/// storage flag representation.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CellWidth {
+    /// A normal single-column cell.
+    Single,
+    /// The first cell of a double-column character.
+    Wide,
+    /// The trailing cell reserved by a double-column character.
+    WideSpacer,
+    /// A leading spacer used when a wide character wraps at the margin.
+    LeadingWideSpacer,
+}
+
+/// The underline decoration applied to a cell.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UnderlineStyle {
+    Single,
+    Double,
+    Curly,
+    Dotted,
+    Dashed,
+}
+
+/// Stable, read-only access to a cell's terminal attributes.
+///
+/// The compact bit layout remains an implementation detail; frame adapters
+/// can query semantic properties without copying raw masks.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CellAttributes {
+    flags: u16,
+}
+
+impl CellAttributes {
+    pub const fn inverse(self) -> bool {
+        self.flags & compact::flags::INVERSE != 0
+    }
+
+    pub const fn bold(self) -> bool {
+        self.flags & compact::flags::BOLD != 0
+    }
+
+    pub const fn italic(self) -> bool {
+        self.flags & compact::flags::ITALIC != 0
+    }
+
+    pub const fn dim(self) -> bool {
+        self.flags & compact::flags::DIM != 0
+    }
+
+    pub const fn hidden(self) -> bool {
+        self.flags & compact::flags::HIDDEN != 0
+    }
+
+    pub const fn strikeout(self) -> bool {
+        self.flags & compact::flags::STRIKEOUT != 0
+    }
+
+    pub const fn wrapped(self) -> bool {
+        self.flags & compact::flags::WRAPLINE != 0
+    }
+
+    pub const fn combining(self) -> bool {
+        self.flags & compact::flags::COMBINING != 0
+    }
+
+    pub const fn underline(self) -> Option<UnderlineStyle> {
+        if self.flags & compact::flags::DOUBLE_UNDERLINE != 0 {
+            Some(UnderlineStyle::Double)
+        } else if self.flags & compact::flags::UNDERCURL != 0 {
+            Some(UnderlineStyle::Curly)
+        } else if self.flags & compact::flags::DOTTED_UNDERLINE != 0 {
+            Some(UnderlineStyle::Dotted)
+        } else if self.flags & compact::flags::DASHED_UNDERLINE != 0 {
+            Some(UnderlineStyle::Dashed)
+        } else if self.flags & compact::flags::UNDERLINE != 0 {
+            Some(UnderlineStyle::Single)
+        } else {
+            None
+        }
+    }
+}
+
 /// A compact, `#[repr(C)]`, 8-byte cell: a Unicode scalar, a style index into
 /// the snapshot style table, and raw attribute flags.
 #[repr(C)]
@@ -61,6 +146,25 @@ impl Cell {
     pub const WIDE: u16 = 0x0020;
     pub const WIDE_SPACER: u16 = 0x0040;
     pub const COMBINING: u16 = 0x8000;
+
+    /// Returns the cell's semantic display-width role without exposing the
+    /// compact storage masks.
+    pub const fn width(&self) -> CellWidth {
+        if self.flags & compact::flags::LEADING_WIDE_CHAR_SPACER != 0 {
+            CellWidth::LeadingWideSpacer
+        } else if self.flags & compact::flags::WIDE_CHAR_SPACER != 0 {
+            CellWidth::WideSpacer
+        } else if self.flags & compact::flags::WIDE_CHAR != 0 {
+            CellWidth::Wide
+        } else {
+            CellWidth::Single
+        }
+    }
+
+    /// Returns stable semantic accessors for the cell's attributes.
+    pub const fn attributes(&self) -> CellAttributes {
+        CellAttributes { flags: self.flags }
+    }
 
     #[inline]
     pub fn is_default(&self) -> bool {

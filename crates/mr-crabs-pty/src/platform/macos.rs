@@ -128,6 +128,12 @@ pub(crate) fn spawn_pty_child(
     let master_raw = master.as_raw_fd();
     let slave_raw = slave.as_raw_fd();
 
+    // A close-on-exec pipe lets the child report the errno from chdir/execve
+    // (or earlier setup) before spawn returns. EOF means execve succeeded.
+    let (exec_error_read, exec_error_write) = exec_error_pipe().map_err(PtyError::Spawn)?;
+    let exec_error_read_raw = exec_error_read.as_raw_fd();
+    let exec_error_write_raw = exec_error_write.as_raw_fd();
+
     // Fork the child. The child branch never returns: it either execs
     // successfully or _exit(127)s.
     //
@@ -145,6 +151,7 @@ pub(crate) fn spawn_pty_child(
         // constructed and validated above; see child_exec for the full
         // invariant list. This call diverges (execve or _exit).
         unsafe {
+            libc::close(exec_error_read_raw);
             child_exec(
                 master_raw,
                 slave_raw,
@@ -152,15 +159,129 @@ pub(crate) fn spawn_pty_child(
                 &argv_ptrs,
                 &envp_ptrs,
                 cwd_ptr,
+                exec_error_write_raw,
             )
         }
     }
 
-    // Parent: drop the slave side (the child holds its own dup2'd copies on
-    // 0/1/2); the master stays open for reading child output and writing
-    // input. The child pid is returned for supervision and reaping.
+    // Parent: close its copy of the write end, then wait for either an errno
+    // payload or close-on-exec EOF. This makes chdir/execve failures
+    // synchronous while allowing successful commands to continue normally.
+    drop(exec_error_write);
     drop(slave);
-    Ok((master, pid))
+    match read_exec_error(&exec_error_read) {
+        Ok(None) => Ok((master, pid)),
+        Ok(Some(errno)) => {
+            reap_child_blocking(pid);
+            Err(PtyError::Spawn(io::Error::from_raw_os_error(errno)))
+        }
+        Err(err) => {
+            // The handshake itself failed. Terminate the child directly (it
+            // may not have reached setsid yet), then reap before returning.
+            unsafe { libc::kill(pid, libc::SIGKILL) };
+            reap_child_blocking(pid);
+            Err(PtyError::Spawn(err))
+        }
+    }
+}
+
+/// Create a pipe whose write end closes automatically on successful exec.
+fn exec_error_pipe() -> io::Result<(OwnedFd, OwnedFd)> {
+    let mut fds = [-1; 2];
+    // SAFETY: `fds` provides space for exactly two descriptors.
+    if unsafe { libc::pipe(fds.as_mut_ptr()) } == -1 {
+        return Err(io::Error::last_os_error());
+    }
+    // SAFETY: pipe returned two fresh descriptors, each transferred once.
+    let read = unsafe { OwnedFd::from_raw_fd(fds[0]) };
+    let write = unsafe { OwnedFd::from_raw_fd(fds[1]) };
+    for fd in [&read, &write] {
+        // SAFETY: fd is live and F_SETFD changes only descriptor flags.
+        if unsafe { libc::fcntl(fd.as_raw_fd(), libc::F_SETFD, libc::FD_CLOEXEC) } == -1 {
+            return Err(io::Error::last_os_error());
+        }
+    }
+    Ok((read, write))
+}
+
+/// Read the child's errno report. EOF before any bytes means exec succeeded.
+fn read_exec_error(fd: &OwnedFd) -> io::Result<Option<c_int>> {
+    let mut bytes = [0_u8; std::mem::size_of::<c_int>()];
+    let mut offset = 0;
+    loop {
+        // SAFETY: the remaining slice is valid writable memory for read.
+        let read = unsafe {
+            libc::read(
+                fd.as_raw_fd(),
+                bytes[offset..].as_mut_ptr().cast(),
+                bytes.len() - offset,
+            )
+        };
+        if read == 0 {
+            return if offset == 0 {
+                Ok(None)
+            } else {
+                Err(io::Error::new(
+                    io::ErrorKind::UnexpectedEof,
+                    "partial PTY child exec error report",
+                ))
+            };
+        }
+        if read < 0 {
+            let err = io::Error::last_os_error();
+            if err.kind() == io::ErrorKind::Interrupted {
+                continue;
+            }
+            return Err(err);
+        }
+        offset += read as usize;
+        if offset == bytes.len() {
+            return Ok(Some(c_int::from_ne_bytes(bytes)));
+        }
+    }
+}
+
+fn reap_child_blocking(pid: pid_t) {
+    loop {
+        // SAFETY: pid names the child created by this function; a null status
+        // pointer is permitted when only reaping is required.
+        let result = unsafe { libc::waitpid(pid, std::ptr::null_mut(), 0) };
+        if result == pid {
+            return;
+        }
+        if result == -1 && io::Error::last_os_error().kind() == io::ErrorKind::Interrupted {
+            continue;
+        }
+        return;
+    }
+}
+
+/// Report the current errno to the parent and terminate without destructors.
+unsafe fn report_exec_error_and_exit(error_fd: c_int) -> ! {
+    // SAFETY: macOS exposes thread-local errno through __error. No other libc
+    // call occurs between the failing operation and this load.
+    let errno = unsafe { *libc::__error() };
+    let bytes = errno.to_ne_bytes();
+    let mut offset = 0;
+    while offset < bytes.len() {
+        // SAFETY: error_fd is the live pipe write end and the byte slice is
+        // valid. write and _exit are async-signal-safe after fork.
+        let written = unsafe {
+            libc::write(
+                error_fd,
+                bytes[offset..].as_ptr().cast(),
+                bytes.len() - offset,
+            )
+        };
+        if written > 0 {
+            offset += written as usize;
+        } else if written == -1 && unsafe { *libc::__error() } == libc::EINTR {
+            continue;
+        } else {
+            break;
+        }
+    }
+    unsafe { libc::_exit(CHILD_SETUP_FAILURE) }
 }
 
 /// Post-fork child routine: make the child a session/process-group leader,
@@ -183,6 +304,8 @@ pub(crate) fn spawn_pty_child(
 ///   NUL-terminated C strings (a trailing null pointer was pushed by the
 ///   caller), and both the arrays and the strings remain valid in the
 ///   child's memory image.
+/// - `exec_error_fd` is the live close-on-exec pipe write end inherited from
+///   the parent and is used only to report a setup errno before `_exit`.
 unsafe fn child_exec(
     master_fd: c_int,
     slave_fd: c_int,
@@ -190,6 +313,7 @@ unsafe fn child_exec(
     argv_ptrs: &[*const c_char],
     envp_ptrs: &[*const c_char],
     cwd_ptr: Option<*const c_char>,
+    exec_error_fd: c_int,
 ) -> ! {
     // Become a new session leader and process-group leader. The forked child
     // is not a process-group leader (its pid differs from its pgid, which is
@@ -201,7 +325,7 @@ unsafe fn child_exec(
         // SAFETY: `_exit` terminates this (the child) process image at once
         // and never returns, skipping atexit handlers and Rust destructors
         // as required after fork.
-        unsafe { libc::_exit(CHILD_SETUP_FAILURE) }
+        unsafe { report_exec_error_and_exit(exec_error_fd) }
     }
 
     // Claim the slave as the controlling terminal. TIOCSCTTY with a zero
@@ -215,7 +339,7 @@ unsafe fn child_exec(
     if unsafe { libc::ioctl(slave_fd, libc::TIOCSCTTY as libc::c_ulong, 0) } == -1 {
         // SAFETY: `_exit` terminates this process image without running
         // destructors; required in the post-fork child (see above).
-        unsafe { libc::_exit(CHILD_SETUP_FAILURE) }
+        unsafe { report_exec_error_and_exit(exec_error_fd) }
     }
 
     // Wire the slave to stdin/stdout/stderr. dup2 atomically replaces each
@@ -232,7 +356,7 @@ unsafe fn child_exec(
     } {
         // SAFETY: `_exit` terminates this process image without running
         // destructors; required in the post-fork child (see above).
-        unsafe { libc::_exit(CHILD_SETUP_FAILURE) }
+        unsafe { report_exec_error_and_exit(exec_error_fd) }
     }
 
     // Drop the original slave descriptor and the inherited master. The
@@ -256,7 +380,7 @@ unsafe fn child_exec(
         if unsafe { libc::chdir(cwd) } == -1 {
             // SAFETY: `_exit` terminates this process image without running
             // destructors; required in the post-fork child (see above).
-            unsafe { libc::_exit(CHILD_SETUP_FAILURE) }
+            unsafe { report_exec_error_and_exit(exec_error_fd) }
         }
     }
 
@@ -271,10 +395,9 @@ unsafe fn child_exec(
     unsafe {
         libc::execve(program_ptr, argv_ptrs.as_ptr(), envp_ptrs.as_ptr());
     }
-    // SAFETY: execve returned, so it failed (it only returns on error). The
-    // child cannot run; `_exit` terminates the process image without running
-    // destructors, as required in the post-fork child.
-    unsafe { libc::_exit(CHILD_SETUP_FAILURE) }
+    // SAFETY: execve returned, so it failed. Report its errno synchronously
+    // and terminate without running destructors.
+    unsafe { report_exec_error_and_exit(exec_error_fd) }
 }
 
 /// Apply `size` to the PTY master.

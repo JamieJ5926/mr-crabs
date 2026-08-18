@@ -19,8 +19,9 @@
 //!   inherited or overlay `COLORTERM` passes through untouched.
 //!
 //! Shell discovery precedence (see [`CommandBuilder::discover_shell`]):
-//! explicit absolute existing path, then `$SHELL` (non-empty, absolute), then
-//! the user's `pw_shell` from the passwd database, then [`DEFAULT_SHELL`].
+//! an explicit path (returned unchanged so spawn errors are not hidden), then
+//! `$SHELL` (non-empty, absolute), then the user's `pw_shell` from the passwd
+//! database, then [`DEFAULT_SHELL`].
 
 use std::collections::BTreeMap;
 use std::ffi::CStr;
@@ -173,14 +174,12 @@ impl CommandBuilder {
 
     /// Resolves the shell executable to run, using the documented precedence:
     ///
-    /// 1. `explicit`, when it is an absolute path to an existing file;
+    /// 1. `explicit`, returned unchanged so an invalid requested shell is
+    ///    rejected by spawn rather than silently replaced;
     /// 2. `$SHELL`, when non-empty and absolute;
     /// 3. the user's `pw_shell` from the passwd database, when non-empty;
     /// 4. [`DEFAULT_SHELL`].
     ///
-    /// A relative `explicit` is deliberately ignored so callers cannot
-    /// accidentally depend on the parent's working directory; use
-    /// [`CommandBuilder::cwd`] plus an absolute path for that case.
     pub fn discover_shell(explicit: Option<&Path>) -> PathBuf {
         let shell_env = std::env::var("SHELL").ok();
         Self::discover_shell_from(explicit, shell_env.as_deref(), passwd_shell().as_deref())
@@ -195,9 +194,7 @@ impl CommandBuilder {
         passwd_shell: Option<&Path>,
     ) -> PathBuf {
         if let Some(path) = explicit {
-            if path.is_absolute() && path.is_file() {
-                return path.to_path_buf();
-            }
+            return path.to_path_buf();
         }
         if let Some(shell) = shell_env {
             if !shell.is_empty() {
@@ -332,25 +329,25 @@ mod tests {
     }
 
     #[test]
-    fn discover_shell_precedence_relative_explicit_ignored() {
-        // "Cargo.toml" exists relative to the crate root during `cargo test`
-        // but is not absolute, so it must be ignored.
+    fn discover_shell_preserves_relative_explicit_for_spawn_validation() {
+        let explicit = Path::new("not-a-real-shell");
         let resolved = CommandBuilder::discover_shell_from(
-            Some(Path::new("Cargo.toml")),
+            Some(explicit),
             Some("/bin/zsh"),
             Some(Path::new("/bin/bash")),
         );
-        assert_eq!(resolved, PathBuf::from("/bin/zsh"));
+        assert_eq!(resolved, explicit);
     }
 
     #[test]
-    fn discover_shell_precedence_nonexistent_absolute_explicit_ignored() {
+    fn discover_shell_preserves_nonexistent_explicit_for_spawn_validation() {
+        let explicit = Path::new("/definitely/not/a/real/shell");
         let resolved = CommandBuilder::discover_shell_from(
-            Some(Path::new("/definitely/not/a/real/shell")),
+            Some(explicit),
             Some("/bin/zsh"),
             Some(Path::new("/bin/bash")),
         );
-        assert_eq!(resolved, PathBuf::from("/bin/zsh"));
+        assert_eq!(resolved, explicit);
     }
 
     #[test]

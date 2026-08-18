@@ -4,7 +4,9 @@ use std::sync::Arc;
 use std::sync::mpsc::Receiver;
 use std::time::{Duration, Instant};
 
-use mr_crabs_pty::{CommandBuilder, ExitStatus, PtyConfig, PtySession, PtySize, WriteError};
+use mr_crabs_pty::{
+    CommandBuilder, ExitStatus, PtyConfig, PtyError, PtySession, PtySize, WriteError,
+};
 
 fn zsh(script: &str) -> CommandBuilder {
     let mut command = CommandBuilder::new("/bin/zsh");
@@ -338,4 +340,67 @@ fn dropping_parent_reaps_child() {
         std::io::Error::last_os_error().raw_os_error(),
         Some(libc::ESRCH)
     );
+}
+
+fn default_size() -> PtySize {
+    PtySize::new(80, 24, 8, 16).unwrap()
+}
+
+fn assert_spawn_enoent(config: PtyConfig) {
+    match PtySession::spawn(config) {
+        Err(PtyError::Spawn(error)) => {
+            assert_eq!(error.kind(), std::io::ErrorKind::NotFound);
+            assert_eq!(error.raw_os_error(), Some(libc::ENOENT));
+        }
+        Err(error) => panic!("expected typed spawn error, got {error:?}"),
+        Ok(_) => panic!("invalid command unexpectedly spawned"),
+    }
+}
+
+#[test]
+fn invalid_executable_fails_synchronously_with_os_cause() {
+    let command = CommandBuilder::new("/definitely/not/a/mr-crabs-executable");
+    assert_spawn_enoent(PtyConfig::new(command, default_size()));
+}
+
+#[test]
+fn invalid_cwd_fails_synchronously_with_os_cause() {
+    let mut command = CommandBuilder::new("/bin/sh");
+    command.cwd("/definitely/not/a/mr-crabs-working-directory");
+    assert_spawn_enoent(PtyConfig::new(command, default_size()));
+}
+
+#[test]
+fn invalid_explicit_shell_is_not_silently_replaced() {
+    let invalid = std::path::Path::new("/definitely/not/a/mr-crabs-shell");
+    let mut command = CommandBuilder::new("/bin/sh");
+    command.shell(Some(invalid));
+    assert_spawn_enoent(PtyConfig::new(command, default_size()));
+}
+
+#[test]
+fn failed_spawn_leaves_no_child() {
+    const HELPER_ENV: &str = "MR_CRABS_FAILED_SPAWN_REAP_HELPER";
+    if std::env::var_os(HELPER_ENV).is_some() {
+        let command = CommandBuilder::new("/definitely/not/a/mr-crabs-executable");
+        assert_spawn_enoent(PtyConfig::new(command, default_size()));
+
+        let mut status = 0;
+        // SAFETY: -1 asks about any child of this isolated helper process;
+        // WNOHANG prevents blocking. The failed spawn must already be reaped.
+        let result = unsafe { libc::waitpid(-1, &mut status, libc::WNOHANG) };
+        assert_eq!(result, -1, "failed spawn left child pid {result}");
+        assert_eq!(
+            std::io::Error::last_os_error().raw_os_error(),
+            Some(libc::ECHILD)
+        );
+        return;
+    }
+
+    let status = std::process::Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", "failed_spawn_leaves_no_child", "--nocapture"])
+        .env(HELPER_ENV, "1")
+        .status()
+        .expect("run isolated failed-spawn helper");
+    assert!(status.success(), "isolated failed-spawn helper failed");
 }
