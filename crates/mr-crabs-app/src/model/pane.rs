@@ -50,6 +50,9 @@ pub struct PtySpawnConfig {
     pub term: String,
     pub colorterm: String,
     pub scrollback_lines: usize,
+    /// POSIX shell fragment executed before the interactive shell on the same PTY (new windows only).
+    /// When non-empty, the pane spawns `/bin/sh -c '( eval "$1" ); exec "$0"' <shell> <fragment>`.
+    pub startup_command: Option<String>,
 }
 
 impl PtySpawnConfig {
@@ -62,6 +65,7 @@ impl PtySpawnConfig {
             term: "xterm-ghostty".to_string(),
             colorterm: "truecolor".to_string(),
             scrollback_lines: ScrollbackConfig::default().max_lines,
+            startup_command: None,
         }
     }
 
@@ -197,13 +201,34 @@ impl PaneSession {
     }
 
     /// Spawn a real PTY session with the initial measured cell dimensions.
+    ///
+    /// The shell is resolved once via `CommandBuilder::discover_shell`. When
+    /// `config.startup_command` is non-empty the child is
+    /// `/bin/sh -c '( eval "$1" ); exec "$0"' <resolved-shell> <fragment>`,
+    /// so the fragment runs before the interactive shell on the same PTY.
+    /// `cwd`/`env`/`TERM`/`COLORTERM` apply identically in both cases.
     pub fn spawn_with_output_wake(
         config: PtySpawnConfig,
         cell_px: (u16, u16),
         output_wake: Option<OutputWake>,
     ) -> Result<Self, PtyError> {
-        let mut command = CommandBuilder::new("/bin/sh");
-        command.shell(config.shell.as_deref());
+        use std::ffi::OsString;
+        let resolved_shell = CommandBuilder::discover_shell(config.shell.as_deref());
+        let mut command = if config
+            .startup_command
+            .as_ref()
+            .is_some_and(|s| !s.is_empty())
+        {
+            let fragment = config.startup_command.as_deref().unwrap().to_string();
+            let mut c = CommandBuilder::new("/bin/sh");
+            c.arg("-c")
+                .arg("( eval \"$1\" ); exec \"$0\"")
+                .arg(OsString::from(&resolved_shell))
+                .arg(fragment);
+            c
+        } else {
+            CommandBuilder::new(&resolved_shell)
+        };
         if let Some(cwd) = &config.cwd {
             command.cwd(cwd);
         }
@@ -883,6 +908,13 @@ impl PaneModel {
         self.protocol_sink.set_terminfo_name(name);
     }
 
+    /// Set the pre-shell fragment for a pending pane (new windows only). Mutates the pending spawn config; live panes ignore it.
+    pub fn set_startup_command(&mut self, command: Option<String>) {
+        if let Some(pending) = self.pending_spawn.as_mut() {
+            pending.config.startup_command = command;
+        }
+    }
+
     /// Feed bytes directly to the engine (tests and the detached path).
     /// Graphics protocol commands are not intercepted on this path; use
     /// [`PaneModel::pump`] over a receiver session to exercise the scanned
@@ -1530,6 +1562,374 @@ mod tests {
         pane.session
             .shutdown(Duration::from_millis(200))
             .expect("shutdown");
+    }
+
+    #[test]
+    fn startup_command_hidden_literal_with_bootstrap() {
+        let mut config = PtySpawnConfig::new(GridSize::new(80, 24)).with_shell("/bin/sh");
+        config.startup_command = Some("printf BOOTSTRAP_MARKER_9f3e".to_string());
+        let mut pane = PaneModel::pending(PaneId::new(11), config).expect("pending pane");
+        let geometry = SurfaceGeometry::from_viewport(
+            mr_crabs_element::PixelExtent {
+                width: 1000.0,
+                height: 600.0,
+            },
+            mr_crabs_element::CellMetrics::new(10.0, 20.0).expect("metrics"),
+            crate::model::geometry::PaddingPx::default(),
+        )
+        .expect("geometry");
+        assert!(pane.commit_geometry(geometry, None).expect("spawn"));
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        let mut saw_marker = false;
+        let mut saw_literal = false;
+        loop {
+            pane.pump(8);
+            let snapshot = pane.core.terminal_snapshot();
+            let cols = usize::from(snapshot.size.cols);
+            let mut text = String::new();
+            for row in 0..usize::from(snapshot.size.rows) {
+                let start = row * cols;
+                for cell in &snapshot.cells[start..start + cols] {
+                    if let Some(ch) = char::from_u32(cell.content) {
+                        text.push(ch);
+                    }
+                }
+                text.push('\n');
+            }
+            if text.contains("BOOTSTRAP_MARKER_9f3e") {
+                saw_marker = true;
+            }
+            if text.contains("printf BOOTSTRAP_MARKER") {
+                saw_literal = true;
+            }
+            if saw_marker || std::time::Instant::now() > deadline {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        assert!(saw_marker, "bootstrap marker must appear");
+        assert!(!saw_literal, "literal startup command must not appear");
+        pane.session
+            .shutdown(Duration::from_millis(200))
+            .expect("shutdown");
+    }
+
+    #[test]
+    fn startup_command_explicit_zsh_isolated_counters_once() {
+        let zsh = PathBuf::from("/bin/zsh");
+        if !zsh.is_file() {
+            return;
+        }
+        let tmp = std::env::temp_dir().join(format!("mr-crabs-zsh-count-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).expect("tmpdir");
+        let env_counter = tmp.join("env.count");
+        let rc_counter = tmp.join("rc.count");
+        let zshenv = tmp.join(".zshenv");
+        let zshrc = tmp.join(".zshrc");
+        std::fs::write(
+            &zshenv,
+            format!("echo x >> \"{}\"\n", env_counter.to_string_lossy()),
+        )
+        .expect("write zshenv");
+        std::fs::write(
+            &zshrc,
+            format!("echo y >> \"{}\"\n", rc_counter.to_string_lossy()),
+        )
+        .expect("write zshrc");
+        let mut config = PtySpawnConfig::new(GridSize::new(80, 24)).with_shell("/bin/zsh");
+        config.startup_command = Some("printf ISOLATED_ZSH_OK".to_string());
+        config
+            .env
+            .insert("ZDOTDIR".to_string(), tmp.to_string_lossy().to_string());
+        let mut pane = PaneModel::pending(PaneId::new(12), config).expect("pending pane");
+        let geometry = SurfaceGeometry::from_viewport(
+            mr_crabs_element::PixelExtent {
+                width: 1000.0,
+                height: 600.0,
+            },
+            mr_crabs_element::CellMetrics::new(10.0, 20.0).expect("metrics"),
+            crate::model::geometry::PaddingPx::default(),
+        )
+        .expect("geometry");
+        assert!(pane.commit_geometry(geometry, None).expect("spawn"));
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        let mut saw = false;
+        loop {
+            pane.pump(8);
+            let snap = pane.core.terminal_snapshot();
+            let cols = usize::from(snap.size.cols);
+            let mut text = String::new();
+            for row in 0..usize::from(snap.size.rows) {
+                let start = row * cols;
+                for cell in &snap.cells[start..start + cols] {
+                    if let Some(ch) = char::from_u32(cell.content) {
+                        text.push(ch);
+                    }
+                }
+                text.push('\n');
+            }
+            if text.contains("ISOLATED_ZSH_OK") {
+                saw = true;
+                break;
+            }
+            if text.contains("printf ISOLATED_ZSH") {
+                panic!("literal leaked");
+            }
+            if std::time::Instant::now() > deadline {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        assert!(saw, "isolated zsh marker must appear");
+        // zsh already reap-friendly; allow a moment for counters
+        std::thread::sleep(Duration::from_millis(200));
+        let env_lines = std::fs::read_to_string(&env_counter).unwrap_or_default();
+        let rc_lines = std::fs::read_to_string(&rc_counter).unwrap_or_default();
+        let env_count = env_lines.lines().count();
+        let rc_count = rc_lines.lines().count();
+        assert_eq!(env_count, 1, "zshenv must run exactly once: {env_lines:?}");
+        assert_eq!(rc_count, 1, "zshrc must run exactly once: {rc_lines:?}");
+        pane.session
+            .shutdown(Duration::from_millis(200))
+            .expect("shutdown");
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn startup_zsh_resize_keeps_one_prompt() {
+        if !PathBuf::from("/bin/zsh").is_file() {
+            return;
+        }
+        let tmp =
+            std::env::temp_dir().join(format!("mr-crabs-zsh-resize-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).expect("tmpdir");
+        std::fs::write(tmp.join(".zshrc"), "PROMPT='PROMPT_MARKER> '\n").expect("write zshrc");
+
+        let mut config = PtySpawnConfig::new(GridSize::new(80, 24)).with_shell("/bin/zsh");
+        config.startup_command = Some(
+            "printf 'FETCH_LINE_01\nFETCH_LINE_02\nFETCH_LINE_03\nFETCH_LINE_04\nFETCH_LINE_05\nFETCH_LINE_06\nFETCH_LINE_07\nFETCH_LINE_08\nFETCH_LINE_09\nFETCH_LINE_10\nFETCH_LINE_11\n'"
+                .to_string(),
+        );
+        config
+            .env
+            .insert("ZDOTDIR".to_string(), tmp.to_string_lossy().to_string());
+        let mut pane = PaneModel::pending(PaneId::new(14), config).expect("pending pane");
+        let initial = SurfaceGeometry::from_viewport(
+            mr_crabs_element::PixelExtent {
+                width: 800.0,
+                height: 160.0,
+            },
+            mr_crabs_element::CellMetrics::new(10.0, 20.0).expect("metrics"),
+            crate::model::geometry::PaddingPx::default(),
+        )
+        .expect("initial geometry");
+        assert!(pane.commit_geometry(initial, None).expect("spawn"));
+        let mut cache = mr_crabs_element::RenderCache::new();
+        cache.apply_frame(&pane.frame().expect("spawn frame"));
+
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        loop {
+            pane.pump(8);
+            cache.apply_frame(&pane.frame().expect("startup frame"));
+            let snapshot = pane.core.terminal_snapshot();
+            let text: String = snapshot
+                .cells
+                .iter()
+                .filter_map(|cell| char::from_u32(cell.content))
+                .collect();
+            if text.contains("FETCH_LINE_11") && text.contains("PROMPT_MARKER>") {
+                break;
+            }
+            assert!(
+                std::time::Instant::now() <= deadline,
+                "startup output and first prompt must appear"
+            );
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        let history_before_resize = pane.core.terminal.history_len();
+        assert!(
+            history_before_resize > 0,
+            "short startup grid must page fetch rows into history"
+        );
+
+        let resized = SurfaceGeometry::from_viewport(
+            mr_crabs_element::PixelExtent {
+                width: 800.0,
+                height: 480.0,
+            },
+            mr_crabs_element::CellMetrics::new(10.0, 20.0).expect("metrics"),
+            crate::model::geometry::PaddingPx::default(),
+        )
+        .expect("resized geometry");
+        assert!(pane.commit_geometry(resized, None).expect("resize"));
+        cache.apply_frame(&pane.frame().expect("resize frame"));
+        pane.session.write(b"x").expect("type after resize");
+
+        let deadline = std::time::Instant::now() + Duration::from_secs(3);
+        let text = loop {
+            pane.pump(8);
+            cache.apply_frame(&pane.frame().expect("typed frame"));
+            let snapshot = pane.core.terminal_snapshot();
+            let cols = usize::from(snapshot.size.cols);
+            let mut text = String::new();
+            for row in 0..usize::from(snapshot.size.rows) {
+                let start = row * cols;
+                for cell in &snapshot.cells[start..start + cols] {
+                    if let Some(ch) = char::from_u32(cell.content) {
+                        text.push(ch);
+                    }
+                }
+                text.push('\n');
+            }
+            if text.contains("PROMPT_MARKER> x") || std::time::Instant::now() > deadline {
+                break text;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        };
+        assert!(
+            text.contains("PROMPT_MARKER> x"),
+            "typed text must reach the active prompt:\n{text}"
+        );
+        assert_eq!(
+            text.matches("PROMPT_MARKER>").count(),
+            1,
+            "startup resize must not leave a stale prompt:\n{text}"
+        );
+        assert!(
+            pane.core.terminal.history_len() < history_before_resize,
+            "height growth must restore recent history into the visible grid"
+        );
+        assert!(
+            text.contains("FETCH_LINE_01"),
+            "first fetch row must return to the visible grid:\n{text}"
+        );
+        let cache_text: String = cache
+            .batches()
+            .iter()
+            .flat_map(|row| row.runs.iter())
+            .flat_map(|run| run.text.chars())
+            .collect();
+        assert_eq!(
+            cache_text.matches("PROMPT_MARKER>").count(),
+            1,
+            "render cache must not retain a stale prompt: {cache_text:?}"
+        );
+        pane.session
+            .shutdown(Duration::from_millis(200))
+            .expect("shutdown");
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn startup_command_failures_still_yield_shell() {
+        for (id, fragment) in [
+            (20u64, "false"),
+            (21u64, "exit 7"),
+            (22u64, "exec false"),
+            (23u64, "if then"),
+        ] {
+            let mut config = PtySpawnConfig::new(GridSize::new(80, 24)).with_shell("/bin/sh");
+            config.startup_command = Some(fragment.to_string());
+            let mut pane = PaneModel::pending(PaneId::new(id), config).expect("pending pane");
+            let geometry = SurfaceGeometry::from_viewport(
+                mr_crabs_element::PixelExtent {
+                    width: 1000.0,
+                    height: 600.0,
+                },
+                mr_crabs_element::CellMetrics::new(10.0, 20.0).expect("metrics"),
+                crate::model::geometry::PaddingPx::default(),
+            )
+            .expect("geometry");
+            assert!(pane.commit_geometry(geometry, None).expect("spawn"));
+            // Give the bootstrap time to fail and exec the shell
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+            while std::time::Instant::now() < deadline {
+                pane.pump(8);
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            // Shell must accept input after failure
+            pane.session.write(b"printf RECOVERED\r").expect("write");
+            let deadline2 = std::time::Instant::now() + std::time::Duration::from_secs(3);
+            let mut saw = false;
+            loop {
+                pane.pump(8);
+                let snap = pane.core.terminal_snapshot();
+                let cols = usize::from(snap.size.cols);
+                let mut text = String::new();
+                for row in 0..usize::from(snap.size.rows) {
+                    let start = row * cols;
+                    for cell in &snap.cells[start..start + cols] {
+                        if let Some(ch) = char::from_u32(cell.content) {
+                            text.push(ch);
+                        }
+                    }
+                    text.push('\n');
+                }
+                if text.contains("RECOVERED") {
+                    saw = true;
+                    break;
+                }
+                if std::time::Instant::now() > deadline2 {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            assert!(saw, "shell must recover after fragment {fragment:?}");
+            pane.session
+                .shutdown(Duration::from_millis(200))
+                .expect("shutdown");
+        }
+    }
+
+    #[test]
+    fn startup_none_and_empty_spawn_directly() {
+        for (id, startup) in [(30u64, None), (31u64, Some(String::new()))] {
+            let mut config = PtySpawnConfig::new(GridSize::new(80, 24)).with_shell("/bin/sh");
+            config.startup_command = startup;
+            let mut pane = PaneModel::pending(PaneId::new(id), config).expect("pending pane");
+            let geometry = SurfaceGeometry::from_viewport(
+                mr_crabs_element::PixelExtent {
+                    width: 1000.0,
+                    height: 600.0,
+                },
+                mr_crabs_element::CellMetrics::new(10.0, 20.0).expect("metrics"),
+                crate::model::geometry::PaddingPx::default(),
+            )
+            .expect("geometry");
+            assert!(pane.commit_geometry(geometry, None).expect("spawn"));
+            pane.session.write(b"printf DIRECT_OK\r").expect("write");
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+            let mut saw = false;
+            loop {
+                pane.pump(8);
+                let snap = pane.core.terminal_snapshot();
+                let cols = usize::from(snap.size.cols);
+                let mut text = String::new();
+                for row in 0..usize::from(snap.size.rows) {
+                    let start = row * cols;
+                    for cell in &snap.cells[start..start + cols] {
+                        if let Some(ch) = char::from_u32(cell.content) {
+                            text.push(ch);
+                        }
+                    }
+                    text.push('\n');
+                }
+                if text.contains("DIRECT_OK") {
+                    saw = true;
+                    break;
+                }
+                if std::time::Instant::now() > deadline {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            assert!(saw, "direct spawn must produce shell");
+            pane.session
+                .shutdown(Duration::from_millis(200))
+                .expect("shutdown");
+        }
     }
 
     #[test]

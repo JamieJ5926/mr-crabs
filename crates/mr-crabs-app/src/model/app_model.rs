@@ -16,6 +16,10 @@ use mr_crabs_protocols::sink::ClipboardEvent;
 use mr_crabs_pty::OutputWake;
 use mr_crabs_terminal::{FrameDelta, GridSize};
 
+use crate::diagnostics::{
+    DiagnosticEvent, DiagnosticFrameEvent, DiagnosticPumpEvent, DiagnosticTrace,
+};
+
 use crate::accessibility::AccessibilitySnapshot;
 use crate::action::AppAction;
 use crate::crash::CrashReporter;
@@ -103,6 +107,9 @@ pub struct AppModel {
     /// The active search query (S8): `SearchNext`/`SearchPrevious` run
     /// against this needle on the focused pane. Empty means no query.
     pub search_query: String,
+    /// Disabled-by-default bounded diagnostic ring (Step 2C1). `None` when
+    /// diagnostics are off; `Some(trace)` when installed by tests.
+    diagnostic_trace: Option<Arc<DiagnosticTrace>>,
     /// Event-driven notification shared by every live PTY reader. `None` for
     /// headless models and tests that pump explicit fake queues.
     output_wake: Option<OutputWake>,
@@ -189,6 +196,7 @@ impl AppModel {
             last_update_check: None,
             last_open_url: None,
             search_query: String::new(),
+            diagnostic_trace: None,
             output_wake,
             next_window: 1,
             next_tab: 1,
@@ -337,6 +345,7 @@ impl AppModel {
                 term: terminfo.term,
                 colorterm: terminfo.colorterm,
                 scrollback_lines: settings.scrollback_lines as usize,
+                startup_command: None,
             };
             if let Ok(mut pane) =
                 PaneModel::pending_with_output_wake(id, config, self.output_wake.clone())
@@ -370,7 +379,11 @@ impl AppModel {
         }
         let window_id = self.alloc_window_id();
         let tab_id = self.alloc_tab_id();
-        let pane = self.new_pane(size, None);
+        let mut pane = self.new_pane(size, None);
+        let settings = self.settings.current();
+        if settings.startup_fetch && !settings.startup_fetch_command.is_empty() {
+            pane.set_startup_command(Some(settings.startup_fetch_command.clone()));
+        }
         let pane_id = pane.id;
         let mut window = WindowModel::new(window_id, tab_id, pane_id, size).ok()?;
         window
@@ -392,7 +405,11 @@ impl AppModel {
         let size = self.settings.current().default_grid;
         let window_id = self.alloc_window_id();
         let tab_id = self.alloc_tab_id();
-        let pane = self.new_pane(size, cwd);
+        let mut pane = self.new_pane(size, cwd);
+        let settings = self.settings.current();
+        if settings.startup_fetch && !settings.startup_fetch_command.is_empty() {
+            pane.set_startup_command(Some(settings.startup_fetch_command.clone()));
+        }
         let pane_id = pane.id;
         let mut window = WindowModel::new(window_id, tab_id, pane_id, size).ok()?;
         window
@@ -571,7 +588,48 @@ impl AppModel {
         for pane_id in close {
             self.close_pane_anywhere(pane_id);
         }
+        if let Some(trace) = self.diagnostic_trace.clone() {
+            trace.push(DiagnosticEvent::Pump(DiagnosticPumpEvent {
+                chunks: stats.chunks,
+                bytes: stats.bytes,
+                frames: stats.frames,
+                pending: stats.pending,
+            }));
+            if let Some(pane) = self.focused_pane() {
+                if let Some(frame) = pane.frame() {
+                    trace.push(DiagnosticEvent::Frame(DiagnosticFrameEvent {
+                        pane_id: pane.id,
+                        sequence: frame.sequence,
+                        damage: frame.damage,
+                        cursor_row: frame.cursor.row,
+                        cursor_col: frame.cursor.col,
+                        cursor_shape: frame.cursor.shape,
+                        cursor_visible: frame.cursor.visible,
+                        cursor_blinking: frame.cursor.blinking,
+                        cursor_wrap_pending: frame.cursor.wrap_pending,
+                        alternate_screen: frame.viewport.alternate_screen,
+                    }));
+                }
+            }
+        }
         stats
+    }
+
+    /// Install a bounded diagnostic trace (tests only). Capacity clamped to >=1.
+    pub fn install_diagnostic_trace(&mut self, capacity: usize) -> Arc<DiagnosticTrace> {
+        let trace = Arc::new(DiagnosticTrace::new(capacity));
+        self.diagnostic_trace = Some(Arc::clone(&trace));
+        trace
+    }
+
+    /// Set an externally owned diagnostic trace.
+    pub fn set_diagnostic_trace(&mut self, trace: Option<Arc<DiagnosticTrace>>) {
+        self.diagnostic_trace = trace;
+    }
+
+    /// Access the installed trace, if any.
+    pub fn diagnostic_trace(&self) -> Option<Arc<DiagnosticTrace>> {
+        self.diagnostic_trace.clone()
     }
 
     /// Whether any pane has output queued right now.
@@ -660,6 +718,11 @@ impl AppModel {
         if let Some(window_id) = self.new_window_with(self.quick_terminal.grid)
             && let Some(window) = self.windows.get_mut(&window_id)
         {
+            for tab in window.tabs.values_mut() {
+                for pane in tab.panes.values_mut() {
+                    pane.set_startup_command(None);
+                }
+            }
             window.is_quick_terminal = true;
             window.title = "Quick Terminal".to_string();
             self.quick_terminal.window_id = Some(window_id);
@@ -1672,5 +1735,239 @@ mod tests {
         assert_eq!(requests[1].0, second);
         assert_eq!(requests[1].1.kind, b'c');
         assert_eq!(requests[1].1.data, b"c2Vjb25k");
+    }
+    // ── diagnostic trace (Step 2C1) ──
+
+    #[test]
+    fn default_app_has_no_trace() {
+        let model = headless();
+        assert!(model.diagnostic_trace().is_none());
+    }
+
+    #[test]
+    fn trace_capacity_clamped_eviction_and_order_via_app() {
+        let mut model = headless();
+        let trace = model.install_diagnostic_trace(0);
+        assert_eq!(trace.capacity(), 1);
+        assert!(trace.is_empty());
+        // With no frame yet, each pump records only Pump.
+        model.pump(8);
+        let snap = trace.snapshot();
+        assert_eq!(snap.len(), 1);
+        assert!(snap[0].as_pump().is_some());
+        // snapshot does not drain
+        assert_eq!(trace.len(), 1);
+        assert_eq!(trace.snapshot().len(), 1);
+        model.pump(8);
+        assert_eq!(trace.snapshot().len(), 1);
+
+        // With a frame present, each pump records Pump+Frame.
+        let mut model2 = headless();
+        // Ensure a frame exists by feeding output before installing trace.
+        {
+            let pid = model2.focused_pane_id().unwrap();
+            model2
+                .active_tab_mut()
+                .unwrap()
+                .panes
+                .get_mut(&pid)
+                .unwrap()
+                .feed_test_output(b"x");
+        }
+        let trace2 = model2.install_diagnostic_trace(4);
+        model2.pump(8);
+        model2.pump(8);
+        // Two pumps => 4 events (Pump,Frame,Pump,Frame) exactly fills cap 4
+        let snap2 = trace2.snapshot();
+        assert_eq!(snap2.len(), 4);
+        assert!(snap2[0].as_pump().is_some());
+        assert!(snap2[1].as_frame().is_some());
+        assert!(snap2[2].as_pump().is_some());
+        assert!(snap2[3].as_frame().is_some());
+        // Nondraining check
+        assert_eq!(trace2.snapshot(), snap2);
+        assert_eq!(trace2.len(), 4);
+        // One more pump evicts oldest two
+        model2.pump(8);
+        let snap3 = trace2.snapshot();
+        assert_eq!(snap3.len(), 4);
+        assert!(
+            snap3[0].as_pump().is_some(),
+            "oldest pump evicted correctly"
+        );
+    }
+
+    #[test]
+    fn installed_trace_records_fake_queue_pump_fields_and_cursor() {
+        let mut model = headless();
+        let _window_id = model.active_window.unwrap();
+        let pane_id = model.focused_pane_id().unwrap();
+        // Install fake session with bounded reader queue to generate real pump stats
+        let (reader_tx, _writer_rx) = {
+            let (reader_tx, reader_rx) = std::sync::mpsc::sync_channel::<Vec<u8>>(8);
+            let (writer_tx, writer_rx) = std::sync::mpsc::sync_channel::<Vec<u8>>(8);
+            let session = crate::model::pane::PaneSession::from_receivers_with_writer(
+                GridSize::new(80, 24),
+                Some(reader_rx),
+                None,
+                Some(writer_tx),
+            );
+            model
+                .active_tab_mut()
+                .unwrap()
+                .panes
+                .get_mut(&pane_id)
+                .unwrap()
+                .session = session;
+            (reader_tx, writer_rx)
+        };
+        let trace = model.install_diagnostic_trace(16);
+        // Queue bytes that move cursor
+        reader_tx.send(b"hello".to_vec()).expect("send");
+        let stats = model.pump(8);
+        assert!(stats.changed());
+        assert_eq!(stats.chunks, 1);
+        assert_eq!(stats.bytes, 5);
+        assert_eq!(stats.frames, 1);
+        assert!(!stats.pending);
+
+        let snap = trace.snapshot();
+        assert_eq!(snap.len(), 2);
+        let pump_ev = snap[0].as_pump().unwrap();
+        assert_eq!(pump_ev.chunks, 1);
+        assert_eq!(pump_ev.bytes, 5);
+        assert_eq!(pump_ev.frames, 1);
+        assert!(!pump_ev.pending);
+        assert!(pump_ev.changed());
+
+        let frame_ev = snap[1].as_frame().unwrap();
+        assert_eq!(frame_ev.pane_id, pane_id);
+        assert_eq!(frame_ev.cursor_col, 5);
+        assert_eq!(frame_ev.cursor_row, 0);
+        assert!(!frame_ev.cursor_wrap_pending);
+        assert!(!frame_ev.alternate_screen);
+        assert!(
+            frame_ev.damage == mr_crabs_terminal::DamageKind::Partial
+                || frame_ev.damage == mr_crabs_terminal::DamageKind::Full,
+            "initial pump may be Full or Partial, got {:?}",
+            frame_ev.damage
+        );
+
+        // Alternate screen flag propagated
+        model
+            .active_tab_mut()
+            .unwrap()
+            .panes
+            .get_mut(&pane_id)
+            .unwrap()
+            .feed_test_output(b"\x1b[?1049h");
+        let _stats2 = model.pump(8);
+        let snap2 = trace.snapshot();
+        let last_frame = snap2.iter().filter_map(|e| e.as_frame()).last().unwrap();
+        assert!(
+            last_frame.alternate_screen,
+            "alternate screen flag propagated"
+        );
+    }
+
+    #[test]
+    fn set_diagnostic_trace_removal_stops_recording() {
+        let mut model = headless();
+        let external = std::sync::Arc::new(crate::diagnostics::DiagnosticTrace::new(4));
+        model.set_diagnostic_trace(Some(std::sync::Arc::clone(&external)));
+        assert!(model.diagnostic_trace().is_some());
+        model.pump(8);
+        // No frame yet: only Pump event
+        assert_eq!(external.snapshot().len(), 1);
+        assert!(external.snapshot()[0].as_pump().is_some());
+        model.set_diagnostic_trace(None);
+        assert!(model.diagnostic_trace().is_none());
+        let before = external.snapshot().len();
+        model.pump(8);
+        assert_eq!(
+            external.snapshot().len(),
+            before,
+            "removed trace must not receive events"
+        );
+    }
+
+    #[test]
+    fn startup_fetch_gui_boot_marker_appears_via_current_platform_pump() {
+        use mr_crabs_config::{ConfigOverlay, SettingKey};
+
+        let mut overlay = ConfigOverlay::default();
+        overlay
+            .set(SettingKey::StartupFetch, "true")
+            .expect("startup_fetch");
+        overlay
+            .set(SettingKey::StartupFetchCommand, "printf GUIBOOT")
+            .expect("command");
+        let store = crate::settings::SettingsStore::from_layers(
+            overlay,
+            ConfigOverlay::default(),
+            ConfigOverlay::default(),
+            None,
+            None,
+            crate::settings::SettingsSource::Json("{}".to_string()),
+            None,
+        );
+        let mut model = AppModel::with_platform_settings_and_output_wake(
+            crate::platform::PlatformCapabilities::current(),
+            store,
+            None,
+        );
+        let window_id = model.new_window().expect("window");
+        let geometry = crate::model::geometry::SurfaceGeometry::from_viewport(
+            PixelExtent {
+                width: 1000.0,
+                height: 600.0,
+            },
+            CellMetrics::new(10.0, 20.0).expect("metrics"),
+            PaddingPx::default(),
+        )
+        .expect("geometry");
+        model.commit_geometry(window_id, geometry);
+        let pane_id = model.focused_pane_id().expect("pane");
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            let found = {
+                let pane = model
+                    .windows
+                    .get(&window_id)
+                    .unwrap()
+                    .tabs
+                    .values()
+                    .next()
+                    .unwrap()
+                    .panes
+                    .get(&pane_id)
+                    .unwrap();
+                let snap = pane.core.terminal_snapshot();
+                let cols = usize::from(snap.size.cols);
+                let mut f = false;
+                for row in 0..usize::from(snap.size.rows) {
+                    let start = row * cols;
+                    let line: String = snap.cells[start..start + cols]
+                        .iter()
+                        .filter_map(|cell| char::from_u32(cell.content))
+                        .collect();
+                    if line.contains("GUIBOOT") {
+                        f = true;
+                        break;
+                    }
+                }
+                f
+            };
+            if found {
+                model.shutdown_all();
+                return;
+            }
+            if std::time::Instant::now() > deadline {
+                model.shutdown_all();
+                panic!("GUI-boot startup marker never appeared");
+            }
+            model.pump(8);
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
     }
 }

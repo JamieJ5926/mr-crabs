@@ -20,8 +20,8 @@
 //! compose on top of the retained full frame instead of repainting
 //! everything.
 
-use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::Arc;
+use std::sync::mpsc::{self, Receiver, Sender};
 
 use gpui::{
     App, ClipboardItem, Context, ElementId, Entity, ExternalPaths, FocusHandle, Font,
@@ -380,6 +380,7 @@ impl Render for WindowView {
         };
         let palette = self.model.read(cx).palette.clone();
         let secure_input = self.model.read(cx).secure_input.is_enabled();
+        let trace_for_paint = self.model.read(cx).diagnostic_trace();
 
         let key_model = self.model.clone();
         let key_shell = self.shell.clone();
@@ -404,25 +405,60 @@ impl Render for WindowView {
                 + f32::from(bundle.rect.y) * bundle.pane_geometry.metrics.height;
             let ime_tx = self.ime_tx.clone();
             let ime_pane_id = bundle.pane_id;
-            let element = TerminalElement::with_shared(bundle.frame, bundle.pane_geometry.metrics)
-                .with_element_id(terminal_element_id(bundle.pane_id))
-                .with_focus(self.focus.clone())
-                .with_font(
-                    terminal_font
-                        .as_ref()
-                        .expect("measured font accompanies geometry")
-                        .clone(),
-                )
-                .with_font_size(px(settings.font_size))
-                .with_palette(terminal_palette)
-                .with_effects(EffectsConfig::from(settings.animation_defaults()))
-                .with_graphics(bundle.graphics)
-                .with_on_paint(|cx| {
-                    let _ = super::wake::pump_output(cx);
-                })
-                .with_input_sink(move |text| {
-                    let _ = ime_tx.send((ime_pane_id, text.to_owned()));
+            let mut element =
+                TerminalElement::with_shared(bundle.frame, bundle.pane_geometry.metrics)
+                    .with_element_id(terminal_element_id(bundle.pane_id))
+                    .with_focus(self.focus.clone())
+                    .with_font(
+                        terminal_font
+                            .as_ref()
+                            .expect("measured font accompanies geometry")
+                            .clone(),
+                    )
+                    .with_font_size(px(settings.font_size))
+                    .with_palette(terminal_palette)
+                    .with_effects(EffectsConfig::from(settings.animation_defaults()))
+                    .with_graphics(bundle.graphics)
+                    .with_on_paint(|cx| {
+                        let _ = super::wake::pump_output(cx);
+                    })
+                    .with_input_sink(move |text| {
+                        let _ = ime_tx.send((ime_pane_id, text.to_owned()));
+                    });
+            if let Some(trace) = trace_for_paint.clone() {
+                let pane_id = bundle.pane_id;
+                element = element.with_paint_diagnostics(move |ev| {
+                    trace.push(crate::diagnostics::DiagnosticEvent::Paint(
+                        crate::diagnostics::DiagnosticPaintEvent {
+                            pane_id,
+                            sequence: ev.sequence,
+                            cursor_blink_requested: ev.cursor_blink_requested,
+                            cursor_visible_phase: ev.cursor_visible_phase,
+                            effects_busy: ev.effects_busy,
+                            burst_bypass: ev.burst_bypass,
+                            revealing: ev.revealing,
+                            pending: ev.pending,
+                            effects_needs_frame: ev.effects_needs_frame,
+                            trail_active: ev.trail_active,
+                            trail_alpha: ev.trail_alpha,
+                            raf_reason: match ev.raf_reason {
+                                mr_crabs_element::PaintRafReason::None => {
+                                    crate::diagnostics::DiagnosticRafReason::None
+                                }
+                                mr_crabs_element::PaintRafReason::CursorBlink => {
+                                    crate::diagnostics::DiagnosticRafReason::CursorBlink
+                                }
+                                mr_crabs_element::PaintRafReason::Effects => {
+                                    crate::diagnostics::DiagnosticRafReason::Effects
+                                }
+                                mr_crabs_element::PaintRafReason::Both => {
+                                    crate::diagnostics::DiagnosticRafReason::Both
+                                }
+                            },
+                        },
+                    ));
                 });
+            }
 
             let mouse_geometry = bundle.pane_geometry;
             let mouse_pane_id = bundle.pane_id;

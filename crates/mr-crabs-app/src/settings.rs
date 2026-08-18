@@ -105,6 +105,12 @@ fn default_cursor_trail_duration() -> u64 {
 fn default_cursor_trail() -> bool {
     mr_crabs_config::DEFAULT_CURSOR_TRAIL
 }
+fn default_startup_fetch() -> bool {
+    mr_crabs_config::DEFAULT_STARTUP_FETCH
+}
+fn default_startup_fetch_command() -> String {
+    mr_crabs_config::DEFAULT_STARTUP_FETCH_COMMAND.to_string()
+}
 
 /// Typed shell settings. Unknown JSON fields are ignored; every field
 /// defaults to the Ghostty-compatible value shown in the field docs.
@@ -173,6 +179,12 @@ pub struct AppSettings {
     /// Permit terminal OSC 52 reads from the system clipboard.
     #[serde(default)]
     pub allow_osc52_read: bool,
+    /// Whether new windows auto-run the startup fetch command.
+    #[serde(default = "default_startup_fetch")]
+    pub startup_fetch: bool,
+    /// POSIX command run on the PTY before the interactive shell starts.
+    #[serde(default = "default_startup_fetch_command")]
+    pub startup_fetch_command: String,
     /// Shell keybindings (keyboard-only operation).
     #[serde(default)]
     pub keybindings: Vec<KeyBindingDef>,
@@ -218,6 +230,8 @@ impl AppSettings {
             text_animation_intensity: effective.text_animation_intensity,
             allow_osc52_write: effective.allow_osc52_write,
             allow_osc52_read: effective.allow_osc52_read,
+            startup_fetch: effective.startup_fetch,
+            startup_fetch_command: effective.startup_fetch_command.clone(),
             keybindings,
         }
     }
@@ -255,6 +269,8 @@ impl AppSettings {
             text_animation_intensity: self.text_animation_intensity,
             allow_osc52_write: self.allow_osc52_write,
             allow_osc52_read: self.allow_osc52_read,
+            startup_fetch: self.startup_fetch,
+            startup_fetch_command: self.startup_fetch_command.clone(),
         }
     }
 
@@ -471,6 +487,8 @@ struct PartialAppSettings {
     text_animation_intensity: Option<f32>,
     allow_osc52_write: Option<bool>,
     allow_osc52_read: Option<bool>,
+    startup_fetch: Option<bool>,
+    startup_fetch_command: Option<String>,
     keybindings: Option<Vec<KeyBindingDef>>,
 }
 
@@ -498,6 +516,8 @@ impl PartialAppSettings {
             text_animation_intensity: self.text_animation_intensity,
             allow_osc52_write: self.allow_osc52_write,
             allow_osc52_read: self.allow_osc52_read,
+            startup_fetch: self.startup_fetch,
+            startup_fetch_command: self.startup_fetch_command,
         };
         (overlay, self.keybindings)
     }
@@ -1106,6 +1126,24 @@ mod tests {
         assert_eq!(settings.text_animation, "typewriter");
         assert_eq!(settings.text_animation_duration_ms, 90);
         assert_eq!(settings.text_animation_intensity, 0.4);
+    }
+
+    #[test]
+    fn startup_fetch_json_overrides_and_defaults() {
+        let settings = AppSettings::from_json(
+            r#"{"startup_fetch": false, "startup_fetch_command": "fastfetch"}"#,
+        )
+        .expect("valid json");
+        assert!(!settings.startup_fetch);
+        assert_eq!(settings.startup_fetch_command, "fastfetch");
+
+        let defaults = AppSettings::default();
+        assert!(defaults.startup_fetch);
+        assert_eq!(defaults.startup_fetch_command, "rustfetch");
+
+        let effective = defaults.effective_config();
+        assert!(effective.startup_fetch);
+        assert_eq!(effective.startup_fetch_command, "rustfetch");
     }
 
     fn unique_stamp() -> u128 {

@@ -39,6 +39,7 @@
 pub mod accessibility;
 pub mod action;
 pub mod crash;
+pub mod diagnostics;
 pub mod dock;
 pub mod intent;
 pub mod keymap;
@@ -54,6 +55,10 @@ pub mod ui;
 pub mod updates;
 
 pub use action::AppAction;
+pub use diagnostics::{
+    DiagnosticEvent, DiagnosticFrameEvent, DiagnosticPaintEvent, DiagnosticPumpEvent,
+    DiagnosticRafReason, DiagnosticTrace,
+};
 pub use model::app_model::{ActionResult, AppModel, AppPumpStats};
 pub use model::pane::{PaneId, PaneModel, PaneSession, PtySpawnConfig};
 pub use model::pane_sink::{PaneProtocolSink, PaneSinkEvent};

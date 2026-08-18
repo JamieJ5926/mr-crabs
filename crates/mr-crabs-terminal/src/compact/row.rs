@@ -74,6 +74,28 @@ impl CompactRow {
         self
     }
 
+    /// Zero-copy construction from storage metadata. Preserves occupancy,
+    /// first_occupied, wrapped, and generation without scanning cells.
+    pub(crate) fn from_parts(
+        cells: Arc<[Cell]>,
+        cols: u16,
+        occupancy: u16,
+        first_occupied: u16,
+        wrapped: bool,
+        generation: u64,
+    ) -> Self {
+        debug_assert!(cells.len() == usize::from(cols));
+        Self {
+            cells,
+            cols,
+            occupancy,
+            first_occupied,
+            wrapped,
+            generation,
+            extras: None,
+        }
+    }
+
     #[cfg(test)]
     #[inline]
     pub fn is_visually_empty(&self) -> bool {

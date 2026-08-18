@@ -105,6 +105,18 @@ struct RowDesc {
     wrapped: bool,
 }
 
+/// Zero-copy carrier for hot segmented suffix extraction. Preserves the
+/// moved `Arc<[Cell]>` allocation identity and per-row metadata.
+#[derive(Clone)]
+pub(crate) struct StoredRow {
+    pub(crate) cells: Arc<[Cell]>,
+    pub(crate) cols: u16,
+    pub(crate) occupancy: u16,
+    pub(crate) first_occupied: u16,
+    pub(crate) wrapped: bool,
+    pub(crate) generation: u64,
+}
+
 /// Hot resident variants:
 /// - `Flat`: contiguous `capacity * cols` buffer (push_line / flat ingest).
 /// - `Segmented`: moved per-row `Arc<[Cell]>` descriptors grouped up to
@@ -1310,6 +1322,112 @@ impl ScrollbackStorage {
         self.cold_cache = None;
         self.maybe_enqueue_full_pages();
         self.enforce_max_lines();
+    }
+
+    /// Withdraw up to `count` rows from the contiguous newest hot segmented
+    /// suffix matching `cols`. Stops at flat/cold/pending/corrupt/mixed-width
+    /// boundaries. Zero-copy Arc moves, oldest→newest, preserves generation,
+    /// updates logical_lines/empty_lines, clears cold_cache, clamps
+    /// enqueue_cursor. No generation bump, no decompression, no channel ops.
+    pub(crate) fn take_newest_hot_segmented_rows(
+        &mut self,
+        count: usize,
+        cols: u16,
+        out: &mut Vec<StoredRow>,
+    ) -> usize {
+        if count == 0 || self.history.is_empty() {
+            return 0;
+        }
+        let mut remaining = count;
+        let mut extracted = 0usize;
+        // Collect chunks newest→oldest then reverse to deliver oldest→newest.
+        let mut chunks: Vec<Vec<StoredRow>> = Vec::new();
+        let mut idx = self.history.len().checked_sub(1);
+        while let Some(i) = idx {
+            if remaining == 0 {
+                break;
+            }
+            let page = &self.history[i];
+            if page.pending {
+                break;
+            }
+            if page.compressed.is_some() {
+                break;
+            }
+            let Some(resident) = page.resident.as_ref() else {
+                break;
+            };
+            let descs = match resident {
+                Resident::Flat(_) => break,
+                Resident::Segmented(d) => d,
+            };
+            if descs.is_empty() || descs.len() != page.lines {
+                break;
+            }
+            // Contiguous suffix where cols matches.
+            let mut suffix_start = descs.len();
+            for (rev_idx, d) in descs.iter().rev().enumerate() {
+                if d.cols != cols {
+                    break;
+                }
+                suffix_start = descs.len() - rev_idx - 1;
+            }
+            let suffix_len = descs.len().saturating_sub(suffix_start);
+            if suffix_len == 0 {
+                break;
+            }
+            let take = suffix_len.min(remaining);
+            let drain_start = descs.len() - take;
+            let generation = page.generation;
+            let mut chunk: Vec<StoredRow> = Vec::with_capacity(take);
+            for d in &descs[drain_start..] {
+                chunk.push(StoredRow {
+                    cells: Arc::clone(&d.cells),
+                    cols: d.cols,
+                    occupancy: d.occupancy,
+                    first_occupied: d.first_occupied,
+                    wrapped: d.wrapped,
+                    generation,
+                });
+            }
+            let whole_page = take == descs.len() && suffix_start == 0;
+            if whole_page {
+                self.history.remove(i);
+                self.logical_lines = self.logical_lines.saturating_sub(take);
+                extracted += take;
+                remaining -= take;
+                chunks.push(chunk);
+                self.cold_cache = None;
+                self.enqueue_cursor = self.enqueue_cursor.min(self.history.len());
+                idx = if i == 0 { None } else { Some(i - 1) };
+                continue;
+            } else {
+                let page_mut = &mut self.history[i];
+                if let Some(Resident::Segmented(descs_mut)) = page_mut.resident.as_mut() {
+                    descs_mut.drain(drain_start..);
+                    page_mut.lines = descs_mut.len();
+                    page_mut.empty_lines = descs_mut
+                        .iter()
+                        .filter(|r| r.occupancy == 0 && !r.wrapped)
+                        .count();
+                }
+                self.logical_lines = self.logical_lines.saturating_sub(take);
+                extracted += take;
+                let _ = remaining - take;
+                chunks.push(chunk);
+                self.cold_cache = None;
+                self.enqueue_cursor = self.enqueue_cursor.min(self.history.len());
+                // Partial drain breaks contiguity; stop after this page.
+                // If we stopped at a width boundary (suffix_start>0) or left
+                // rows in this page, older pages are not contiguous.
+                break;
+            }
+        }
+        // Reverse chunks and extend oldest→newest.
+        for chunk in chunks.into_iter().rev() {
+            out.extend(chunk);
+        }
+        extracted
     }
 }
 

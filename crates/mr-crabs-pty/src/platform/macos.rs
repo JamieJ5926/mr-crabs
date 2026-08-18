@@ -102,7 +102,7 @@ pub(crate) fn spawn_pty_child(
     // argv[0] conventionally names the program as invoked.
     argv.push(program.clone());
     for arg in &command.args {
-        argv.push(cstring_from_bytes(arg.as_bytes()).map_err(PtyError::Spawn)?);
+        argv.push(cstring_from_bytes(arg.as_os_str().as_bytes()).map_err(PtyError::Spawn)?);
     }
     let envp: Vec<CString> = build_envp(&command.envs).map_err(PtyError::Spawn)?;
     let cwd: Option<CString> = command

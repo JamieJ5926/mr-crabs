@@ -3230,6 +3230,7 @@ dependencies = [
  "mr-crabs-protocols",
  "serde",
  "serde_json",
+ "unicode-width",
  "vte",
 ]
 

@@ -532,6 +532,33 @@ impl Terminal {
 
     pub fn resize(&mut self, size: GridSize) -> Result<(), TerminalError> {
         validate_size(size)?;
+        // Same-width primary height growth: withdraw newest hot segmented
+        // suffix from storage and inject into engine history before reflow
+        // so the taller grid exposes those rows and cursors shift exactly.
+        // Width changes, alt-screen, or non-growth bypass restoration.
+        let old_size = self.size;
+        if old_size.cols == size.cols
+            && size.rows > old_size.rows
+            && !self.protocol.engine().has_mode(TerminalMode::AltScreen)
+        {
+            let added = usize::from(size.rows - old_size.rows);
+            let cols = old_size.cols;
+            let mut stored: Vec<crate::storage::StoredRow> = Vec::new();
+            let taken = self
+                .storage
+                .take_newest_hot_segmented_rows(added, cols, &mut stored);
+            if taken > 0 {
+                let rows: Vec<crate::compact::row::CompactRow> = stored
+                    .into_iter()
+                    .map(|r| {
+                        crate::compact::row::CompactRow::from_parts(
+                            r.cells, r.cols, r.occupancy, r.first_occupied, r.wrapped, r.generation,
+                        )
+                    })
+                    .collect();
+                self.protocol.engine_mut().prepend_storage_history(rows);
+            }
+        }
         self.protocol.engine_mut().resize(size)?;
         self.protocol.note_resize(usize::from(size.rows));
         self.size = size;

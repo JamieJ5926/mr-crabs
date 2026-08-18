@@ -12,6 +12,7 @@ use gpui::{
     Pixels, Point, RenderImage, ShapedLine, SharedString, StrikethroughStyle, Style as GpuiStyle,
     TextRun, UnderlineStyle, Window, fill, font, outline, point, px, size, white,
 };
+use mr_crabs_effects::{CellPx, EffectsConfig, EffectsModel, RevealMath, TextAnimation};
 use mr_crabs_graphics::{
     image::{Image, ImageData, ImageFormat},
     iterm::{self, ItermUploads},
@@ -20,7 +21,6 @@ use mr_crabs_graphics::{
     store::{ImageStore, StoreConfig},
     texture::{TextureCache, TextureKey},
 };
-use mr_crabs_effects::{CellPx, EffectsConfig, EffectsModel, RevealMath, TextAnimation};
 use mr_crabs_terminal::{CursorShape, FrameDelta};
 use parking_lot::{Mutex, MutexGuard};
 use std::collections::HashMap;
@@ -32,6 +32,9 @@ use std::time::Instant;
 use crate::{
     CacheAction, CellMetrics, RenderCache, ResizeDeduper, RunBatch, cursor,
     geometry::{pixel_bounds_to_grid, run_bounds},
+    paint_diagnostics::{
+        PaintDiagnosticsEvent, PaintDiagnosticsSink, PaintEffectsOutcome, diagnostic_event,
+    },
     palette,
     selection::selection_rects,
 };
@@ -98,6 +101,7 @@ pub struct TerminalElement {
     borrowed_focus: bool,
     /// Live text/trail effects. `None` keeps the disabled fast path.
     effects: Option<EffectsConfig>,
+    paint_diagnostics: Option<PaintDiagnosticsSink>,
 }
 
 /// The shaping identity that determines whether retained glyph batches must
@@ -173,6 +177,13 @@ impl PaintState {
     }
 }
 
+/// More than one short typed burst: skip concealment so dumps do not flicker.
+const TEXT_REVEAL_BURST_CELLS: usize = 16;
+
+fn text_reveal_is_burst(revealing: usize, pending: usize) -> bool {
+    revealing.saturating_add(pending) > TEXT_REVEAL_BURST_CELLS
+}
+
 impl TerminalElement {
     /// Create an element owning `frame`.
     pub fn new(frame: FrameDelta, metrics: CellMetrics) -> Self {
@@ -199,6 +210,7 @@ impl TerminalElement {
             on_paint: None,
             borrowed_focus: false,
             effects: None,
+            paint_diagnostics: None,
         }
     }
 
@@ -219,6 +231,7 @@ impl TerminalElement {
             on_paint: None,
             borrowed_focus: false,
             effects: None,
+            paint_diagnostics: None,
         }
     }
 
@@ -351,6 +364,14 @@ impl TerminalElement {
     /// nothing in paint state.
     pub fn with_effects(mut self, config: EffectsConfig) -> Self {
         self.effects = Some(config);
+        self
+    }
+
+    pub fn with_paint_diagnostics<F>(mut self, sink: F) -> Self
+    where
+        F: Fn(PaintDiagnosticsEvent) + Send + Sync + 'static,
+    {
+        self.paint_diagnostics = Some(std::sync::Arc::new(sink));
         self
     }
 
@@ -519,26 +540,28 @@ impl TerminalElement {
         // Cursor: terminal activity and cursor movement start a fresh visible
         // blink phase; animation redraws of the same frame advance it.
         let cursor = &frame.cursor;
-        if cursor.visible {
-            let show = if cursor.blinking {
+        let cursor_visible_phase = if cursor.visible {
+            if cursor.blinking {
                 state.cursor_blink.phase_at(frame, Instant::now())
             } else {
                 true
-            };
-            if show {
-                let geometry = cursor::cursor_geometry(cursor, self.metrics);
-                let rect = geometry.bounds + origin;
-                match geometry.shape {
-                    CursorShape::Block | CursorShape::Bar | CursorShape::Underline => {
-                        window.paint_quad(fill(rect, self.palette.cursor_color()));
-                    }
-                    CursorShape::HollowBlock => {
-                        window.paint_quad(outline(
-                            rect,
-                            self.palette.cursor_color(),
-                            BorderStyle::default(),
-                        ));
-                    }
+            }
+        } else {
+            false
+        };
+        if cursor.visible && cursor_visible_phase {
+            let geometry = cursor::cursor_geometry(cursor, self.metrics);
+            let rect = geometry.bounds + origin;
+            match geometry.shape {
+                CursorShape::Block | CursorShape::Bar | CursorShape::Underline => {
+                    window.paint_quad(fill(rect, self.palette.cursor_color()));
+                }
+                CursorShape::HollowBlock => {
+                    window.paint_quad(outline(
+                        rect,
+                        self.palette.cursor_color(),
+                        BorderStyle::default(),
+                    ));
                 }
             }
         }
@@ -547,10 +570,19 @@ impl TerminalElement {
             input.set_bounds(cursor::cursor_geometry(cursor, self.metrics).bounds + origin);
             window.handle_input(focus, input.clone(), cx);
         }
-
         // Animation scheduling: cursor blink plus live text/trail effects.
-        let effects_busy = self.paint_effects(state, frame, origin, window);
-        if cursor::should_request_animation(frame) || effects_busy {
+        let outcome = self.paint_effects(state, frame, origin, window);
+        let effects_busy = outcome.busy;
+        let cursor_requested = cursor::should_request_animation(frame);
+        if let Some(sink) = self.paint_diagnostics.clone() {
+            sink(diagnostic_event(
+                frame.sequence,
+                cursor_requested,
+                cursor_visible_phase,
+                outcome,
+            ));
+        }
+        if cursor_requested || effects_busy {
             window.request_animation_frame();
         }
     }
@@ -561,64 +593,74 @@ impl TerminalElement {
         frame: &FrameDelta,
         origin: Point<Pixels>,
         window: &mut Window,
-    ) -> bool {
+    ) -> PaintEffectsOutcome {
         let Some(config) = self.effects else {
-            return false;
+            return PaintEffectsOutcome::default();
         };
         if config.text_animation == TextAnimation::Disabled && !config.cursor_trail {
             state.effects = None;
-            return false;
+            return PaintEffectsOutcome::default();
         }
-        let cell = CellPx::new(f64::from(self.metrics.width), f64::from(self.metrics.height));
-        let model = state.effects.get_or_insert_with(|| {
-            EffectsModel::new(config, frame.size, cell)
-        });
+        let cell = CellPx::new(
+            f64::from(self.metrics.width),
+            f64::from(self.metrics.height),
+        );
+        let model = state
+            .effects
+            .get_or_insert_with(|| EffectsModel::new(config, frame.size, cell));
         if model.config() != &config || model.cell() != cell {
             model.set_config(config);
         }
         let origin_clock = state.effects_origin.get_or_insert_with(Instant::now);
         let now_ms = origin_clock.elapsed().as_millis() as u64;
         let fx = model.apply_frame(frame, now_ms, true);
-        let math = RevealMath::new(
-            config.text_animation,
-            config.text_animation_duration_ms,
-            config.text_animation_intensity,
-            cell.width,
-        );
-        let bg = self.palette.background_color();
-        let cw = px(self.metrics.width);
-        let ch = px(self.metrics.height);
-        for pending in &fx.pending {
-            let rect = gpui::Bounds {
-                origin: point(
-                    origin.x + px(f32::from(pending.col) * self.metrics.width),
-                    origin.y + px(f32::from(pending.row) * self.metrics.height),
-                ),
-                size: size(cw, ch),
-            };
-            window.paint_quad(fill(rect, bg));
-        }
-        for reveal in &fx.revealing {
-            let hidden = reveal.hidden_fraction_at(&math, cell.width);
-            if hidden <= 0.0 {
-                continue;
+        // Alternate-screen TUIs (OMP) and large dumps restamp many cells.
+        // Concealing them flickers the whole window. Stream only short
+        // primary-screen output.
+        let burst = frame.viewport.alternate_screen
+            || text_reveal_is_burst(fx.revealing.len(), fx.pending.len());
+        if !burst {
+            let math = RevealMath::new(
+                config.text_animation,
+                config.text_animation_duration_ms,
+                config.text_animation_intensity,
+                cell.width,
+            );
+            let bg = self.palette.background_color();
+            let cw = px(self.metrics.width);
+            let ch = px(self.metrics.height);
+            for pending in &fx.pending {
+                let rect = gpui::Bounds {
+                    origin: point(
+                        origin.x + px(f32::from(pending.col) * self.metrics.width),
+                        origin.y + px(f32::from(pending.row) * self.metrics.height),
+                    ),
+                    size: size(cw, ch),
+                };
+                window.paint_quad(fill(rect, bg));
             }
-            let frac = reveal.boundary_fraction(&math) as f32;
-            let shown = cw * frac;
-            let remain = cw - shown;
-            if remain <= px(0.0) {
-                continue;
+            for reveal in &fx.revealing {
+                let hidden = reveal.hidden_fraction_at(&math, cell.width);
+                if hidden <= 0.0 {
+                    continue;
+                }
+                let frac = reveal.boundary_fraction(&math) as f32;
+                let shown = cw * frac;
+                let remain = cw - shown;
+                if remain <= px(0.0) {
+                    continue;
+                }
+                let mut color = bg;
+                color.a = hidden as f32;
+                let rect = gpui::Bounds {
+                    origin: point(
+                        origin.x + px(f32::from(reveal.pos.col) * self.metrics.width) + shown,
+                        origin.y + px(f32::from(reveal.pos.row) * self.metrics.height),
+                    ),
+                    size: size(remain, ch),
+                };
+                window.paint_quad(fill(rect, color));
             }
-            let mut color = bg;
-            color.a = hidden as f32;
-            let rect = gpui::Bounds {
-                origin: point(
-                    origin.x + px(f32::from(reveal.pos.col) * self.metrics.width) + shown,
-                    origin.y + px(f32::from(reveal.pos.row) * self.metrics.height),
-                ),
-                size: size(remain, ch),
-            };
-            window.paint_quad(fill(rect, color));
         }
         if fx.trail.active && fx.trail.alpha > 0.0 {
             let mut glow = self.palette.cursor_color();
@@ -630,7 +672,21 @@ impl TerminalElement {
             };
             window.paint_quad(fill(rect, glow));
         }
-        fx.needs_frame
+        let needs_frame = fx.needs_frame;
+        let trail_active = fx.trail.active;
+        let trail_alpha = fx.trail.alpha;
+        let revealing = fx.revealing.len();
+        let pending = fx.pending.len();
+        let busy = (!burst && needs_frame) || trail_active;
+        PaintEffectsOutcome {
+            busy,
+            burst_bypass: burst,
+            revealing,
+            pending,
+            needs_frame,
+            trail_active,
+            trail_alpha,
+        }
     }
 
     /// Paint one shaped run with every glyph anchored to its terminal cell.
@@ -765,6 +821,20 @@ fn run_paint_style(
         color: None,
     });
     (color, underline, strikethrough)
+}
+
+#[cfg(test)]
+mod paint_diagnostics_tests {
+    use super::*;
+
+    #[test]
+    fn paint_diagnostics_is_opt_in() {
+        let metrics = CellMetrics::new(8.0, 16.0).unwrap();
+        let element = TerminalElement::empty(metrics);
+        assert!(element.paint_diagnostics.is_none());
+        let element = element.with_paint_diagnostics(|_| {});
+        assert!(element.paint_diagnostics.is_some());
+    }
 }
 
 impl Element for TerminalElement {
@@ -2010,5 +2080,14 @@ mod tests {
         let ctx = gfx_ctx();
         overlay.set_context(ctx);
         assert_eq!(overlay.context(), ctx);
+    }
+
+    #[test]
+    fn text_reveal_skips_large_dumps_keeps_short_input() {
+        assert!(!text_reveal_is_burst(1, 0));
+        assert!(!text_reveal_is_burst(16, 0));
+        assert!(text_reveal_is_burst(17, 0));
+        assert!(text_reveal_is_burst(8, 9));
+        assert!(text_reveal_is_burst(80, 0));
     }
 }

@@ -24,7 +24,7 @@
 //! database, then [`DEFAULT_SHELL`].
 
 use std::collections::BTreeMap;
-use std::ffi::CStr;
+use std::ffi::{CStr, OsString};
 use std::path::{Path, PathBuf};
 
 /// `TERM` value injected when neither the builder nor the environment
@@ -45,7 +45,7 @@ pub struct SpawnCommand {
     /// Executable path to spawn.
     pub exe: PathBuf,
     /// Argument vector (not including the executable itself).
-    pub args: Vec<String>,
+    pub args: Vec<OsString>,
     /// Working directory for the child, if any.
     pub cwd: Option<PathBuf>,
     /// Complete child environment, deterministically ordered.
@@ -64,7 +64,7 @@ pub struct SpawnCommand {
 #[derive(Clone, Debug)]
 pub struct CommandBuilder {
     exe: PathBuf,
-    args: Vec<String>,
+    args: Vec<OsString>,
     cwd: Option<PathBuf>,
     env: BTreeMap<String, String>,
     clear_envs: bool,
@@ -87,7 +87,7 @@ impl CommandBuilder {
     }
 
     /// Appends a single argument.
-    pub fn arg(&mut self, arg: impl Into<String>) -> &mut Self {
+    pub fn arg(&mut self, arg: impl Into<OsString>) -> &mut Self {
         self.args.push(arg.into());
         self
     }
@@ -96,7 +96,7 @@ impl CommandBuilder {
     pub fn args<I, S>(&mut self, args: I) -> &mut Self
     where
         I: IntoIterator<Item = S>,
-        S: Into<String>,
+        S: Into<OsString>,
     {
         self.args.extend(args.into_iter().map(Into::into));
         self
@@ -307,6 +307,7 @@ fn passwd_shell() -> Option<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::os::unix::ffi::OsStrExt;
 
     /// Creates a scratch file that certainly exists, with a caller-unique
     /// name so parallel test runs cannot collide.
@@ -496,7 +497,14 @@ mod tests {
             .arg("-c")
             .args(["echo", "hi"])
             .envs([("A", "1"), ("B", "2")]);
-        assert_eq!(builder.args, vec!["-c", "echo", "hi"]);
+        assert_eq!(
+            builder.args,
+            vec![
+                OsString::from("-c"),
+                OsString::from("echo"),
+                OsString::from("hi")
+            ]
+        );
         assert_eq!(builder.envs_overlay().len(), 2);
     }
 
@@ -512,7 +520,7 @@ mod tests {
             .colorterm("truecolor");
         let cmd = builder.to_spawn_command();
         assert_eq!(cmd.exe, PathBuf::from("/bin/sh"));
-        assert_eq!(cmd.args, vec!["-c", "true"]);
+        assert_eq!(cmd.args, vec![OsString::from("-c"), OsString::from("true")]);
         assert_eq!(cmd.cwd, Some(PathBuf::from("/tmp")));
         assert_eq!(cmd.term, "xterm-88color");
         assert_eq!(cmd.colorterm.as_deref(), Some("truecolor"));
@@ -536,5 +544,29 @@ mod tests {
         b.args(["-l"]).env("X", "y").term("xterm-256color");
         assert_eq!(a.build_envs(), b.build_envs());
         assert_eq!(a.to_spawn_command(), b.to_spawn_command());
+    }
+    #[test]
+    fn argv_preserves_non_utf8_bytes_through_spawn_command() {
+        use std::os::unix::ffi::OsStringExt;
+        let raw = vec![0x66, 0x6f, 0x80, 0x6f]; // "fo\x80o"
+        let non_utf8 = OsString::from_vec(raw.clone());
+        let mut builder = CommandBuilder::new("/bin/sh");
+        builder.arg(non_utf8.clone());
+        let cmd = builder.to_spawn_command();
+        assert_eq!(cmd.args.len(), 1);
+        assert_eq!(cmd.args[0].as_bytes(), raw.as_slice());
+        assert_eq!(cmd.args[0], non_utf8);
+    }
+
+    #[test]
+    fn argv_round_trip_non_utf8_via_os_bytes() {
+        use std::os::unix::ffi::OsStringExt;
+        let bytes = vec![0xFF, 0xFE, 0xFD];
+        let arg = OsString::from_vec(bytes.clone());
+        let mut b = CommandBuilder::new("/bin/echo");
+        b.args([arg.clone(), OsString::from("ok")]);
+        let cmd = b.to_spawn_command();
+        assert_eq!(cmd.args[0].as_bytes(), bytes.as_slice());
+        assert_eq!(cmd.args[1], OsString::from("ok"));
     }
 }

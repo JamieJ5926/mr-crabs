@@ -191,6 +191,6 @@ mod tests {
         };
         let cfg = EffectsConfig::from(a);
         assert_eq!(cfg.text_animation_duration_ms, 77);
-        assert_eq!(cfg.text_animation, TextAnimation::Disabled);
+        assert_eq!(cfg.text_animation, TextAnimation::Streaming);
     }
 }

@@ -25,6 +25,10 @@ pub const DEFAULT_CURSOR_TRAIL_DURATION_MS: u64 = 250;
 pub const DEFAULT_TEXT_ANIMATION: &str = "streaming";
 pub const DEFAULT_TEXT_ANIMATION_DURATION_MS: u64 = 120;
 pub const DEFAULT_TEXT_ANIMATION_INTENSITY: f32 = 1.0;
+/// Whether new windows auto-run the startup fetch command.
+pub const DEFAULT_STARTUP_FETCH: bool = true;
+/// POSIX command run on the PTY before the interactive shell starts.
+pub const DEFAULT_STARTUP_FETCH_COMMAND: &str = "rustfetch";
 
 pub const TERM_GHOSTTY: &str = "xterm-ghostty";
 pub const TERM_FALLBACK: &str = "xterm-256color";
@@ -134,10 +138,12 @@ pub enum SettingKey {
     TextAnimationIntensity,
     AllowOsc52Write,
     AllowOsc52Read,
+    StartupFetch,
+    StartupFetchCommand,
 }
 
 impl SettingKey {
-    pub const ALL: [Self; 21] = [
+    pub const ALL: [Self; 23] = [
         Self::FontFamily,
         Self::FontSize,
         Self::LineHeightAdjustPercent,
@@ -159,6 +165,8 @@ impl SettingKey {
         Self::TextAnimationIntensity,
         Self::AllowOsc52Write,
         Self::AllowOsc52Read,
+        Self::StartupFetch,
+        Self::StartupFetchCommand,
     ];
 
     pub fn flag(self) -> &'static str {
@@ -184,6 +192,8 @@ impl SettingKey {
             Self::TextAnimationIntensity => "text-animation-intensity",
             Self::AllowOsc52Write => "clipboard-write",
             Self::AllowOsc52Read => "clipboard-read",
+            Self::StartupFetch => "startup-fetch",
+            Self::StartupFetchCommand => "startup-fetch-command",
         }
     }
 
@@ -214,6 +224,8 @@ impl SettingKey {
             "text-animation-intensity" => Some(Self::TextAnimationIntensity),
             "clipboard-write" | "allow-osc52-write" => Some(Self::AllowOsc52Write),
             "clipboard-read" | "allow-osc52-read" => Some(Self::AllowOsc52Read),
+            "startup-fetch" => Some(Self::StartupFetch),
+            "startup-fetch-command" => Some(Self::StartupFetchCommand),
             _ => None,
         }
     }
@@ -221,7 +233,11 @@ impl SettingKey {
     pub fn is_boolean(self) -> bool {
         matches!(
             self,
-            Self::CursorBlink | Self::CursorTrail | Self::AllowOsc52Write | Self::AllowOsc52Read
+            Self::CursorBlink
+                | Self::CursorTrail
+                | Self::AllowOsc52Write
+                | Self::AllowOsc52Read
+                | Self::StartupFetch
         )
     }
 
@@ -250,6 +266,10 @@ impl SettingKey {
             Self::TextAnimationIntensity => "Text animation intensity.",
             Self::AllowOsc52Write => "Allow OSC 52 writes to the system clipboard.",
             Self::AllowOsc52Read => "Allow OSC 52 reads from the system clipboard.",
+            Self::StartupFetch => "Run the startup fetch command in new windows.",
+            Self::StartupFetchCommand => {
+                "POSIX command run on the PTY before the interactive shell starts."
+            }
         }
     }
 }
@@ -278,6 +298,8 @@ pub struct ConfigOverlay {
     pub text_animation_intensity: Option<f32>,
     pub allow_osc52_write: Option<bool>,
     pub allow_osc52_read: Option<bool>,
+    pub startup_fetch: Option<bool>,
+    pub startup_fetch_command: Option<String>,
 }
 
 impl ConfigOverlay {
@@ -349,6 +371,12 @@ impl ConfigOverlay {
         if over.allow_osc52_read.is_some() {
             self.allow_osc52_read = over.allow_osc52_read;
         }
+        if over.startup_fetch.is_some() {
+            self.startup_fetch = over.startup_fetch;
+        }
+        if over.startup_fetch_command.is_some() {
+            self.startup_fetch_command = over.startup_fetch_command;
+        }
     }
 
     pub fn apply_into(&self, dst: &mut EffectiveConfig) {
@@ -415,6 +443,15 @@ impl ConfigOverlay {
         if let Some(v) = self.allow_osc52_read {
             dst.allow_osc52_read = v;
         }
+        if let Some(v) = self.startup_fetch {
+            dst.startup_fetch = v;
+        }
+        if let Some(v) = &self.startup_fetch_command {
+            dst.startup_fetch_command = v.clone();
+            if v.is_empty() {
+                dst.startup_fetch = false;
+            }
+        }
     }
 
     pub fn set(&mut self, key: SettingKey, value: &str) -> Result<(), String> {
@@ -456,6 +493,8 @@ impl ConfigOverlay {
             }
             SettingKey::AllowOsc52Write => self.allow_osc52_write = Some(parse_bool(value)?),
             SettingKey::AllowOsc52Read => self.allow_osc52_read = Some(parse_bool(value)?),
+            SettingKey::StartupFetch => self.startup_fetch = Some(parse_bool(value)?),
+            SettingKey::StartupFetchCommand => self.startup_fetch_command = Some(value.to_string()),
         }
         Ok(())
     }
@@ -485,6 +524,8 @@ pub struct EffectiveConfig {
     pub text_animation_intensity: f32,
     pub allow_osc52_write: bool,
     pub allow_osc52_read: bool,
+    pub startup_fetch: bool,
+    pub startup_fetch_command: String,
 }
 
 impl Default for EffectiveConfig {
@@ -517,6 +558,8 @@ impl EffectiveConfig {
             text_animation_intensity: DEFAULT_TEXT_ANIMATION_INTENSITY,
             allow_osc52_write: false,
             allow_osc52_read: false,
+            startup_fetch: DEFAULT_STARTUP_FETCH,
+            startup_fetch_command: DEFAULT_STARTUP_FETCH_COMMAND.to_string(),
         }
     }
 
@@ -526,6 +569,9 @@ impl EffectiveConfig {
         file.apply_into(&mut effective);
         cli.apply_into(&mut effective);
         runtime.apply_into(&mut effective);
+        if effective.startup_fetch_command.is_empty() {
+            effective.startup_fetch = false;
+        }
         effective
     }
 
@@ -562,6 +608,8 @@ impl EffectiveConfig {
             }
             SettingKey::AllowOsc52Write => format!("{}", self.allow_osc52_write),
             SettingKey::AllowOsc52Read => format!("{}", self.allow_osc52_read),
+            SettingKey::StartupFetch => format!("{}", self.startup_fetch),
+            SettingKey::StartupFetchCommand => self.startup_fetch_command.clone(),
         }
     }
 
@@ -820,7 +868,7 @@ mod tests {
         }
         assert!(text.contains("cursor-trail-duration = 250ms"));
         assert!(text.contains("font-family = JetBrains Mono"));
-        assert!(text.contains("text-animation = none"));
+        assert!(text.contains("text-animation = streaming"));
     }
 
     #[test]
@@ -944,5 +992,64 @@ mod tests {
         );
         assert!(effective.allow_osc52_write);
         assert!(effective.allow_osc52_read);
+    }
+
+    #[test]
+    fn startup_fetch_round_trips_and_empty_command_disables() {
+        let defaults = EffectiveConfig::defaults();
+        assert!(defaults.startup_fetch);
+        assert_eq!(defaults.startup_fetch_command, "rustfetch");
+
+        let mut overlay = ConfigOverlay::default();
+        overlay
+            .set(SettingKey::StartupFetch, "false")
+            .expect("bool");
+        overlay
+            .set(SettingKey::StartupFetchCommand, "neofetch")
+            .expect("command");
+        let effective = EffectiveConfig::resolve(
+            &overlay,
+            &ConfigOverlay::default(),
+            &ConfigOverlay::default(),
+        );
+        assert!(!effective.startup_fetch);
+        assert_eq!(effective.startup_fetch_command, "neofetch");
+
+        // An explicitly empty command disables the feature.
+        let mut empty = ConfigOverlay::default();
+        empty
+            .set(SettingKey::StartupFetchCommand, "")
+            .expect("empty command");
+        let effective =
+            EffectiveConfig::resolve(&empty, &ConfigOverlay::default(), &ConfigOverlay::default());
+        assert!(!effective.startup_fetch);
+        assert_eq!(effective.startup_fetch_command, "");
+    }
+
+    #[test]
+    fn startup_fetch_cross_layer_empty_command_forces_disabled_even_when_enabled() {
+        let mut file = ConfigOverlay::default();
+        file.set(SettingKey::StartupFetch, "true").expect("true");
+        file.set(SettingKey::StartupFetchCommand, "fastfetch")
+            .expect("cmd");
+        let mut cli = ConfigOverlay::default();
+        cli.set(SettingKey::StartupFetchCommand, "").expect("empty");
+        let effective = EffectiveConfig::resolve(&file, &cli, &ConfigOverlay::default());
+        assert_eq!(effective.startup_fetch_command, "");
+        assert!(
+            !effective.startup_fetch,
+            "empty final command must force startup_fetch=false after all overlays"
+        );
+
+        let mut runtime = ConfigOverlay::default();
+        runtime
+            .set(SettingKey::StartupFetch, "true")
+            .expect("runtime true");
+        let effective2 = EffectiveConfig::resolve(&file, &cli, &runtime);
+        assert_eq!(effective2.startup_fetch_command, "");
+        assert!(
+            !effective2.startup_fetch,
+            "runtime true must not override empty-command normalization"
+        );
     }
 }

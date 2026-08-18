@@ -17,6 +17,7 @@ mod cache;
 mod cursor;
 mod element;
 mod geometry;
+mod paint_diagnostics;
 mod palette;
 mod selection;
 
@@ -31,6 +32,7 @@ pub use geometry::{
     ResizeDeduper, cell_bounds, glyph_cell_cols, glyph_origin, pixel_bounds_to_grid, run_bounds,
 };
 pub use mr_crabs_graphics::placement::{Point, TerminalContext};
+pub use paint_diagnostics::{PaintDiagnosticsEvent, PaintDiagnosticsSink, PaintRafReason};
 pub use palette::{
     ANSI_PALETTE, TerminalPalette, background_color, color_to_hsla, cursor_color, indexed_rgb,
     named_rgb, selection_color, style_background, style_foreground, style_underline,

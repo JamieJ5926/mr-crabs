@@ -256,6 +256,29 @@ fn resize_reflow_joins_wrapped_rows_and_shorter_height_pages_history() {
 }
 
 #[test]
+fn taller_primary_grid_restores_history_and_shifts_live_and_saved_cursor() {
+    let mut term = engine(4, 3);
+    feed(&mut term, b"W0\r\nW1\r\nW2\r\nW3\r\nW4");
+    assert_eq!(term.history_len(), 2);
+    assert_eq!(term.cursor().row, 2);
+    feed(&mut term, b"\x1b7");
+
+    term.resize(size(4, 6)).expect("grow rows");
+
+    assert_eq!(term.history_len(), 0);
+    assert_eq!(
+        visible_text(&term)
+            .iter()
+            .map(|row| row.trim_end())
+            .collect::<Vec<_>>(),
+        vec!["W0", "W1", "W2", "W3", "W4", ""]
+    );
+    assert_eq!(term.cursor().row, 4, "live cursor follows restored history");
+    feed(&mut term, b"\x1b8");
+    assert_eq!(term.cursor().row, 4, "saved cursor follows restored history");
+}
+
+#[test]
 fn modes_set_report_and_restore() {
     let mut term = engine(8, 4);
     assert!(term.has_mode(TerminalMode::ShowCursor));

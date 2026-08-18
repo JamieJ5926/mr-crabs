@@ -158,6 +158,17 @@ impl CompactEngine {
         );
     }
 
+    /// Prepend stored scrollback rows into primary history for same-width
+    /// taller resize. Zero-copy: moves `CompactRow` descriptors; preserves
+    /// occupancy/wrapped/generation. No-op in alternate screen.
+    pub(crate) fn prepend_storage_history(&mut self, rows: Vec<CompactRow>) {
+        if rows.is_empty() || self.alt_active {
+            return;
+        }
+        // Only primary history is eligible; alternate is independent.
+        self.primary.history.extend(rows);
+    }
+
     fn blank_row(&mut self) -> CompactRow {
         while let Some(cells) = self.recycled_rows.pop() {
             if cells.len() != usize::from(self.size.cols) {
@@ -615,6 +626,11 @@ impl CompactEngine {
         } else {
             &mut self.alternate
         };
+        // Capture primary cursor state before the grid is rebuilt so a taller
+        // primary grid can restore history rows underneath the cursor.
+        let history_before = screen.history.len();
+        let cursor_row_before = screen.cursor.row;
+        let saved_row_before = screen.saved.pos.row;
         let reflow = primary && new.cols != old.cols;
         let mut stream: Vec<CompactRow> = screen.history.drain(..).collect();
         stream.extend(screen.active.drain(..));
@@ -639,11 +655,34 @@ impl CompactEngine {
             let _ = stream.drain(..split);
         }
         screen.active = stream.into();
-        screen.cursor.row = screen.cursor.row.min(new.rows.saturating_sub(1));
-        screen.cursor.col = screen.cursor.col.min(new.cols.saturating_sub(1));
-        screen.cursor.wrap_pending = false;
-        screen.saved.pos.row = screen.saved.pos.row.min(new.rows.saturating_sub(1));
-        screen.saved.pos.col = screen.saved.pos.col.min(new.cols.saturating_sub(1));
+        if primary && new.cols == old.cols && new.rows > old.rows {
+            // Same-width height growth: pull the most recent eligible primary
+            // history rows back into the visible grid. The stream/split logic
+            // above already moved row identities; the cursors must follow the
+            // restored prefix so the logical line stays with its row.
+            let restored = history_before.saturating_sub(screen.history.len());
+            if restored > 0 {
+                let restored_u16 = u16::try_from(restored).unwrap_or(u16::MAX);
+                screen.cursor.row = cursor_row_before
+                    .saturating_add(restored_u16)
+                    .min(new.rows.saturating_sub(1));
+                screen.saved.pos.row = saved_row_before
+                    .saturating_add(restored_u16)
+                    .min(new.rows.saturating_sub(1));
+            } else {
+                screen.cursor.row = cursor_row_before.min(new.rows.saturating_sub(1));
+                screen.saved.pos.row = saved_row_before.min(new.rows.saturating_sub(1));
+            }
+            screen.cursor.col = screen.cursor.col.min(new.cols.saturating_sub(1));
+            screen.cursor.wrap_pending = false;
+            screen.saved.pos.col = screen.saved.pos.col.min(new.cols.saturating_sub(1));
+        } else {
+            screen.cursor.row = screen.cursor.row.min(new.rows.saturating_sub(1));
+            screen.cursor.col = screen.cursor.col.min(new.cols.saturating_sub(1));
+            screen.cursor.wrap_pending = false;
+            screen.saved.pos.row = screen.saved.pos.row.min(new.rows.saturating_sub(1));
+            screen.saved.pos.col = screen.saved.pos.col.min(new.cols.saturating_sub(1));
+        }
     }
 
     fn screen(&self) -> &Screen {

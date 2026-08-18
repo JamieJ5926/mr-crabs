@@ -121,10 +121,12 @@ mod tests {
         .expect("parse")
         .expect("config");
         assert!(config.contains("font-size = 21"));
-        assert!(config.contains("cursor-trail = false"));
+        assert!(config.contains("cursor-trail = true"));
         assert!(config.contains("cursor-trail-duration = 250ms"));
-        assert!(config.contains("text-animation = none"));
+        assert!(config.contains("text-animation = streaming"));
         assert!(config.contains("text-animation-duration = 120ms"));
         assert!(config.contains("text-animation-intensity = 1"));
+        assert!(config.contains("startup-fetch = true"));
+        assert!(config.contains("startup-fetch-command = rustfetch"));
     }
 }
