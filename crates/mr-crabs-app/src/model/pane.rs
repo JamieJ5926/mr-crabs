@@ -915,6 +915,13 @@ impl PaneModel {
         }
     }
 
+    #[cfg(test)]
+    pub(crate) fn pending_startup_command(&self) -> Option<&str> {
+        self.pending_spawn
+            .as_ref()
+            .and_then(|pending| pending.config.startup_command.as_deref())
+    }
+
     /// Feed bytes directly to the engine (tests and the detached path).
     /// Graphics protocol commands are not intercepted on this path; use
     /// [`PaneModel::pump`] over a receiver session to exercise the scanned

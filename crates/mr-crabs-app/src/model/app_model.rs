@@ -1334,14 +1334,42 @@ mod tests {
 
     #[test]
     fn quick_terminal_toggle_persists_session_and_window() {
-        let mut model = headless();
+        let mut model = AppModel::with_platform(PlatformCapabilities::current());
         assert!(!model.quick_terminal.is_visible());
         let original_window = model.active_window.unwrap();
+        let original_pane = model
+            .window(original_window)
+            .expect("normal window")
+            .active_tab()
+            .expect("normal tab")
+            .panes
+            .values()
+            .next()
+            .expect("normal pane");
+        assert_eq!(
+            original_pane.pending_startup_command(),
+            Some("rustfetch"),
+            "normal terminals keep the default startup fetch"
+        );
 
         assert!(model.toggle_quick_terminal());
         assert!(model.quick_terminal.is_visible());
         let quick_id = model.quick_terminal.window().expect("quick window");
         assert!(model.window(quick_id).expect("window").is_quick_terminal);
+        let quick_pane = model
+            .window(quick_id)
+            .expect("quick window")
+            .active_tab()
+            .expect("quick tab")
+            .panes
+            .values()
+            .next()
+            .expect("quick pane");
+        assert_eq!(
+            quick_pane.pending_startup_command(),
+            None,
+            "Quick Terminal must suppress startup fetch"
+        );
         assert!(model.window(quick_id).expect("window").visible);
         assert_eq!(model.active_window, Some(quick_id));
 
