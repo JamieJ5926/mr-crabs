@@ -212,20 +212,20 @@ impl PaneSession {
         cell_px: (u16, u16),
         output_wake: Option<OutputWake>,
     ) -> Result<Self, PtyError> {
-        use std::ffi::OsString;
         let resolved_shell = CommandBuilder::discover_shell(config.shell.as_deref());
         let mut command = if config
             .startup_command
             .as_ref()
             .is_some_and(|s| !s.is_empty())
         {
-            let fragment = config.startup_command.as_deref().unwrap().to_string();
-            let mut c = CommandBuilder::new("/bin/sh");
-            c.arg("-c")
-                .arg("( eval \"$1\" ); exec \"$0\"")
-                .arg(OsString::from(&resolved_shell))
-                .arg(fragment);
-            c
+            let argv = mr_crabs_pty::command::startup_shell_argv(
+                resolved_shell.as_os_str(),
+                config.startup_command.as_deref().unwrap(),
+            );
+            let mut argv = argv.into_iter();
+            let mut command = CommandBuilder::new(argv.next().expect("startup argv executable"));
+            command.args(argv);
+            command
         } else {
             CommandBuilder::new(&resolved_shell)
         };

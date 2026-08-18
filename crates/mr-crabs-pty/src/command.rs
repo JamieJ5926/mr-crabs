@@ -34,6 +34,34 @@ pub const DEFAULT_TERM: &str = "xterm-256color";
 /// Final fallback shell when no other discovery source yields one.
 pub const DEFAULT_SHELL: &str = "/bin/sh";
 
+/// POSIX launcher used to run a startup fragment before replacing itself with
+/// the user's interactive shell on the same PTY.
+pub const STARTUP_SHELL_LAUNCHER: &str = "/bin/sh";
+
+/// Positional-argument script for [`startup_shell_argv`]. The fragment is
+/// evaluated in a subshell so failure never prevents the interactive shell
+/// from starting; `exec` then leaves interactive programs attached directly
+/// to the original PTY.
+pub const STARTUP_SHELL_SCRIPT: &str = "( eval \"$1\" ); exec \"$0\"";
+
+/// Build the reusable argv contract for a pre-shell startup fragment.
+///
+/// The returned vector includes the executable at index zero and preserves
+/// non-UTF-8 shell paths and fragments as [`OsString`] values. PTY hosts own
+/// the actual spawn and may adapt this argv to their process API.
+pub fn startup_shell_argv(
+    shell: impl Into<OsString>,
+    fragment: impl Into<OsString>,
+) -> Vec<OsString> {
+    vec![
+        OsString::from(STARTUP_SHELL_LAUNCHER),
+        OsString::from("-c"),
+        OsString::from(STARTUP_SHELL_SCRIPT),
+        shell.into(),
+        fragment.into(),
+    ]
+}
+
 /// A fully materialized command ready to be spawned by the platform layer.
 ///
 /// `envs` is the complete child environment (merged parent env when
@@ -307,7 +335,7 @@ fn passwd_shell() -> Option<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::os::unix::ffi::OsStrExt;
+    use std::os::unix::ffi::{OsStrExt, OsStringExt};
 
     /// Creates a scratch file that certainly exists, with a caller-unique
     /// name so parallel test runs cannot collide.
@@ -315,6 +343,30 @@ mod tests {
         let file = format!("mr-crabs-pty-{}-{name}", std::process::id());
         std::fs::write(std::env::temp_dir().join(&file), b"").expect("write scratch file");
         std::env::temp_dir().join(file)
+    }
+
+    #[test]
+    fn startup_shell_argv_has_exact_same_pty_contract() {
+        let argv = startup_shell_argv("/bin/zsh", "rustfetch");
+        assert_eq!(
+            argv,
+            vec![
+                OsString::from("/bin/sh"),
+                OsString::from("-c"),
+                OsString::from("( eval \"$1\" ); exec \"$0\""),
+                OsString::from("/bin/zsh"),
+                OsString::from("rustfetch"),
+            ]
+        );
+    }
+
+    #[test]
+    fn startup_shell_argv_preserves_non_utf8_values() {
+        let shell = OsString::from_vec(vec![b'/', b'x', 0xff]);
+        let fragment = OsString::from_vec(vec![b'f', 0xfe]);
+        let argv = startup_shell_argv(shell.clone(), fragment.clone());
+        assert_eq!(argv[3].as_bytes(), shell.as_bytes());
+        assert_eq!(argv[4].as_bytes(), fragment.as_bytes());
     }
 
     #[test]
