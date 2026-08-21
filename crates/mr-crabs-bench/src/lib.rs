@@ -1,3 +1,5 @@
+pub mod termbench;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug)]
