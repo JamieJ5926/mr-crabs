@@ -866,6 +866,24 @@ pub struct PaneModel {
     /// reader data and never rebuilds a success frame.
     terminal_error: Option<TerminalError>,
 }
+fn drain_graphics_responses(
+    queue: &mut std::collections::VecDeque<Vec<u8>>,
+    session: &mut PaneSession,
+) -> bool {
+    while let Some(front) = queue.front() {
+        match session.write(front) {
+            Ok(()) => {
+                queue.pop_front();
+            }
+            Err(WriteError::Full) => return true,
+            Err(_) => {
+                queue.clear();
+                return false;
+            }
+        }
+    }
+    false
+}
 
 impl PaneModel {
     fn from_parts(
@@ -1521,19 +1539,6 @@ impl PaneModel {
         for response in responses.drain(..) {
             self.pending_graphics_responses.push_back(response);
         }
-        let drain_pending =
-            |queue: &mut std::collections::VecDeque<Vec<u8>>, session: &mut PaneSession| -> bool {
-                let mut backpressured = false;
-                while let Some(front) = queue.front() {
-                    if session.write(front).is_ok() {
-                        queue.pop_front();
-                    } else {
-                        backpressured = true;
-                        break;
-                    }
-                }
-                backpressured
-            };
         // Fail-closed: a TerminalError from the scanned feed means the failed
         // chunk was consumed/dropped (no requeue; FEED_SLICE partial commits
         // would double-feed) and not counted. Do not rebuild a success frame.
@@ -1541,7 +1546,7 @@ impl PaneModel {
             if self.terminal_error.is_none() {
                 self.terminal_error = Some(err);
             }
-            if drain_pending(&mut self.pending_graphics_responses, &mut self.session) {
+            if drain_graphics_responses(&mut self.pending_graphics_responses, &mut self.session) {
                 stats.pending = true;
             }
             let replies = self.protocol_sink.drain_pty_replies();
@@ -1567,7 +1572,7 @@ impl PaneModel {
             self.refresh_graphics_context();
             return stats;
         }
-        if drain_pending(&mut self.pending_graphics_responses, &mut self.session) {
+        if drain_graphics_responses(&mut self.pending_graphics_responses, &mut self.session) {
             stats.pending = true;
         }
         let replies = self.protocol_sink.drain_pty_replies();
@@ -2260,6 +2265,25 @@ mod tests {
         pane.lifecycle = PtyLifecycle::Detached;
         pane.rebuild_frame();
         (pane, reader_tx, writer_rx)
+    }
+    #[test]
+    fn graphics_response_retry_stops_when_writer_closes() {
+        let (writer_tx, writer_rx) = sync_channel::<Vec<u8>>(1);
+        writer_tx.send(vec![0]).expect("fill writer queue");
+        let mut session = PaneSession::from_receivers_with_writer(
+            GridSize::new(80, 24),
+            None,
+            None,
+            Some(writer_tx),
+        );
+        let mut responses = std::collections::VecDeque::from([vec![1]]);
+
+        assert!(drain_graphics_responses(&mut responses, &mut session));
+        assert_eq!(responses.front(), Some(&vec![1]));
+
+        drop(writer_rx);
+        assert!(!drain_graphics_responses(&mut responses, &mut session));
+        assert!(responses.is_empty());
     }
 
     #[test]
