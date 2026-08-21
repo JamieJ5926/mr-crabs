@@ -167,7 +167,11 @@ pub fn viewport_row<R: HistoryRead + ?Sized>(
 /// The live path only stamps metadata; it does not take another terminal
 /// snapshot. Alternate-screen detection is synchronized before reading the
 /// effective offset, so primary history is never projected behind it.
-pub fn project_frame(terminal: &mut Terminal, viewport: &mut Viewport, frame: &mut FrameDelta) -> Result<(), TerminalError> {
+pub fn project_frame(
+    terminal: &mut Terminal,
+    viewport: &mut Viewport,
+    frame: &mut FrameDelta,
+) -> Result<(), TerminalError> {
     let history_lines = terminal.history_len();
     viewport.sync_screen(terminal.has_mode(TerminalMode::AltScreen), history_lines);
     frame.viewport = TerminalViewport {
@@ -476,7 +480,9 @@ mod tests {
         // lines (feeds 3-5).
         for i in 0..5 {
             term.feed(format!("L{i:04}abc\r\n").as_bytes())
-                .unwrap_or_else(|error| panic!("viewport hot/cold fixture feed should succeed for L{i:04}abc: {error}"));
+                .unwrap_or_else(|error| {
+                    panic!("viewport hot/cold fixture feed should succeed for L{i:04}abc: {error}")
+                });
         }
         let snap = snapshot_for(&term);
         assert_eq!(term.history_len(), 3, "three lines scrolled out");
@@ -523,7 +529,9 @@ mod tests {
         // character, and scroll two rows per feed.
         for i in 0..4 {
             term.feed(format!("W{i}xxx\r\n").as_bytes())
-                .unwrap_or_else(|error| panic!("viewport resize fixture feed should succeed for W{i}xxx: {error}"));
+                .unwrap_or_else(|error| {
+                    panic!("viewport resize fixture feed should succeed for W{i}xxx: {error}")
+                });
         }
         let narrow = term.history_len();
         // Four one-row feeds on a two-row grid: feeds 2-4 each scroll one

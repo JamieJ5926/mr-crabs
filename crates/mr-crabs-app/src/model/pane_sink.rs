@@ -202,9 +202,12 @@ mod tests {
         let (mut left, left_rx) = pane_with_writer(1, size);
         let (mut right, right_rx) = pane_with_writer(2, size);
 
-        left.feed_test_output(b"\x1b[c\x1bP+q544E\x1b\\").expect("pane_sink fixture feed should succeed");
+        left.feed_test_output(b"\x1b[c\x1bP+q544E\x1b\\")
+            .expect("pane_sink fixture feed should succeed");
         left.pump(64);
-        right.feed_test_output(b"\x1b[5n").expect("pane_sink fixture feed should succeed");
+        right
+            .feed_test_output(b"\x1b[5n")
+            .expect("pane_sink fixture feed should succeed");
         right.pump(64);
 
         let left_bytes = take_writes(&left_rx);
@@ -264,9 +267,12 @@ mod tests {
             })
         );
 
-        pane.feed_test_output(b"\x1b[18t\x1b[").expect("pane_sink fixture feed should succeed");
-        pane.feed_test_output(b"16").expect("pane_sink fixture feed should succeed");
-        pane.feed_test_output(b"t\x1b[14t").expect("pane_sink fixture feed should succeed");
+        pane.feed_test_output(b"\x1b[18t\x1b[")
+            .expect("pane_sink fixture feed should succeed");
+        pane.feed_test_output(b"16")
+            .expect("pane_sink fixture feed should succeed");
+        pane.feed_test_output(b"t\x1b[14t")
+            .expect("pane_sink fixture feed should succeed");
         pane.pump(64);
         let bytes = take_writes(&rx);
         assert!(

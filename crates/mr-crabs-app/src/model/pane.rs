@@ -793,7 +793,10 @@ fn surface_pixels(cells: u16, measured: Option<f32>, rounded: u16) -> u32 {
 /// requests are applied by feeding CSI through the engine (inline, so
 /// subsequent stream bytes see the moved cursor), and protocol responses
 /// are queued for the session write after the drain pass.
-fn apply_graphics_effects(parts: &mut FeedParts<'_>, overlay: &mut GraphicsOverlay) -> Result<(), TerminalError> {
+fn apply_graphics_effects(
+    parts: &mut FeedParts<'_>,
+    overlay: &mut GraphicsOverlay,
+) -> Result<(), TerminalError> {
     for (rows, col) in overlay.drain_cursor_moves() {
         feed_cursor_move(parts.core, rows, col)?;
     }
@@ -1517,18 +1520,19 @@ impl PaneModel {
         for response in responses.drain(..) {
             self.pending_graphics_responses.push_back(response);
         }
-        let drain_pending = |queue: &mut std::collections::VecDeque<Vec<u8>>, session: &mut PaneSession| -> bool {
-            let mut backpressured = false;
-            while let Some(front) = queue.front() {
-                if session.write(front).is_ok() {
-                    queue.pop_front();
-                } else {
-                    backpressured = true;
-                    break;
+        let drain_pending =
+            |queue: &mut std::collections::VecDeque<Vec<u8>>, session: &mut PaneSession| -> bool {
+                let mut backpressured = false;
+                while let Some(front) = queue.front() {
+                    if session.write(front).is_ok() {
+                        queue.pop_front();
+                    } else {
+                        backpressured = true;
+                        break;
+                    }
                 }
-            }
-            backpressured
-        };
+                backpressured
+            };
         // Fail-closed: a TerminalError from the scanned feed means the failed
         // chunk was consumed/dropped (no requeue; FEED_SLICE partial commits
         // would double-feed) and not counted. Do not rebuild a success frame.
@@ -1834,8 +1838,7 @@ mod tests {
         if !PathBuf::from("/bin/zsh").is_file() {
             return;
         }
-        let tmp =
-            std::env::temp_dir().join(format!("mr-crabs-zsh-resize-{}", std::process::id()));
+        let tmp = std::env::temp_dir().join(format!("mr-crabs-zsh-resize-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&tmp);
         std::fs::create_dir_all(&tmp).expect("tmpdir");
         std::fs::write(tmp.join(".zshrc"), "PROMPT='PROMPT_MARKER> '\n").expect("write zshrc");
@@ -2210,7 +2213,8 @@ mod tests {
     fn pane_pump_feeds_terminal_and_publishes_frame() {
         let mut pane = PaneModel::detached(PaneId::new(1), GridSize::new(80, 24)).expect("pane");
         assert!(pane.frame().is_none());
-        pane.feed_test_output(b"hi").expect("pane fixture feed should succeed");
+        pane.feed_test_output(b"hi")
+            .expect("pane fixture feed should succeed");
         let frame = pane.frame().expect("frame after feed");
         assert_eq!(frame.size, GridSize::new(80, 24));
         assert_eq!(pane.core.terminal_snapshot().size, GridSize::new(80, 24));
@@ -2396,7 +2400,8 @@ mod tests {
     #[test]
     fn user_selection_projects_across_history_and_visible_rows_and_copies() {
         let mut pane = PaneModel::detached(PaneId::new(1), GridSize::new(5, 2)).expect("pane");
-        pane.feed_test_output(b"old1\r\nold2\r\nlive!").expect("pane fixture feed should succeed");
+        pane.feed_test_output(b"old1\r\nold2\r\nlive!")
+            .expect("pane fixture feed should succeed");
         assert_eq!(pane.core.terminal.history_len(), 1);
         pane.scroll_viewport_up(1);
         pane.begin_selection(0, 0, SelectionGesture::Cell);
@@ -2411,7 +2416,8 @@ mod tests {
     #[test]
     fn viewport_frame_metadata_pins_scrollback_and_tracks_alternate_screen() {
         let mut pane = PaneModel::detached(PaneId::new(1), GridSize::new(5, 2)).expect("pane");
-        pane.feed_test_output(b"old1\r\nold2\r\nlive!").expect("pane fixture feed should succeed");
+        pane.feed_test_output(b"old1\r\nold2\r\nlive!")
+            .expect("pane fixture feed should succeed");
         let history_before = pane.core.terminal.history_len();
         assert_eq!(history_before, 1);
         let live = pane.frame().expect("live frame");
@@ -2432,7 +2438,8 @@ mod tests {
             "old1"
         );
 
-        pane.feed_test_output(b"\r\nnext").expect("pane fixture feed should succeed");
+        pane.feed_test_output(b"\r\nnext")
+            .expect("pane fixture feed should succeed");
         let history_after = pane.core.terminal.history_len();
         assert!(history_after > history_before);
         assert_eq!(
@@ -2458,7 +2465,8 @@ mod tests {
         );
 
         let saved_primary_offset = pane.viewport_offset();
-        pane.feed_test_output(b"\x1b[?1049hALT").expect("pane fixture feed should succeed");
+        pane.feed_test_output(b"\x1b[?1049hALT")
+            .expect("pane fixture feed should succeed");
         let alternate = pane.frame().expect("alternate frame");
         assert!(alternate.viewport.alternate_screen);
         assert_eq!(alternate.viewport.scroll_offset, 0);
@@ -2467,7 +2475,8 @@ mod tests {
         pane.scroll_viewport_down(usize::MAX);
         assert_eq!(pane.viewport_offset(), 0, "alternate scrolling is isolated");
 
-        pane.feed_test_output(b"\x1b[?1049l").expect("pane fixture feed should succeed");
+        pane.feed_test_output(b"\x1b[?1049l")
+            .expect("pane fixture feed should succeed");
         let primary = pane.frame().expect("primary frame");
         assert!(!primary.viewport.alternate_screen);
         assert_eq!(pane.viewport_offset(), saved_primary_offset);
@@ -2486,7 +2495,8 @@ mod tests {
     #[test]
     fn search_selects_visible_match_and_sets_selection() {
         let mut pane = PaneModel::detached(PaneId::new(1), GridSize::new(80, 24)).expect("pane");
-        pane.feed_test_output(b"alpha\r\nbeta\r\nalpha\r\n").expect("pane fixture feed should succeed");
+        pane.feed_test_output(b"alpha\r\nbeta\r\nalpha\r\n")
+            .expect("pane fixture feed should succeed");
         assert_eq!(
             pane.search(b"alpha", true),
             SearchApply::Selected { line: 2, col: 0 }
@@ -2501,7 +2511,8 @@ mod tests {
     #[test]
     fn search_next_wraps_and_previous_goes_back() {
         let mut pane = PaneModel::detached(PaneId::new(1), GridSize::new(80, 24)).expect("pane");
-        pane.feed_test_output(b"alpha\r\nbeta\r\nalpha\r\n").expect("pane fixture feed should succeed");
+        pane.feed_test_output(b"alpha\r\nbeta\r\nalpha\r\n")
+            .expect("pane fixture feed should succeed");
         assert_eq!(
             pane.search(b"alpha", true),
             SearchApply::Selected { line: 2, col: 0 }
@@ -2523,7 +2534,8 @@ mod tests {
     #[test]
     fn search_no_match_and_empty_needle_clear_selection() {
         let mut pane = PaneModel::detached(PaneId::new(1), GridSize::new(80, 24)).expect("pane");
-        pane.feed_test_output(b"alpha\n").expect("pane fixture feed should succeed");
+        pane.feed_test_output(b"alpha\n")
+            .expect("pane fixture feed should succeed");
         assert_eq!(pane.search(b"zzz", true), SearchApply::NoMatch);
         assert!(!pane.search.active);
         assert_eq!(pane.search(b"", true), SearchApply::NoNeedle);
@@ -2536,7 +2548,8 @@ mod tests {
         let mut pane = PaneModel::detached(PaneId::new(1), GridSize::new(10, 3)).expect("pane");
         // Scroll 6 lines through a 3-row grid: 4 lines land in history
         // (the trailing newline also scrolls the cursor line into view).
-        pane.feed_test_output(b"a\nb\nc\nd\ne\nf\n").expect("pane fixture feed should succeed");
+        pane.feed_test_output(b"a\nb\nc\nd\ne\nf\n")
+            .expect("pane fixture feed should succeed");
         assert_eq!(pane.core.terminal.history_len(), 4);
         // The oldest match is in history; the viewport scrolls to show it.
         assert_eq!(
@@ -2561,7 +2574,8 @@ mod tests {
         for _ in 0..4_200 {
             output.extend_from_slice(b"filler\r\n");
         }
-        pane.feed_test_output(&output).expect("pane fixture feed should succeed");
+        pane.feed_test_output(&output)
+            .expect("pane fixture feed should succeed");
         assert!(pane.core.terminal.history_len() > SEARCH_SLICE_BUDGET);
         assert_eq!(pane.search(b"needle", true), SearchApply::Searching);
         assert!(pane.search.pending.is_some());
@@ -2733,7 +2747,8 @@ mod tests {
     #[test]
     fn frame_search_matches_emits_all_visible_sorted_half_open() {
         let mut pane = PaneModel::detached(PaneId::new(1), GridSize::new(20, 4)).expect("pane");
-        pane.feed_test_output(b"alpha\r\nbeta\r\nalpha\r\ngamma").expect("pane fixture feed should succeed");
+        pane.feed_test_output(b"alpha\r\nbeta\r\nalpha\r\ngamma")
+            .expect("pane fixture feed should succeed");
         assert_eq!(
             pane.search(b"alpha", true),
             SearchApply::Selected { line: 2, col: 0 }
@@ -2768,7 +2783,8 @@ mod tests {
     #[test]
     fn frame_search_matches_clips_and_omits_when_scrolled() {
         let mut pane = PaneModel::detached(PaneId::new(1), GridSize::new(10, 3)).expect("pane");
-        pane.feed_test_output(b"zero\r\none\r\ntwo\r\nthree\r\nfour\r\nfive\r\n").expect("pane fixture feed should succeed");
+        pane.feed_test_output(b"zero\r\none\r\ntwo\r\nthree\r\nfour\r\nfive\r\n")
+            .expect("pane fixture feed should succeed");
         let history = pane.core.terminal.history_len();
         assert!(history >= 2);
         pane.viewport.scroll_up(1, history);
@@ -2821,7 +2837,8 @@ mod tests {
     #[test]
     fn selection_kind_block_is_rectangular_others_linear() {
         let mut pane = PaneModel::detached(PaneId::new(1), GridSize::new(10, 3)).expect("pane");
-        pane.feed_test_output(b"hello world\r\nsecond line\r\nthird line").expect("pane fixture feed should succeed");
+        pane.feed_test_output(b"hello world\r\nsecond line\r\nthird line")
+            .expect("pane fixture feed should succeed");
         pane.begin_selection(0, 0, SelectionGesture::Block);
         pane.update_selection(1, 2);
         assert_eq!(
@@ -2844,7 +2861,8 @@ mod tests {
         );
         pane.clear_selection();
         // Search fallback is linear.
-        pane.feed_test_output(b"\r\nalpha").expect("pane fixture feed should succeed");
+        pane.feed_test_output(b"\r\nalpha")
+            .expect("pane fixture feed should succeed");
         pane.search(b"alpha", true);
         assert_eq!(
             pane.frame().expect("frame").selection.kind,
@@ -2867,7 +2885,9 @@ mod tests {
         assert_eq!(frame.hyperlinks[0].uri, "https://example.com");
         // Unlinked pane has no hyperlinks.
         let mut plain = PaneModel::detached(PaneId::new(2), GridSize::new(40, 3)).expect("pane");
-        plain.feed_test_output(b"plain text no links").expect("pane fixture feed should succeed");
+        plain
+            .feed_test_output(b"plain text no links")
+            .expect("pane fixture feed should succeed");
         assert!(plain.frame().expect("frame").hyperlinks.is_empty());
     }
     #[test]
@@ -2895,7 +2915,8 @@ mod tests {
     #[test]
     fn frame_hyperlinks_alternate_screen_maps_to_viewport_rows() {
         let mut pane = PaneModel::detached(PaneId::new(1), GridSize::new(40, 3)).expect("pane");
-        pane.feed_test_output(b"\x1b[?1049h").expect("pane fixture feed should succeed");
+        pane.feed_test_output(b"\x1b[?1049h")
+            .expect("pane fixture feed should succeed");
         pane.feed_test_output(b"\x1b]8;;https://example.com/alt\x07altlink\x1b]8;;\x07")
             .expect("pane fixture feed should succeed");
         let frame = pane.frame().expect("frame");

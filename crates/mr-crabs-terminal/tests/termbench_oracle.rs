@@ -114,7 +114,11 @@ fn term_81x25() -> Terminal {
     Terminal::new(GridSize::new(81, 25)).unwrap()
 }
 
-fn style_at(snap: &mr_crabs_terminal::NormalizedSnapshot, row: u16, col: u16) -> mr_crabs_terminal::Style {
+fn style_at(
+    snap: &mr_crabs_terminal::NormalizedSnapshot,
+    row: u16,
+    col: u16,
+) -> mr_crabs_terminal::Style {
     let cols = usize::from(snap.size.cols);
     let idx = usize::from(row) * cols + usize::from(col);
     let cell = &snap.cells[idx];
@@ -130,7 +134,8 @@ fn termbench_fg_small_compacts_without_overflow() {
     cfg.max_lines = 0;
     term.set_scrollback_config(cfg);
     for f in 0..SMALL_FRAMES as u32 {
-        term.feed(&frame_payload(false, f)).expect("terminal feed must succeed without overflow after compaction");
+        term.feed(&frame_payload(false, f))
+            .expect("terminal feed must succeed without overflow after compaction");
     }
     let last = (SMALL_FRAMES - 1) as u32;
     let snap = term.snapshot();
@@ -138,7 +143,10 @@ fn termbench_fg_small_compacts_without_overflow() {
         let cols = usize::from(snap.size.cols);
         let idx = usize::from(y) * cols + usize::from(x);
         let cell = &snap.cells[idx];
-        assert!(!cell.is_default(), "sampled cell should be non-default at {y},{x}");
+        assert!(
+            !cell.is_default(),
+            "sampled cell should be non-default at {y},{x}"
+        );
         assert_eq!(
             cell.content as u8,
             expected_char(last, y as u32, x as u32),
@@ -146,7 +154,11 @@ fn termbench_fg_small_compacts_without_overflow() {
         );
         let resolved = style_at(&snap, y, x);
         let exp_fg = expected_fg_rgb(last, y as u32, x as u32);
-        assert_eq!(resolved.foreground, NormalizedColor::Rgb(exp_fg), "FG mismatch at {y},{x} frame {last}");
+        assert_eq!(
+            resolved.foreground,
+            NormalizedColor::Rgb(exp_fg),
+            "FG mismatch at {y},{x} frame {last}"
+        );
         assert_eq!(
             resolved.background,
             NormalizedColor::Named(NamedColorValue::Background),
@@ -164,7 +176,8 @@ fn termbench_fgbg_small_compacts_without_overflow() {
     cfg.max_lines = 0;
     term.set_scrollback_config(cfg);
     for f in 0..SMALL_FRAMES as u32 {
-        term.feed(&frame_payload(true, f)).expect("terminal feed must succeed without overflow after compaction");
+        term.feed(&frame_payload(true, f))
+            .expect("terminal feed must succeed without overflow after compaction");
     }
     let last = (SMALL_FRAMES - 1) as u32;
     let snap = term.snapshot();
@@ -172,11 +185,22 @@ fn termbench_fgbg_small_compacts_without_overflow() {
         let cols = usize::from(snap.size.cols);
         let idx = usize::from(y) * cols + usize::from(x);
         let cell = &snap.cells[idx];
-        assert!(!cell.is_default(), "FGBG cell should be non-default at {y},{x}");
+        assert!(
+            !cell.is_default(),
+            "FGBG cell should be non-default at {y},{x}"
+        );
         assert_eq!(cell.content as u8, expected_char(last, y as u32, x as u32));
         let resolved = style_at(&snap, y, x);
-        assert_eq!(resolved.foreground, NormalizedColor::Rgb(expected_fg_rgb(last, y as u32, x as u32)), "FGBG FG mismatch at {y},{x}");
-        assert_eq!(resolved.background, NormalizedColor::Rgb(expected_bg_rgb(last, y as u32, x as u32)), "FGBG BG mismatch at {y},{x}");
+        assert_eq!(
+            resolved.foreground,
+            NormalizedColor::Rgb(expected_fg_rgb(last, y as u32, x as u32)),
+            "FGBG FG mismatch at {y},{x}"
+        );
+        assert_eq!(
+            resolved.background,
+            NormalizedColor::Rgb(expected_bg_rgb(last, y as u32, x as u32)),
+            "FGBG BG mismatch at {y},{x}"
+        );
     }
 }
 
@@ -198,7 +222,10 @@ fn termbench_sampled_oracle_short_prefix() {
         let cols = usize::from(snap.size.cols);
         let idx = usize::from(y) * cols + usize::from(x);
         let cell = &snap.cells[idx];
-        assert!(!cell.is_default(), "sampled cell should be non-default at {y},{x}");
+        assert!(
+            !cell.is_default(),
+            "sampled cell should be non-default at {y},{x}"
+        );
         assert_eq!(
             cell.content as u8,
             expected_char(last, y as u32, x as u32),
@@ -206,7 +233,11 @@ fn termbench_sampled_oracle_short_prefix() {
         );
         let resolved = style_at(&snap, y, x);
         let exp_fg = expected_fg_rgb(last, y as u32, x as u32);
-        assert_eq!(resolved.foreground, NormalizedColor::Rgb(exp_fg), "FG mismatch at {y},{x} frame {last}");
+        assert_eq!(
+            resolved.foreground,
+            NormalizedColor::Rgb(exp_fg),
+            "FG mismatch at {y},{x} frame {last}"
+        );
         // FGPerChar keeps default background.
         assert_eq!(
             resolved.background,
@@ -228,11 +259,22 @@ fn termbench_sampled_oracle_short_prefix() {
         let cols = usize::from(snap2.size.cols);
         let idx = usize::from(y) * cols + usize::from(x);
         let cell = &snap2.cells[idx];
-        assert!(!cell.is_default(), "FGBG cell should be non-default at {y},{x}");
+        assert!(
+            !cell.is_default(),
+            "FGBG cell should be non-default at {y},{x}"
+        );
         assert_eq!(cell.content as u8, expected_char(last, y as u32, x as u32));
         let resolved = style_at(&snap2, y, x);
-        assert_eq!(resolved.foreground, NormalizedColor::Rgb(expected_fg_rgb(last, y as u32, x as u32)), "FGBG FG mismatch at {y},{x}");
-        assert_eq!(resolved.background, NormalizedColor::Rgb(expected_bg_rgb(last, y as u32, x as u32)), "FGBG BG mismatch at {y},{x}");
+        assert_eq!(
+            resolved.foreground,
+            NormalizedColor::Rgb(expected_fg_rgb(last, y as u32, x as u32)),
+            "FGBG FG mismatch at {y},{x}"
+        );
+        assert_eq!(
+            resolved.background,
+            NormalizedColor::Rgb(expected_bg_rgb(last, y as u32, x as u32)),
+            "FGBG BG mismatch at {y},{x}"
+        );
     }
 }
 
@@ -246,20 +288,28 @@ fn termbench_cells_per_frame_and_counts_are_pinned() {
     assert_eq!(SMALL_FRAMES, 512);
     assert_eq!(NORMAL_FRAMES, 8192);
     // Inclusive ranges: X=0..=80 (81 cols), Y=0..=24 (25 rows).
-    assert_eq!((0..=WIDTH_INCLUSIVE).count() * (0..=HEIGHT_INCLUSIVE).count(), CELLS_PER_FRAME);
+    assert_eq!(
+        (0..=WIDTH_INCLUSIVE).count() * (0..=HEIGHT_INCLUSIVE).count(),
+        CELLS_PER_FRAME
+    );
 }
 
 #[test]
 fn termbench_alternate_screen_round_trips_short_payload() {
     let mut term = term_81x25();
     // Seed primary with a known cell so we can verify restoration.
-    term.feed(b"\x1b[38;2;255;0;0m\x1b[1;1HX").expect("terminal feed");
+    term.feed(b"\x1b[38;2;255;0;0m\x1b[1;1HX")
+        .expect("terminal feed");
     let primary_snap = term.snapshot();
     let primary_cell = primary_snap.cells[0];
     let primary_style = primary_snap.styles[usize::from(primary_cell.style)].clone();
 
     term.feed(b"\x1b[?1049h").expect("terminal feed");
-    assert!(term.snapshot().modes.contains(&mr_crabs_terminal::TerminalMode::AltScreen));
+    assert!(
+        term.snapshot()
+            .modes
+            .contains(&mr_crabs_terminal::TerminalMode::AltScreen)
+    );
     for f in 0..4u32 {
         term.feed(&frame_payload(false, f)).expect("terminal feed");
     }
@@ -267,19 +317,36 @@ fn termbench_alternate_screen_round_trips_short_payload() {
     let alt_snap = term.snapshot();
     let expected = expected_char(3, 0, 0);
     let alt_cell = &alt_snap.cells[0];
-    assert_eq!(alt_cell.content as u8, expected, "alt screen char should reflect last alt frame");
+    assert_eq!(
+        alt_cell.content as u8, expected,
+        "alt screen char should reflect last alt frame"
+    );
     let alt_style = &alt_snap.styles[usize::from(alt_cell.style)];
-    assert_eq!(alt_style.foreground, NormalizedColor::Rgb(expected_fg_rgb(3, 0, 0)));
+    assert_eq!(
+        alt_style.foreground,
+        NormalizedColor::Rgb(expected_fg_rgb(3, 0, 0))
+    );
 
     term.feed(b"\x1b[?1049l").expect("terminal feed");
-    assert!(!term.snapshot().modes.contains(&mr_crabs_terminal::TerminalMode::AltScreen));
+    assert!(
+        !term
+            .snapshot()
+            .modes
+            .contains(&mr_crabs_terminal::TerminalMode::AltScreen)
+    );
     let restored = term.snapshot();
     assert_eq!(restored.size, GridSize::new(81, 25));
     // Primary content must be restored exactly.
     let restored_cell = &restored.cells[0];
-    assert_eq!(restored_cell.content, primary_cell.content, "primary cell content should round-trip through alt screen");
+    assert_eq!(
+        restored_cell.content, primary_cell.content,
+        "primary cell content should round-trip through alt screen"
+    );
     let restored_style = &restored.styles[usize::from(restored_cell.style)];
-    assert_eq!(*restored_style, primary_style, "primary style should round-trip through alt screen");
+    assert_eq!(
+        *restored_style, primary_style,
+        "primary style should round-trip through alt screen"
+    );
 }
 
 #[test]
@@ -299,7 +366,11 @@ fn termbench_saved_pen_and_reset_is_stable() {
     let q_cell = &snap.cells[1]; // row 0 col 1
     assert_eq!(q_cell.content as u8, b'Q');
     let q_style = &snap.styles[usize::from(q_cell.style)];
-    assert_eq!(q_style.foreground, NormalizedColor::Rgb([10, 20, 30]), "saved pen FG should restore after termbench churn");
+    assert_eq!(
+        q_style.foreground,
+        NormalizedColor::Rgb([10, 20, 30]),
+        "saved pen FG should restore after termbench churn"
+    );
     // Explicit reset must clear to default.
     term.feed(b"\x1b[0m").expect("terminal feed");
     term.feed(b"\x1b[1;3H").expect("terminal feed");
@@ -308,8 +379,14 @@ fn termbench_saved_pen_and_reset_is_stable() {
     let r_cell = &snap2.cells[2];
     assert_eq!(r_cell.content as u8, b'R');
     let r_style = &snap2.styles[usize::from(r_cell.style)];
-    assert_eq!(r_style.foreground, NormalizedColor::Named(NamedColorValue::Foreground));
-    assert_eq!(r_style.background, NormalizedColor::Named(NamedColorValue::Background));
+    assert_eq!(
+        r_style.foreground,
+        NormalizedColor::Named(NamedColorValue::Foreground)
+    );
+    assert_eq!(
+        r_style.background,
+        NormalizedColor::Named(NamedColorValue::Background)
+    );
 }
 
 #[test]
@@ -323,7 +400,10 @@ fn termbench_hot_history_drain_is_overflow_safe_for_short_payload() {
     }
     // Drain without re-enqueue: hot pages remain bounded.
     term.drain_compression();
-    assert!(term.history_len() < 100_000, "history must remain bounded after short payload");
+    assert!(
+        term.history_len() < 100_000,
+        "history must remain bounded after short payload"
+    );
     // Visible grid must remain exact after drain.
     let snap = term.snapshot();
     let last = 7u32;
@@ -333,7 +413,10 @@ fn termbench_hot_history_drain_is_overflow_safe_for_short_payload() {
         let cell = &snap.cells[idx];
         assert_eq!(cell.content as u8, expected_char(last, y as u32, x as u32));
         let style = &snap.styles[usize::from(cell.style)];
-        assert_eq!(style.foreground, NormalizedColor::Rgb(expected_fg_rgb(last, y as u32, x as u32)));
+        assert_eq!(
+            style.foreground,
+            NormalizedColor::Rgb(expected_fg_rgb(last, y as u32, x as u32))
+        );
     }
     // History reads must not corrupt or panic (termbench itself does not scroll,
     // so history may be empty — the check is that reads are safe).
@@ -364,8 +447,16 @@ fn termbench_cold_history_round_trips_short_payload() {
         let cols = usize::from(snap.size.cols);
         let idx = usize::from(y) * cols + usize::from(x);
         let cell = &snap.cells[idx];
-        assert_eq!(cell.content as u8, expected_char(last, y as u32, x as u32), "char should survive cold round-trip at {y},{x}");
+        assert_eq!(
+            cell.content as u8,
+            expected_char(last, y as u32, x as u32),
+            "char should survive cold round-trip at {y},{x}"
+        );
         let style = &snap.styles[usize::from(cell.style)];
-        assert_eq!(style.foreground, NormalizedColor::Rgb(expected_fg_rgb(last, y as u32, x as u32)), "FG should survive cold round-trip at {y},{x}");
+        assert_eq!(
+            style.foreground,
+            NormalizedColor::Rgb(expected_fg_rgb(last, y as u32, x as u32)),
+            "FG should survive cold round-trip at {y},{x}"
+        );
     }
 }

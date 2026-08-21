@@ -375,13 +375,12 @@ impl CompactEngine {
         let mut cells = Vec::with_capacity(cols * rows);
         for row in self.screen().active.iter() {
             for col in 0..cols {
-                let mut cell = if col < usize::from(row.first_occupied)
-                    || col >= usize::from(row.occupancy)
-                {
-                    Cell::default()
-                } else {
-                    row.cells[col]
-                };
+                let mut cell =
+                    if col < usize::from(row.first_occupied) || col >= usize::from(row.occupancy) {
+                        Cell::default()
+                    } else {
+                        row.cells[col]
+                    };
                 cell.flags &= !flags::COMBINING;
                 cells.push(cell);
             }
@@ -403,8 +402,6 @@ impl CompactEngine {
     pub(crate) fn style_epoch(&self) -> u64 {
         self.styles.epoch()
     }
-
-
 
     pub(crate) fn stage_style_remap(
         &self,
@@ -532,10 +529,7 @@ impl CompactEngine {
         // Row generations already bumped in staged rows where backing changed.
     }
 
-    pub(crate) fn collect_live_style_ids(
-        &self,
-        out: &mut std::collections::BTreeSet<u16>,
-    ) {
+    pub(crate) fn collect_live_style_ids(&self, out: &mut std::collections::BTreeSet<u16>) {
         out.insert(self.pen.style);
         out.insert(self.primary.saved.pen.style);
         out.insert(self.alternate.saved.pen.style);
@@ -731,7 +725,6 @@ impl CompactEngine {
         self.apply_visible_grid(cells, combining_marks, hyperlinks);
         Ok(())
     }
-
 
     pub fn restore_cursor(&mut self, cursor: CursorSnapshot) -> Result<(), TerminalError> {
         if cursor.row >= self.size.rows || cursor.col >= self.size.cols {
@@ -1375,10 +1368,11 @@ pub(crate) struct EngineCensusDiag {
 }
 
 impl CompactEngine {
-
     #[cfg(test)]
     #[inline]
-    fn occupied_range_from_metadata(row: &crate::compact::row::CompactRow) -> std::ops::Range<usize> {
+    fn occupied_range_from_metadata(
+        row: &crate::compact::row::CompactRow,
+    ) -> std::ops::Range<usize> {
         let cols = usize::from(row.cols);
         let first = usize::from(row.first_occupied.min(row.cols));
         let mut end = usize::from(row.occupancy.min(row.cols));
@@ -1399,7 +1393,11 @@ impl CompactEngine {
 
     #[inline]
     #[cfg(test)]
-    fn collect_row_styles(cells: &[Cell], range: std::ops::Range<usize>, out: &mut std::collections::BTreeSet<u16>) {
+    fn collect_row_styles(
+        cells: &[Cell],
+        range: std::ops::Range<usize>,
+        out: &mut std::collections::BTreeSet<u16>,
+    ) {
         // Single frozen placed-cell rule: style of every placed cell inside the
         // occupied range, plus style 0 for any blank row. Exhaustive and
         // optimized must both use this or an inline identical loop.
@@ -1407,18 +1405,34 @@ impl CompactEngine {
             out.insert(0);
             return;
         }
-        for cell in &cells[range] { out.insert(cell.style); }
+        for cell in &cells[range] {
+            out.insert(cell.style);
+        }
     }
     /// Optimized engine census: current pen + primary.saved + alternate.saved
     /// + primary/alternate active + primary/alternate history. Uses production
     ///   metadata occupancy; exhaustive uses independent scan-plus-wrap.
     #[cfg(test)]
-    pub(crate) fn census_engine_styles_optimized(&self, out: &mut std::collections::BTreeSet<u16>) -> EngineCensusDiag {
-        let mut diag = EngineCensusDiag { active_rows: 0, history_rows: 0, pens: 3, total_cells_scanned: 0, total_occupied_cells: 0 };
+    pub(crate) fn census_engine_styles_optimized(
+        &self,
+        out: &mut std::collections::BTreeSet<u16>,
+    ) -> EngineCensusDiag {
+        let mut diag = EngineCensusDiag {
+            active_rows: 0,
+            history_rows: 0,
+            pens: 3,
+            total_cells_scanned: 0,
+            total_occupied_cells: 0,
+        };
         out.insert(self.pen.style);
         out.insert(self.primary.saved.pen.style);
         out.insert(self.alternate.saved.pen.style);
-        for row in self.primary.active.iter().chain(self.primary.history.iter()) {
+        for row in self
+            .primary
+            .active
+            .iter()
+            .chain(self.primary.history.iter())
+        {
             diag.total_cells_scanned += row.cells.len();
             let range = Self::occupied_range_from_metadata(row);
             if range.is_empty() {
@@ -1430,7 +1444,12 @@ impl CompactEngine {
         }
         diag.active_rows = self.primary.active.len();
         diag.history_rows = self.primary.history.len();
-        for row in self.alternate.active.iter().chain(self.alternate.history.iter()) {
+        for row in self
+            .alternate
+            .active
+            .iter()
+            .chain(self.alternate.history.iter())
+        {
             diag.total_cells_scanned += row.cells.len();
             let range = Self::occupied_range_from_metadata(row);
             if range.is_empty() {
@@ -1452,46 +1471,93 @@ impl CompactEngine {
     /// Preserves wrapped-to-full-row semantics: exhaustive scan extends to
     /// `cells.len()` when `wrapped` is set, matching storage/optimized.
     #[cfg(test)]
-    pub(crate) fn census_engine_styles_exhaustive(&self, out: &mut std::collections::BTreeSet<u16>) -> EngineCensusDiag {
-        let mut diag = EngineCensusDiag { active_rows: 0, history_rows: 0, pens: 3, total_cells_scanned: 0, total_occupied_cells: 0 };
+    pub(crate) fn census_engine_styles_exhaustive(
+        &self,
+        out: &mut std::collections::BTreeSet<u16>,
+    ) -> EngineCensusDiag {
+        let mut diag = EngineCensusDiag {
+            active_rows: 0,
+            history_rows: 0,
+            pens: 3,
+            total_cells_scanned: 0,
+            total_occupied_cells: 0,
+        };
         out.insert(self.pen.style);
         out.insert(self.primary.saved.pen.style);
         out.insert(self.alternate.saved.pen.style);
-        for row in self.primary.active.iter().chain(self.primary.history.iter()) {
+        for row in self
+            .primary
+            .active
+            .iter()
+            .chain(self.primary.history.iter())
+        {
             diag.total_cells_scanned += row.cells.len();
             // Inline exhaustive scan (no delegation) — same predicate, separate code path.
-            let range = if row.cells.is_empty() { None } else {
-                let first = row.cells.iter().position(|c| !c.is_default()).unwrap_or(row.cells.len());
-                if first == row.cells.len() { None } else {
+            let range = if row.cells.is_empty() {
+                None
+            } else {
+                let first = row
+                    .cells
+                    .iter()
+                    .position(|c| !c.is_default())
+                    .unwrap_or(row.cells.len());
+                if first == row.cells.len() {
+                    None
+                } else {
                     let mut last = row.cells.len();
-                    while last > first && row.cells[last - 1].is_default() { last -= 1; }
-                    if row.wrapped { last = row.cells.len(); }
+                    while last > first && row.cells[last - 1].is_default() {
+                        last -= 1;
+                    }
+                    if row.wrapped {
+                        last = row.cells.len();
+                    }
                     Some(first..last)
                 }
             };
             if let Some(r) = range {
                 diag.total_occupied_cells += r.len();
-                for cell in &row.cells[r] { out.insert(cell.style); }
+                for cell in &row.cells[r] {
+                    out.insert(cell.style);
+                }
             } else {
                 out.insert(0);
             }
         }
         diag.active_rows = self.primary.active.len();
         diag.history_rows = self.primary.history.len();
-        for row in self.alternate.active.iter().chain(self.alternate.history.iter()) {
+        for row in self
+            .alternate
+            .active
+            .iter()
+            .chain(self.alternate.history.iter())
+        {
             diag.total_cells_scanned += row.cells.len();
-            let range = if row.cells.is_empty() { None } else {
-                let first = row.cells.iter().position(|c| !c.is_default()).unwrap_or(row.cells.len());
-                if first == row.cells.len() { None } else {
+            let range = if row.cells.is_empty() {
+                None
+            } else {
+                let first = row
+                    .cells
+                    .iter()
+                    .position(|c| !c.is_default())
+                    .unwrap_or(row.cells.len());
+                if first == row.cells.len() {
+                    None
+                } else {
                     let mut last = row.cells.len();
-                    while last > first && row.cells[last - 1].is_default() { last -= 1; }
-                    if row.wrapped { last = row.cells.len(); }
+                    while last > first && row.cells[last - 1].is_default() {
+                        last -= 1;
+                    }
+                    if row.wrapped {
+                        last = row.cells.len();
+                    }
                     Some(first..last)
                 }
             };
             if let Some(r) = range {
                 diag.total_occupied_cells += r.len();
-                for cell in &row.cells[r] { out.insert(cell.style); }
+                for cell in &row.cells[r] {
+                    out.insert(cell.style);
+                }
             } else {
                 out.insert(0);
             }
@@ -1501,8 +1567,6 @@ impl CompactEngine {
         diag
     }
 }
-
-
 
 impl CompactEngine {
     pub(crate) fn input_text_run(&mut self, text: &str) {

@@ -1507,7 +1507,8 @@ mod tests {
             tab.panes
                 .get_mut(&pane_id)
                 .unwrap()
-                .feed_test_output(b"alpha\r\nbeta\r\nalpha\r\n").expect("app_model fixture feed should succeed");
+                .feed_test_output(b"alpha\r\nbeta\r\nalpha\r\n")
+                .expect("app_model fixture feed should succeed");
         }
         let resolver = model.keymap_resolver();
         // Search-next starts at the most recent match (line 2).
@@ -1555,7 +1556,8 @@ mod tests {
             tab.panes
                 .get_mut(&pane_id)
                 .unwrap()
-                .feed_test_output(b"alpha\n").expect("app_model fixture feed should succeed");
+                .feed_test_output(b"alpha\n")
+                .expect("app_model fixture feed should succeed");
         }
         assert!(model.dispatch(AppAction::SearchNext).performed);
         model.set_search_query("");
@@ -1792,7 +1794,8 @@ mod tests {
             .panes
             .get_mut(&pane_id)
             .unwrap()
-            .feed_test_output(b"hi").expect("app_model fixture feed should succeed");
+            .feed_test_output(b"hi")
+            .expect("app_model fixture feed should succeed");
         let frame = model.focused_frame(window_id).expect("frame");
         assert_eq!(frame.size, GridSize::new(80, 24));
         // The frame is shared, not rebuilt by reading.
@@ -1865,7 +1868,8 @@ mod tests {
                 .panes
                 .get_mut(&pid)
                 .unwrap()
-                .feed_test_output(b"x").expect("app_model fixture feed should succeed");
+                .feed_test_output(b"x")
+                .expect("app_model fixture feed should succeed");
         }
         let trace2 = model2.install_diagnostic_trace(4);
         model2.pump(8);
@@ -1953,7 +1957,8 @@ mod tests {
             .panes
             .get_mut(&pane_id)
             .unwrap()
-            .feed_test_output(b"\x1b[?1049h").expect("app_model fixture feed should succeed");
+            .feed_test_output(b"\x1b[?1049h")
+            .expect("app_model fixture feed should succeed");
         let _stats2 = model.pump(8);
         let snap2 = trace.snapshot();
         let last_frame = snap2.iter().filter_map(|e| e.as_frame()).last().unwrap();

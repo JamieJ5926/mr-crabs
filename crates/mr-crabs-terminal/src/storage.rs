@@ -230,8 +230,6 @@ pub(crate) struct StorageCensusDiag {
     pub total_occupied_cells: usize,
 }
 
-
-
 // ---------------------------------------------------------------------------
 // ScrollbackStorage — owns history + bounded channels + worker handle.
 // ---------------------------------------------------------------------------
@@ -1032,7 +1030,10 @@ impl ScrollbackStorage {
                     self.stale_discarded += 1;
                     page.pending = false;
                 } else {
-                    page.compressed = Some(Self::intern_compressed(&mut self.compressed_pool, compressed));
+                    page.compressed = Some(Self::intern_compressed(
+                        &mut self.compressed_pool,
+                        compressed,
+                    ));
                     page.sparse = sparse;
                     page.resident = None;
                     page.pending = false;
@@ -1049,7 +1050,6 @@ impl ScrollbackStorage {
         }
     }
 
-
     // -----------------------------------------------------------------------
     // Style-cardinality census — private storage internals, full-cold
     // inclusive, decoded via reusable private scratch without mutating
@@ -1057,7 +1057,13 @@ impl ScrollbackStorage {
     // One explicit occupied-range rule is shared by optimized/exhaustive.
     // -----------------------------------------------------------------------
     #[inline]
-    fn occupied_range_for_census(cells: &[Cell], cols: usize, first_occupied: u16, occupancy: u16, wrapped: bool) -> std::ops::Range<usize> {
+    fn occupied_range_for_census(
+        cells: &[Cell],
+        cols: usize,
+        first_occupied: u16,
+        occupancy: u16,
+        wrapped: bool,
+    ) -> std::ops::Range<usize> {
         let first = usize::from(first_occupied.min(cols as u16));
         let mut end = usize::from(occupancy.min(cols as u16));
         if wrapped && end < cols {
@@ -1116,7 +1122,11 @@ impl ScrollbackStorage {
             pending: page.pending,
         };
         let ok = decode_page(&tmp, &mut self.census_cells, &mut self.census_encoded);
-        if ok { Some(self.census_cells.len()) } else { None }
+        if ok {
+            Some(self.census_cells.len())
+        } else {
+            None
+        }
     }
 
     pub(crate) fn collect_live_style_ids(
@@ -1131,7 +1141,12 @@ impl ScrollbackStorage {
                     Some(Resident::Segmented(_)) => 2u8,
                     None => 0u8,
                 };
-                (kind, usize::from(page.cols), page.lines, page.compressed.is_some())
+                (
+                    kind,
+                    usize::from(page.cols),
+                    page.lines,
+                    page.compressed.is_some(),
+                )
             };
             match kind {
                 1 => {
@@ -1316,7 +1331,10 @@ impl ScrollbackStorage {
     }
 
     #[cfg(test)]
-    pub(crate) fn census_storage_styles_optimized(&mut self, out: &mut BTreeSet<u16>) -> StorageCensusDiag {
+    pub(crate) fn census_storage_styles_optimized(
+        &mut self,
+        out: &mut BTreeSet<u16>,
+    ) -> StorageCensusDiag {
         let mut diag = StorageCensusDiag {
             total_pages: self.history.len(),
             hot_flat_pages: 0,
@@ -1348,13 +1366,19 @@ impl ScrollbackStorage {
                     for line in 0..lines {
                         let start = line * cols_usize;
                         let end = start + cols_usize;
-                        if end > buf.len() { break; }
+                        if end > buf.len() {
+                            break;
+                        }
                         let slice = &buf[start..end];
                         diag.total_cells_scanned += cols_usize;
                         let range = Self::occupied_range_by_scan(slice, false);
-                        for cell in &slice[range.clone()] { out.insert(cell.style); }
+                        for cell in &slice[range.clone()] {
+                            out.insert(cell.style);
+                        }
                         diag.total_occupied_cells += range.len();
-                        if range.is_empty() { out.insert(0); }
+                        if range.is_empty() {
+                            out.insert(0);
+                        }
                     }
                 }
             } else if kind == 2 {
@@ -1364,10 +1388,20 @@ impl ScrollbackStorage {
                     for d in descs.iter() {
                         diag.total_rows += 1;
                         diag.total_cells_scanned += d.cells.len();
-                        let range = Self::occupied_range_for_census(&d.cells, usize::from(d.cols), d.first_occupied, d.occupancy, d.wrapped);
-                        for cell in &d.cells[range.clone()] { out.insert(cell.style); }
+                        let range = Self::occupied_range_for_census(
+                            &d.cells,
+                            usize::from(d.cols),
+                            d.first_occupied,
+                            d.occupancy,
+                            d.wrapped,
+                        );
+                        for cell in &d.cells[range.clone()] {
+                            out.insert(cell.style);
+                        }
                         diag.total_occupied_cells += range.len();
-                        if range.is_empty() { out.insert(0); }
+                        if range.is_empty() {
+                            out.insert(0);
+                        }
                     }
                 }
             } else if has_compressed {
@@ -1383,14 +1417,20 @@ impl ScrollbackStorage {
                 for line in 0..lines {
                     let start = line * cols_usize;
                     let end = start + cols_usize;
-                    if end > decoded.len() { break; }
+                    if end > decoded.len() {
+                        break;
+                    }
                     let slice = &decoded[start..end];
                     diag.total_rows += 1;
                     diag.total_cells_scanned += cols_usize;
                     let range = Self::occupied_range_by_scan(slice, false);
-                    for cell in &slice[range.clone()] { out.insert(cell.style); }
+                    for cell in &slice[range.clone()] {
+                        out.insert(cell.style);
+                    }
                     diag.total_occupied_cells += range.len();
-                    if range.is_empty() { out.insert(0); }
+                    if range.is_empty() {
+                        out.insert(0);
+                    }
                 }
             }
         }
@@ -1398,7 +1438,10 @@ impl ScrollbackStorage {
     }
 
     #[cfg(test)]
-    pub(crate) fn census_storage_styles_exhaustive(&mut self, out: &mut BTreeSet<u16>) -> StorageCensusDiag {
+    pub(crate) fn census_storage_styles_exhaustive(
+        &mut self,
+        out: &mut BTreeSet<u16>,
+    ) -> StorageCensusDiag {
         let mut diag = StorageCensusDiag {
             total_pages: self.history.len(),
             hot_flat_pages: 0,
@@ -1429,13 +1472,19 @@ impl ScrollbackStorage {
                     for line in 0..lines {
                         let start = line * cols_usize;
                         let end = start + cols_usize;
-                        if end > buf.len() { break; }
+                        if end > buf.len() {
+                            break;
+                        }
                         let slice = &buf[start..end];
                         diag.total_cells_scanned += cols_usize;
                         let range = Self::occupied_range_by_scan(slice, false);
-                        for cell in &slice[range.clone()] { out.insert(cell.style); }
+                        for cell in &slice[range.clone()] {
+                            out.insert(cell.style);
+                        }
                         diag.total_occupied_cells += range.len();
-                        if range.is_empty() { out.insert(0); }
+                        if range.is_empty() {
+                            out.insert(0);
+                        }
                     }
                 }
             } else if kind == 2 {
@@ -1448,9 +1497,13 @@ impl ScrollbackStorage {
                         // Independently recompute placement from cells, while
                         // preserving CompactRow's wrapped-to-full-row rule.
                         let range = Self::occupied_range_by_scan(&d.cells, d.wrapped);
-                        for cell in &d.cells[range.clone()] { out.insert(cell.style); }
+                        for cell in &d.cells[range.clone()] {
+                            out.insert(cell.style);
+                        }
                         diag.total_occupied_cells += range.len();
-                        if range.is_empty() { out.insert(0); }
+                        if range.is_empty() {
+                            out.insert(0);
+                        }
                     }
                 }
             } else if has_compressed {
@@ -1465,14 +1518,20 @@ impl ScrollbackStorage {
                 for line in 0..lines {
                     let start = line * cols_usize;
                     let end = start + cols_usize;
-                    if end > decoded.len() { break; }
+                    if end > decoded.len() {
+                        break;
+                    }
                     let slice = &decoded[start..end];
                     diag.total_rows += 1;
                     diag.total_cells_scanned += cols_usize;
                     let range = Self::occupied_range_by_scan(slice, false);
-                    for cell in &slice[range.clone()] { out.insert(cell.style); }
+                    for cell in &slice[range.clone()] {
+                        out.insert(cell.style);
+                    }
                     diag.total_occupied_cells += range.len();
-                    if range.is_empty() { out.insert(0); }
+                    if range.is_empty() {
+                        out.insert(0);
+                    }
                 }
             }
         }
@@ -1483,7 +1542,6 @@ impl ScrollbackStorage {
             self.apply_completion(completion);
         }
     }
-
 
     fn intern_compressed(pool: &mut HashMap<u64, Vec<Weak<[u8]>>>, bytes: Vec<u8>) -> Arc<[u8]> {
         use std::hash::{DefaultHasher, Hash, Hasher};
@@ -1570,8 +1628,13 @@ impl ScrollbackStorage {
             if !should {
                 continue;
             }
-            let (expected_id, bytes_vec) = iter.next().expect("force_compress ordering: missing staged bytes");
-            debug_assert_eq!(page.id, expected_id, "force_compress page-id ordering mismatch");
+            let (expected_id, bytes_vec) = iter
+                .next()
+                .expect("force_compress ordering: missing staged bytes");
+            debug_assert_eq!(
+                page.id, expected_id,
+                "force_compress page-id ordering mismatch"
+            );
             page.compressed = Some(Self::intern_compressed(
                 &mut self.compressed_pool,
                 bytes_vec,
@@ -1580,7 +1643,10 @@ impl ScrollbackStorage {
             page.resident = None;
             page.pending = false;
         }
-        debug_assert!(iter.next().is_none(), "force_compress: staged bytes leftover");
+        debug_assert!(
+            iter.next().is_none(),
+            "force_compress: staged bytes leftover"
+        );
         // Drain any completions that may have raced before force.
         self.drain_compression();
         self.enforce_max_lines();
@@ -1990,10 +2056,7 @@ fn encode_cold_page(page: &Page, cells: &[Cell]) -> Result<Vec<u8>, TerminalErro
 
     if !page.sparse {
         let bytes = unsafe {
-            std::slice::from_raw_parts(
-                cells.as_ptr().cast::<u8>(),
-                std::mem::size_of_val(cells),
-            )
+            std::slice::from_raw_parts(cells.as_ptr().cast::<u8>(), std::mem::size_of_val(cells))
         };
         return Ok(compress_bytes(bytes));
     }
@@ -2011,10 +2074,9 @@ fn encode_cold_page(page: &Page, cells: &[Cell]) -> Result<Vec<u8>, TerminalErro
             .get(start..end)
             .ok_or(TerminalError::StyleCompactionCorrupt)?;
         let range = ScrollbackStorage::occupied_range_by_scan(row, false);
-        let first = u16::try_from(range.start)
-            .map_err(|_| TerminalError::StyleCompactionCorrupt)?;
-        let span = u16::try_from(range.len())
-            .map_err(|_| TerminalError::StyleCompactionCorrupt)?;
+        let first =
+            u16::try_from(range.start).map_err(|_| TerminalError::StyleCompactionCorrupt)?;
+        let span = u16::try_from(range.len()).map_err(|_| TerminalError::StyleCompactionCorrupt)?;
         encoded.extend_from_slice(&first.to_le_bytes());
         encoded.extend_from_slice(&span.to_le_bytes());
         if !range.is_empty() {
@@ -2027,8 +2089,8 @@ fn encode_cold_page(page: &Page, cells: &[Cell]) -> Result<Vec<u8>, TerminalErro
             encoded.extend_from_slice(bytes);
         }
     }
-    let encoded_len = u32::try_from(encoded.len())
-        .map_err(|_| TerminalError::StyleCompactionCorrupt)?;
+    let encoded_len =
+        u32::try_from(encoded.len()).map_err(|_| TerminalError::StyleCompactionCorrupt)?;
     let block = compress_bytes(&encoded);
     let mut compressed = Vec::with_capacity(4 + block.len());
     compressed.extend_from_slice(&encoded_len.to_le_bytes());
@@ -2445,34 +2507,69 @@ mod owned_ingest_tests {
 
     #[test]
     fn quiesce_while_queued_does_not_reenqueue_and_clears_pending() {
-        let mut s = ScrollbackStorage::new(4, ScrollbackConfig { max_lines: 100, hot_page_lines: 1, max_queued_jobs: 4, max_pending_completions: 4 });
-        for i in 0..4 { s.ingest_owned_row(row_arc(4, i*10, 4), 4, 4, false, 1); }
+        let mut s = ScrollbackStorage::new(
+            4,
+            ScrollbackConfig {
+                max_lines: 100,
+                hot_page_lines: 1,
+                max_queued_jobs: 4,
+                max_pending_completions: 4,
+            },
+        );
+        for i in 0..4 {
+            s.ingest_owned_row(row_arc(4, i * 10, 4), 4, 4, false, 1);
+        }
         let before_cursor = s.history.len();
         let ok = s.quiesce_for_style_transaction();
         assert!(ok, "quiesce must succeed to zero queued/pending/pages");
         assert_eq!(s.queued_jobs.load(std::sync::atomic::Ordering::Acquire), 0);
-        assert_eq!(s.pending_completions.load(std::sync::atomic::Ordering::Acquire), 0);
+        assert_eq!(
+            s.pending_completions
+                .load(std::sync::atomic::Ordering::Acquire),
+            0
+        );
         assert!(s.history.iter().all(|p| !p.pending));
         // No fresh enqueue occurred beyond prior pages.
         assert!(s.history.len() >= before_cursor.saturating_sub(0));
-        let mut a = std::collections::BTreeSet::new(); let da = s.census_storage_styles_optimized(&mut a);
-        let mut b = std::collections::BTreeSet::new(); let db = s.census_storage_styles_exhaustive(&mut b);
+        let mut a = std::collections::BTreeSet::new();
+        let da = s.census_storage_styles_optimized(&mut a);
+        let mut b = std::collections::BTreeSet::new();
+        let db = s.census_storage_styles_exhaustive(&mut b);
         assert_eq!(a, b);
         assert_eq!(da.total_pages, db.total_pages);
     }
 
     #[test]
     fn census_includes_cold_and_hot_flat_and_segmented() {
-        let mut s = ScrollbackStorage::new(4, ScrollbackConfig { max_lines: 100, hot_page_lines: 2, max_queued_jobs: 4, max_pending_completions: 4 });
+        let mut s = ScrollbackStorage::new(
+            4,
+            ScrollbackConfig {
+                max_lines: 100,
+                hot_page_lines: 2,
+                max_queued_jobs: 4,
+                max_pending_completions: 4,
+            },
+        );
         // Segmented hot
-        for i in 0..3 { s.ingest_owned_row(row_arc(4, i*10, 4), 4, 4, false, 1); }
+        for i in 0..3 {
+            s.ingest_owned_row(row_arc(4, i * 10, 4), 4, 4, false, 1);
+        }
         // Flat hot
-        let flat: std::sync::Arc<[Cell]> = (0..8).map(|i| Cell { content: i as u32, style: (i as u16)+10, flags: 0 }).collect::<Vec<_>>().into();
+        let flat: std::sync::Arc<[Cell]> = (0..8)
+            .map(|i| Cell {
+                content: i as u32,
+                style: (i as u16) + 10,
+                flags: 0,
+            })
+            .collect::<Vec<_>>()
+            .into();
         s.ingest_owned_flat_page(flat, 4, 2, 1);
         let _ = s.quiesce_for_style_transaction();
         s.force_compress_all();
-        let mut a = std::collections::BTreeSet::new(); let da = s.census_storage_styles_optimized(&mut a);
-        let mut b = std::collections::BTreeSet::new(); let db = s.census_storage_styles_exhaustive(&mut b);
+        let mut a = std::collections::BTreeSet::new();
+        let da = s.census_storage_styles_optimized(&mut a);
+        let mut b = std::collections::BTreeSet::new();
+        let db = s.census_storage_styles_exhaustive(&mut b);
         assert_eq!(a, b);
         assert!(da.cold_pages > 0 || da.hot_flat_pages > 0);
         assert_eq!(da.total_pages, db.total_pages);
@@ -2481,20 +2578,44 @@ mod owned_ingest_tests {
 
     #[test]
     fn census_cold_corrupt_fails_closed_without_mutating_cache() {
-        let mut s = ScrollbackStorage::new(4, ScrollbackConfig { max_lines: 100, hot_page_lines: 1, max_queued_jobs: 4, max_pending_completions: 4 });
-        for i in 0..4 { s.ingest_owned_row(row_arc(4, i*10, 4), 4, 4, false, 1); }
+        let mut s = ScrollbackStorage::new(
+            4,
+            ScrollbackConfig {
+                max_lines: 100,
+                hot_page_lines: 1,
+                max_queued_jobs: 4,
+                max_pending_completions: 4,
+            },
+        );
+        for i in 0..4 {
+            s.ingest_owned_row(row_arc(4, i * 10, 4), 4, 4, false, 1);
+        }
         let _ = s.quiesce_for_style_transaction();
         s.force_compress_all();
         s.drain_compression();
-        assert!(s.stats().compressed_bytes > 0, "expected at least one cold page for corruption test");
+        assert!(
+            s.stats().compressed_bytes > 0,
+            "expected at least one cold page for corruption test"
+        );
         s.corrupt_one_cold_page_for_test();
         let cache_none_before = s.cold_cache.is_none();
-        let mut a = std::collections::BTreeSet::new(); let da = s.census_storage_styles_optimized(&mut a);
-        let mut b = std::collections::BTreeSet::new(); let db = s.census_storage_styles_exhaustive(&mut b);
+        let mut a = std::collections::BTreeSet::new();
+        let da = s.census_storage_styles_optimized(&mut a);
+        let mut b = std::collections::BTreeSet::new();
+        let db = s.census_storage_styles_exhaustive(&mut b);
         // Both views must still agree, but must surface corruption.
         assert_eq!(a, b);
-        assert!(da.corrupt_cold_pages >= 1, "optimized must count corrupt, got {da:?}");
-        assert!(db.corrupt_cold_pages >= 1, "exhaustive must count corrupt, got {db:?}");
-        assert!(s.cold_cache.is_none() == cache_none_before || s.cold_cache.is_none(), "census must not populate ColdReadCache");
+        assert!(
+            da.corrupt_cold_pages >= 1,
+            "optimized must count corrupt, got {da:?}"
+        );
+        assert!(
+            db.corrupt_cold_pages >= 1,
+            "exhaustive must count corrupt, got {db:?}"
+        );
+        assert!(
+            s.cold_cache.is_none() == cache_none_before || s.cold_cache.is_none(),
+            "census must not populate ColdReadCache"
+        );
     }
 }

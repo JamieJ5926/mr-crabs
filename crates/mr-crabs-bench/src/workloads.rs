@@ -500,7 +500,9 @@ fn throughput_workload(id: &'static str) -> WorkloadOutcome {
         let len = ((total - offset) as usize).min(CHUNK);
         source.fill_chunk(&mut scratch, offset, len);
         if let Err(err) = term.feed(&scratch) {
-            return failed(format!("throughput feed failed at offset {offset}: {err:?}"));
+            return failed(format!(
+                "throughput feed failed at offset {offset}: {err:?}"
+            ));
         }
         tracker.tick();
         offset += len as u64;

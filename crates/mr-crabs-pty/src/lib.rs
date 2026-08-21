@@ -48,12 +48,12 @@ use std::fmt::{self, Display, Formatter};
 pub mod command;
 /// Declare the error types ([`PtyError`], [`WriteError`]).
 pub mod error;
+/// Declare the optional phase-timing probes.
+pub mod phase;
 /// Declare the macOS platform boundary.
 pub mod platform;
 /// Declare the bounded writer/reader channels and capacities.
 pub mod queue;
-/// Declare the optional phase-timing probes.
-pub mod phase;
 /// Declare the PTY session lifecycle ([`PtySession`], [`PtyConfig`],
 /// [`ExitStatus`]).
 pub mod session;
