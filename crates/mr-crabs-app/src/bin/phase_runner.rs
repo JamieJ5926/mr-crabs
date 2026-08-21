@@ -63,7 +63,7 @@ fn remainder_within_budget(remainder: u64, wall: u64, budget_pct: u64) -> bool {
         return false;
     }
     match remainder.checked_mul(100) {
-        Some(v) => v <= wall.checked_mul(budget_pct).unwrap_or(u64::MAX),
+        Some(v) => v <= wall.saturating_mul(budget_pct),
         None => false,
     }
 }
@@ -110,6 +110,8 @@ struct PhaseMaps {
     app: HashMap<&'static str, (u64, u64)>,
     element: HashMap<&'static str, (u64, u64)>,
 }
+type PhaseDelta = Vec<(&'static str, u64, u64)>;
+type PhaseDeltas = (PhaseDelta, PhaseDelta, PhaseDelta, PhaseDelta);
 
 fn capture_maps() -> PhaseMaps {
     #[allow(unused_mut)]
@@ -124,14 +126,7 @@ fn capture_maps() -> PhaseMaps {
     m
 }
 
-fn deltas_since(
-    prev: &PhaseMaps,
-) -> (
-    Vec<(&'static str, u64, u64)>,
-    Vec<(&'static str, u64, u64)>,
-    Vec<(&'static str, u64, u64)>,
-    Vec<(&'static str, u64, u64)>,
-) {
+fn deltas_since(prev: &PhaseMaps) -> PhaseDeltas {
     #[cfg(feature = "phase-timing")]
     {
         return (
@@ -676,7 +671,7 @@ fn main() {
     let timeout = Duration::from_millis(timeout_ms.unwrap_or(8000));
 
     let sparse = sparse_payload(total_bytes);
-    let fullscreen = fullscreen_payload(total_bytes, 80 as usize, 24 as usize);
+    let fullscreen = fullscreen_payload(total_bytes, 80, 24);
     let mut workloads: Vec<(String, Vec<u8>)> = Vec::new();
     match variant_filter.as_deref() {
         Some("sparse") | Some("sparse_scrolling") => {

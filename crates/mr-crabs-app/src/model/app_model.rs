@@ -1961,7 +1961,11 @@ mod tests {
             .expect("app_model fixture feed should succeed");
         let _stats2 = model.pump(8);
         let snap2 = trace.snapshot();
-        let last_frame = snap2.iter().filter_map(|e| e.as_frame()).last().unwrap();
+        let last_frame = snap2
+            .iter()
+            .filter_map(|e| e.as_frame())
+            .next_back()
+            .unwrap();
         assert!(
             last_frame.alternate_screen,
             "alternate screen flag propagated"

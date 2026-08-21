@@ -1480,10 +1480,11 @@ impl PaneModel {
     /// Drain output, then expose exit only after the reader queue is empty.
     pub fn pump(&mut self, cap: usize) -> DrainStats {
         if let Some(err) = self.terminal_error {
-            let mut stats = DrainStats::default();
-            stats.error = Some(err);
-            stats.pending = true;
-            return stats;
+            return DrainStats {
+                error: Some(err),
+                pending: true,
+                ..Default::default()
+            };
         }
         #[cfg(feature = "phase-timing")]
         let _pump_guard = crate::phase::Guard::new("pane_pump");
