@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::Style;
+use crate::{Style, TerminalError};
 
 /// Interned style table: dedup via Vec<Style> + HashMap. ID 0 is always Style::default().
 /// IDs are limited to u16 for the 8-byte Cell invariant.
@@ -8,6 +8,94 @@ use crate::Style;
 pub struct StyleTable {
     styles: Vec<Style>,
     index: HashMap<Style, u16>,
+    epoch: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct StyleRemap {
+    pub(crate) old_to_new: Vec<u16>,
+    pub(crate) new_styles: Vec<Style>,
+    pub(crate) old_len: usize,
+}
+
+impl StyleRemap {
+    pub(crate) fn new(old_styles: &[Style], live_ids: &std::collections::BTreeSet<u16>) -> Result<Self, TerminalError> {
+        if old_styles.is_empty() || old_styles[0] != Style::default() || live_ids.first() != Some(&0) {
+            return Err(TerminalError::StyleCompactionCorrupt);
+        }
+
+        let mut old_to_new = vec![u16::MAX; old_styles.len()];
+        let mut new_styles = Vec::with_capacity(live_ids.len());
+        for &old_id in live_ids {
+            let old_index = usize::from(old_id);
+            let Some(style) = old_styles.get(old_index) else {
+                return Err(TerminalError::StyleCompactionCorrupt);
+            };
+            let new_id = u16::try_from(new_styles.len())
+                .map_err(|_| TerminalError::StyleCompactionCapacity)?;
+            old_to_new[old_index] = new_id;
+            new_styles.push(style.clone());
+        }
+
+        if new_styles.first() != Some(&Style::default()) {
+            return Err(TerminalError::StyleCompactionCorrupt);
+        }
+        Ok(Self {
+            old_to_new,
+            new_styles,
+            old_len: old_styles.len(),
+        })
+    }
+
+    pub(crate) fn validate_for(&self, old_styles: &[Style]) -> Result<(), TerminalError> {
+        if self.old_len != old_styles.len()
+            || self.old_to_new.len() != self.old_len
+            || self.new_styles.is_empty()
+            || self.new_styles.len() > usize::from(u16::MAX) + 1
+            || self.new_styles[0] != Style::default()
+            || self.old_to_new.first() != Some(&0)
+        {
+            return Err(TerminalError::StyleCompactionCorrupt);
+        }
+
+        // Dense monotonic check: live entries in old order must map to 0..new_len-1 sequentially.
+        let mut expected: u16 = 0;
+        let mut seen = vec![false; self.new_styles.len()];
+        for (old_id, &mapped) in self.old_to_new.iter().enumerate() {
+            if mapped == u16::MAX {
+                continue;
+            }
+            if usize::from(mapped) >= self.new_styles.len() {
+                return Err(TerminalError::StyleCompactionCorrupt);
+            }
+            if mapped != expected {
+                return Err(TerminalError::StyleCompactionCorrupt);
+            }
+            if seen[usize::from(mapped)] {
+                return Err(TerminalError::StyleCompactionCorrupt);
+            }
+            seen[usize::from(mapped)] = true;
+            if old_styles.get(old_id) != Some(&self.new_styles[usize::from(mapped)]) {
+                return Err(TerminalError::StyleCompactionCorrupt);
+            }
+            expected = expected.wrapping_add(1);
+        }
+        if usize::from(expected) != self.new_styles.len() {
+            return Err(TerminalError::StyleCompactionCorrupt);
+        }
+        if seen.iter().any(|&v| !v) {
+            return Err(TerminalError::StyleCompactionCorrupt);
+        }
+        Ok(())
+    }
+
+    pub(crate) fn map(&self, old_id: u16) -> Result<u16, TerminalError> {
+        self.old_to_new
+            .get(usize::from(old_id))
+            .copied()
+            .filter(|&mapped| mapped != u16::MAX)
+            .ok_or(TerminalError::StyleCompactionCorrupt)
+    }
 }
 
 impl Default for StyleTable {
@@ -24,7 +112,31 @@ impl StyleTable {
         Self {
             styles: vec![default],
             index,
+            epoch: 0,
         }
+    }
+
+    pub fn from_exact(styles: &[Style]) -> Result<Self, TerminalError> {
+        if styles.is_empty() {
+            return Err(TerminalError::RestoreStyleTable);
+        }
+        if styles.len() > usize::from(u16::MAX) + 1 {
+            return Err(TerminalError::RestoreStyleTable);
+        }
+        if styles[0] != Style::default() {
+            return Err(TerminalError::RestoreStyleTable);
+        }
+        let styled = styles.to_vec();
+        let mut index: HashMap<Style, u16> = HashMap::new();
+        for (idx, style) in styled.iter().enumerate() {
+            let id = u16::try_from(idx).expect("style index fits u16");
+            index.entry(style.clone()).or_insert(id);
+        }
+        Ok(Self {
+            styles: styled,
+            index,
+            epoch: 0,
+        })
     }
 
     /// Intern a style, returning its stable u16 ID.
@@ -44,6 +156,17 @@ impl StyleTable {
 
     pub fn as_slice(&self) -> &[Style] {
         &self.styles
+    }
+
+    pub(crate) fn epoch(&self) -> u64 {
+        self.epoch
+    }
+
+    pub(crate) fn stage_remapped(&self, remap: &StyleRemap) -> Result<Self, TerminalError> {
+        remap.validate_for(&self.styles)?;
+        let mut staged = Self::from_exact(&remap.new_styles)?;
+        staged.epoch = self.epoch.wrapping_add(1);
+        Ok(staged)
     }
 
     pub fn len(&self) -> usize {
@@ -230,5 +353,67 @@ impl SelectionAnchor {
         F: FnOnce(LogicalOffset) -> LogicalOffset,
     {
         self.offset = f(self.offset);
+    }
+}
+
+#[cfg(test)]
+mod style_table_exact_tests {
+    use super::*;
+    use crate::{NamedColorValue, NormalizedColor};
+
+    fn red_style() -> Style {
+        Style {
+            foreground: NormalizedColor::Named(NamedColorValue::Red),
+            background: NormalizedColor::Named(NamedColorValue::Background),
+            underline: None,
+        }
+    }
+
+    #[test]
+    fn from_exact_retains_duplicates_and_first_id_wins() {
+        let def = Style::default();
+        let red = red_style();
+        let input = vec![def.clone(), red.clone(), red.clone()];
+        let mut table = StyleTable::from_exact(&input).expect("from_exact should succeed");
+        assert_eq!(table.len(), 3);
+        assert_eq!(table.get(0), Some(&def));
+        assert_eq!(table.get(1), Some(&red));
+        assert_eq!(table.get(2), Some(&red));
+        // intern of duplicate value resolves to first ID (1)
+        assert_eq!(table.intern(red.clone()), 1);
+        // ensure underlying vec retains order/duplicates
+        assert_eq!(table.as_slice(), input.as_slice());
+    }
+
+    #[test]
+    fn from_exact_accepts_65536_defaults() {
+        let def = Style::default();
+        let input = vec![def; 65536];
+        let table = StyleTable::from_exact(&input).expect("65536 should be accepted");
+        assert_eq!(table.len(), 65536);
+        // converting index 65,535 succeeds - get max u16
+        assert!(table.get(u16::MAX).is_some());
+    }
+
+    #[test]
+    fn from_exact_rejects_65537() {
+        let def = Style::default();
+        let input = vec![def; 65537];
+        let err = StyleTable::from_exact(&input).unwrap_err();
+        assert_eq!(err, TerminalError::RestoreStyleTable);
+    }
+
+    #[test]
+    fn from_exact_rejects_nondefault_index0() {
+        let red = red_style();
+        let input = vec![red];
+        let err = StyleTable::from_exact(&input).unwrap_err();
+        assert_eq!(err, TerminalError::RestoreStyleTable);
+        // also empty rejected
+        let empty: Vec<Style> = vec![];
+        assert_eq!(
+            StyleTable::from_exact(&empty).unwrap_err(),
+            TerminalError::RestoreStyleTable
+        );
     }
 }
