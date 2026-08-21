@@ -13,7 +13,7 @@
 //! * trail: frames are demanded while within the configured fade duration;
 //! * disabled effects demand nothing and retain nothing.
 
-use mr_crabs_terminal::{FrameDelta, GridSize};
+use mr_crabs_terminal::{DamageKind, FrameDelta, GridSize};
 
 use crate::coords::CellPx;
 use crate::key::{ChangeTracker, NEVER_BITS, NEVER_MS};
@@ -36,6 +36,7 @@ pub struct EffectsFrame {
     pub pending: Vec<CellPos>,
     /// The cursor trail state for this frame.
     pub trail: TrailFrame,
+    pub text_reveal_allowed: bool,
     /// True when another animation frame must be scheduled after this one.
     pub needs_frame: bool,
 }
@@ -56,6 +57,7 @@ pub struct EffectsModel {
     schedule: TypewriterSchedule,
     trail: CursorTrail,
     last_now_ms: f64,
+    last_history_rows: Option<u32>,
     frame: EffectsFrame,
 }
 
@@ -92,6 +94,7 @@ impl EffectsModel {
                 config.cursor_trail_duration_ms,
             )),
             last_now_ms: 0.0,
+            last_history_rows: None,
             frame: EffectsFrame::default(),
         }
     }
@@ -156,16 +159,17 @@ impl EffectsModel {
     pub fn apply_frame(&mut self, frame: &FrameDelta, now_ms: u64, focus: bool) -> &EffectsFrame {
         let now = (now_ms as f64).max(self.last_now_ms);
         self.last_now_ms = now;
+        let size_changed = frame.size != self.size;
+        let previous_history_rows = self.last_history_rows.replace(frame.viewport.history_rows);
 
         let out = &mut self.frame;
         out.revealing.clear();
         out.pending.clear();
         out.trail = TrailFrame::default();
         out.needs_frame = false;
+        out.text_reveal_allowed = false;
 
-        // Grid resize: keep the stored prefix and stamp new cells (oracle
-        // textAnimationEnsureBuffers).
-        if frame.size != self.size {
+        if size_changed {
             self.size = frame.size;
             if let Some(tracker) = &mut self.tracker {
                 tracker.resize(
@@ -179,14 +183,69 @@ impl EffectsModel {
         let mut needs_text = false;
         if let Some(tracker) = &mut self.tracker {
             let duration_ms = self.config.text_animation_duration_ms as f64;
-            self.schedule.begin_build(now, duration_ms);
-            for rd in &frame.rows {
-                tracker.update_row(rd.row, rd.generation, &rd.cells, now, &mut self.schedule);
+            let is_full = frame.damage == DamageKind::Full;
+            let is_alt = frame.viewport.alternate_screen;
+            let is_large = frame.rows.len() > 16;
+            let history_consistent = previous_history_rows.is_some_and(|previous| {
+                frame.viewport.history_rows == previous
+                    || previous.checked_add(1) == Some(frame.viewport.history_rows)
+            });
+            let can_translate = !is_alt
+                && !size_changed
+                && is_full
+                && history_consistent
+                && tracker.can_translate_up_one(&frame.rows);
+            let process_rows = !is_full || can_translate;
+            let mut translated = false;
+            let mut bottom_only = false;
+            if is_full {
+                if can_translate {
+                    tracker.translate_up_one();
+                    translated = true;
+                    bottom_only = true;
+                } else {
+                    tracker.adopt_rows(&frame.rows);
+                    self.schedule = TypewriterSchedule::new(
+                        if self.config.text_animation == TextAnimation::Typewriter {
+                            duration_ms / 8.0
+                        } else {
+                            0.0
+                        },
+                    );
+                }
+            }
+            out.text_reveal_allowed =
+                !is_alt && !size_changed && (translated || (!is_full && !is_large));
+            if process_rows {
+                self.schedule.begin_build(now, duration_ms);
+                if bottom_only {
+                    let target = self.size.rows.saturating_sub(1);
+                    for rd in &frame.rows {
+                        if rd.row == target {
+                            tracker.update_row(
+                                rd.row,
+                                rd.generation,
+                                &rd.cells,
+                                now,
+                                &mut self.schedule,
+                            );
+                            break;
+                        }
+                    }
+                } else {
+                    for rd in &frame.rows {
+                        tracker.update_row(
+                            rd.row,
+                            rd.generation,
+                            &rd.cells,
+                            now,
+                            &mut self.schedule,
+                        );
+                    }
+                }
             }
             if tracker.last_change_ms() != NEVER_MS {
                 let elapsed = now - tracker.last_change_ms();
-                // Future timestamps (a typewriter burst running ahead of
-                // the present) keep frames scheduled until they arrive.
                 needs_text = elapsed < 0.0 || elapsed < duration_ms;
             }
             collect_reveals(tracker, self.config.text_animation, duration_ms, now, out);
@@ -695,5 +754,104 @@ mod tests {
         );
         m.clear_change_texture_dirty();
         assert!(!m.change_texture_dirty());
+    }
+    #[test]
+    fn primary_scroll_translates_reveal_state_and_stamps_only_new_row() {
+        let size = GridSize::new(3, 3);
+        let mut m = model(TextAnimation::Streaming, 3, 3);
+        let cursor = CursorState::default();
+        let mut baseline = frame_at(
+            size,
+            1,
+            vec![
+                row(0, 1, &[65, 32, 32]),
+                row(1, 1, &[66, 32, 32]),
+                row(2, 1, &[67, 32, 32]),
+            ],
+            cursor,
+        );
+        baseline.damage = DamageKind::Full;
+        let frame = m.apply_frame(&baseline, 1000, true);
+        assert!(!frame.text_reveal_allowed);
+        assert!(frame.revealing.is_empty());
+
+        let mut scrolled = frame_at(
+            size,
+            2,
+            vec![
+                row(0, 2, &[66, 32, 32]),
+                row(1, 2, &[67, 32, 32]),
+                row(2, 2, &[68, 32, 32]),
+            ],
+            cursor,
+        );
+        scrolled.damage = DamageKind::Full;
+        scrolled.viewport.history_rows = 1;
+        let frame = m.apply_frame(&scrolled, 1100, true);
+        assert!(frame.text_reveal_allowed);
+        assert_eq!(frame.revealing.len(), 3);
+        assert!(
+            frame
+                .revealing
+                .iter()
+                .all(|reveal| reveal.pos.row == 2 && reveal.change_ms == 1100.0)
+        );
+
+        let mut clean = frame_at(size, 3, Vec::new(), cursor);
+        clean.viewport.history_rows = 1;
+        let frame = m.apply_frame(&clean, 1110, true);
+        assert!(frame.text_reveal_allowed);
+        assert_eq!(frame.revealing.len(), 3);
+        assert!(frame.revealing.iter().all(|reveal| reveal.pos.row == 2));
+    }
+    #[test]
+    fn tall_and_saturated_history_scrolls_still_reveal_new_bottom_row() {
+        let size = GridSize::new(3, 20);
+        let mut m = model(TextAnimation::Streaming, 3, 20);
+        let cursor = CursorState::default();
+        let rows = (0..20)
+            .map(|index| row(index, 1, &[65 + u32::from(index), 32, 32]))
+            .collect();
+        let mut baseline = frame_at(size, 1, rows, cursor);
+        baseline.damage = DamageKind::Full;
+        let _ = m.apply_frame(&baseline, 1000, true);
+
+        let rows = (0..20)
+            .map(|index| {
+                let content = if index == 19 {
+                    90
+                } else {
+                    66 + u32::from(index)
+                };
+                row(index, 2, &[content, 32, 32])
+            })
+            .collect();
+        let mut first_scroll = frame_at(size, 2, rows, cursor);
+        first_scroll.damage = DamageKind::Full;
+        first_scroll.viewport.history_rows = 1;
+        let frame = m.apply_frame(&first_scroll, 1100, true);
+        assert!(frame.text_reveal_allowed);
+        assert_eq!(frame.revealing.len(), 3);
+        assert!(frame.revealing.iter().all(|reveal| reveal.pos.row == 19));
+
+        let rows = (0..20)
+            .map(|index| {
+                let content = if index == 19 {
+                    91
+                } else if index == 18 {
+                    90
+                } else {
+                    67 + u32::from(index)
+                };
+                row(index, 3, &[content, 32, 32])
+            })
+            .collect();
+        let mut saturated_scroll = frame_at(size, 3, rows, cursor);
+        saturated_scroll.damage = DamageKind::Full;
+        saturated_scroll.viewport.history_rows = 1;
+        let frame = m.apply_frame(&saturated_scroll, 1300, true);
+        assert!(frame.text_reveal_allowed);
+        assert_eq!(frame.revealing.len(), 3);
+        assert!(frame.revealing.iter().all(|reveal| reveal.pos.row == 19));
     }
 }

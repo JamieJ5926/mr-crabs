@@ -7,12 +7,15 @@
 //! (CoreText on macOS); no wgpu, no libghostty-vt, no Zig.
 
 use gpui::{
-    App, BorderStyle, Bounds, Corners, Element, ElementId, FocusHandle, Font, FontFeatures,
-    FontStyle, FontWeight, GlobalElementId, Hsla, InspectorElementId, IntoElement, LayoutId,
-    Pixels, Point, RenderImage, ShapedLine, SharedString, StrikethroughStyle, Style as GpuiStyle,
-    TextRun, UnderlineStyle, Window, fill, font, outline, point, px, size, white,
+    App, BorderStyle, Bounds, BoxShadow, Corners, Element, ElementId, FocusHandle, Font,
+    FontFeatures, FontStyle, FontWeight, GlobalElementId, Hsla, InspectorElementId, IntoElement,
+    LayoutId, PathBuilder, Pixels, Point, RenderImage, ShapedLine, SharedString,
+    StrikethroughStyle, Style as GpuiStyle, TextRun, UnderlineStyle, Window, fill, font, outline,
+    point, px, size, white,
 };
-use mr_crabs_effects::{CellPx, EffectsConfig, EffectsModel, RevealMath, TextAnimation};
+use mr_crabs_effects::{
+    CellPx, EffectsConfig, EffectsModel, LinePx, RectPx, RevealMath, TextAnimation,
+};
 use mr_crabs_graphics::{
     image::{Image, ImageData, ImageFormat},
     iterm::{self, ItermUploads},
@@ -21,7 +24,7 @@ use mr_crabs_graphics::{
     store::{ImageStore, StoreConfig},
     texture::{TextureCache, TextureKey},
 };
-use mr_crabs_terminal::{CursorShape, FrameDelta};
+use mr_crabs_terminal::{CursorShape, FrameDelta, GridSize};
 use parking_lot::{Mutex, MutexGuard};
 use std::collections::HashMap;
 use std::ops::Range;
@@ -175,13 +178,58 @@ impl PaintState {
             self.shaped_lines.push(Vec::new());
         }
     }
+
+    fn effects_model(
+        &mut self,
+        config: EffectsConfig,
+        size: GridSize,
+        cell: CellPx,
+    ) -> &mut EffectsModel {
+        let model = self
+            .effects
+            .get_or_insert_with(|| EffectsModel::new(config, size, cell));
+        if model.cell() != cell {
+            *model = EffectsModel::new(config, size, cell);
+        } else if model.config() != &config {
+            model.set_config(config);
+        }
+        model
+    }
 }
 
-/// More than one short typed burst: skip concealment so dumps do not flicker.
-const TEXT_REVEAL_BURST_CELLS: usize = 16;
+pub(crate) fn trail_glow_bounds(
+    glow_rect: RectPx,
+    origin: Point<Pixels>,
+) -> Option<Bounds<Pixels>> {
+    if glow_rect.degenerate() {
+        return None;
+    }
+    Some(Bounds {
+        origin: point(
+            origin.x + px(glow_rect.x as f32),
+            origin.y + px(glow_rect.y as f32),
+        ),
+        size: size(px(glow_rect.w as f32), px(glow_rect.h as f32)),
+    })
+}
 
-fn text_reveal_is_burst(revealing: usize, pending: usize) -> bool {
-    revealing.saturating_add(pending) > TEXT_REVEAL_BURST_CELLS
+pub(crate) fn trail_segment_points(
+    segment: LinePx,
+    origin: Point<Pixels>,
+) -> (Point<Pixels>, Point<Pixels>) {
+    let from = point(
+        origin.x + px(segment.from.x as f32),
+        origin.y + px(segment.from.y as f32),
+    );
+    let to = point(
+        origin.x + px(segment.to.x as f32),
+        origin.y + px(segment.to.y as f32),
+    );
+    (from, to)
+}
+
+pub(crate) fn trail_stroke_width(radius_px: f64) -> Pixels {
+    px((radius_px * 0.5).max(1.0) as f32)
 }
 
 impl TerminalElement {
@@ -605,20 +653,15 @@ impl TerminalElement {
             f64::from(self.metrics.width),
             f64::from(self.metrics.height),
         );
-        let model = state
-            .effects
-            .get_or_insert_with(|| EffectsModel::new(config, frame.size, cell));
-        if model.config() != &config || model.cell() != cell {
-            model.set_config(config);
-        }
         let origin_clock = state.effects_origin.get_or_insert_with(Instant::now);
         let now_ms = origin_clock.elapsed().as_millis() as u64;
-        let fx = model.apply_frame(frame, now_ms, true);
-        // Alternate-screen TUIs (OMP) and large dumps restamp many cells.
-        // Concealing them flickers the whole window. Stream only short
-        // primary-screen output.
-        let burst = frame.viewport.alternate_screen
-            || text_reveal_is_burst(fx.revealing.len(), fx.pending.len());
+        let model = state.effects_model(config, frame.size, cell);
+        let focused = self
+            .focus
+            .as_ref()
+            .is_some_and(|focus| focus.is_focused(window));
+        let fx = model.apply_frame(frame, now_ms, focused);
+        let burst = !fx.text_reveal_allowed;
         if !burst {
             let math = RevealMath::new(
                 config.text_animation,
@@ -663,14 +706,28 @@ impl TerminalElement {
             }
         }
         if fx.trail.active && fx.trail.alpha > 0.0 {
-            let mut glow = self.palette.cursor_color();
-            glow.a = fx.trail.alpha as f32;
-            let r = fx.trail.glow_rect;
-            let rect = gpui::Bounds {
-                origin: point(origin.x + px(r.x as f32), origin.y + px(r.y as f32)),
-                size: size(px(r.w as f32), px(r.h as f32)),
-            };
-            window.paint_quad(fill(rect, glow));
+            if let Some(rect) = trail_glow_bounds(fx.trail.glow_rect, origin) {
+                let mut glow = self.palette.cursor_color();
+                glow.a = fx.trail.alpha as f32;
+                if glow.a > 0.0 {
+                    window.paint_drop_shadows(
+                        rect,
+                        Corners::all(px(0.0)),
+                        &[BoxShadow::new(px(0.0), px(0.0), glow)
+                            .blur_radius(px(fx.trail.radius_px as f32))],
+                    );
+                    if let Some(segment) = fx.trail.segment {
+                        let (from, to) = trail_segment_points(segment, origin);
+                        let width = trail_stroke_width(fx.trail.radius_px);
+                        let mut builder = PathBuilder::stroke(width);
+                        builder.move_to(from);
+                        builder.line_to(to);
+                        if let Ok(path) = builder.build() {
+                            window.paint_path(path, glow);
+                        }
+                    }
+                }
+            }
         }
         let needs_frame = fx.needs_frame;
         let trail_active = fx.trail.active;
@@ -1576,6 +1633,7 @@ fn build_render_image(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use mr_crabs_effects::PointPx;
     use mr_crabs_terminal::{
         CursorShape, CursorState, DamageKind, FramePool, GridSize, RowDelta, Run, SelectionState,
         Style as TermStyle,
@@ -1777,6 +1835,18 @@ mod tests {
             font_size: px(font_size),
             metrics,
         }
+    }
+
+    #[test]
+    fn effects_model_rebuilds_when_cell_metrics_change() {
+        let mut state = PaintState::default();
+        let config = EffectsConfig::default();
+        let size = GridSize::new(80, 24);
+        let initial = CellPx::new(10.0, 20.0);
+        let resized = CellPx::new(12.0, 24.0);
+
+        assert_eq!(state.effects_model(config, size, initial).cell(), initial);
+        assert_eq!(state.effects_model(config, size, resized).cell(), resized);
     }
 
     #[test]
@@ -2083,11 +2153,54 @@ mod tests {
     }
 
     #[test]
-    fn text_reveal_skips_large_dumps_keeps_short_input() {
-        assert!(!text_reveal_is_burst(1, 0));
-        assert!(!text_reveal_is_burst(16, 0));
-        assert!(text_reveal_is_burst(17, 0));
-        assert!(text_reveal_is_burst(8, 9));
-        assert!(text_reveal_is_burst(80, 0));
+    fn trail_glow_translates_by_origin() {
+        let glow = RectPx::new(12.0, 8.0, 10.0, 20.0);
+        let origin = point(px(5.0), px(7.0));
+        let bounds = trail_glow_bounds(glow, origin).expect("bounds");
+        assert_eq!(bounds.origin.x, px(17.0));
+        assert_eq!(bounds.origin.y, px(15.0));
+        assert_eq!(bounds.size.width, px(10.0));
+        assert_eq!(bounds.size.height, px(20.0));
+    }
+
+    #[test]
+    fn trail_glow_reports_degenerate_as_none() {
+        assert!(
+            trail_glow_bounds(RectPx::new(0.0, 0.0, 0.0, 10.0), point(px(0.0), px(0.0))).is_none()
+        );
+        assert!(
+            trail_glow_bounds(RectPx::new(0.0, 0.0, 10.0, 0.0), point(px(0.0), px(0.0))).is_none()
+        );
+    }
+
+    #[test]
+    fn trail_segment_points_translate_by_origin() {
+        let origin = point(px(3.0), px(4.0));
+        let seg = LinePx::new(PointPx::new(1.0, 2.0), PointPx::new(10.0, 12.0));
+        let (from, to) = trail_segment_points(seg, origin);
+        assert_eq!(from, point(px(4.0), px(6.0)));
+        assert_eq!(to, point(px(13.0), px(16.0)));
+    }
+
+    #[test]
+    fn trail_stroke_width_clamps_at_one() {
+        assert_eq!(trail_stroke_width(10.0), px(5.0));
+        assert_eq!(trail_stroke_width(0.2), px(1.0));
+        assert_eq!(trail_stroke_width(1.0), px(1.0));
+    }
+
+    #[test]
+    fn trail_segment_stroke_builds_nonempty_path() {
+        let origin = point(px(0.0), px(0.0));
+        let seg = LinePx::new(PointPx::new(0.0, 0.0), PointPx::new(20.0, 0.0));
+        let (from, to) = trail_segment_points(seg, origin);
+        let mut builder = PathBuilder::stroke(px(4.0));
+        builder.move_to(from);
+        builder.line_to(to);
+        let path = builder.build().expect("path");
+        assert_ne!(
+            format!("{path:?}"),
+            format!("{:?}", PathBuilder::stroke(px(1.0)).build().unwrap())
+        );
     }
 }

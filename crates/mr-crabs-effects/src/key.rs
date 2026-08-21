@@ -15,7 +15,7 @@
 //! and never animate, matching the oracle.
 
 use crate::schedule::TypewriterSchedule;
-use mr_crabs_terminal::Cell;
+use mr_crabs_terminal::{Cell, RowDelta};
 
 /// Sentinel change time (milliseconds) for cells that never changed:
 /// -1000 shader seconds (oracle `TextAnimationState.never = -1000`), so
@@ -215,6 +215,68 @@ impl ChangeTracker {
             self.upload_dirty = true;
             self.repack();
         }
+    }
+
+    pub fn can_translate_up_one(&self, rows: &[RowDelta]) -> bool {
+        if self.cap != self.cols.saturating_mul(self.rows) || rows.len() != self.rows {
+            return false;
+        }
+        rows.iter().take(self.rows.saturating_sub(1)).all(|row| {
+            let dst = usize::from(row.row);
+            dst < self.rows.saturating_sub(1)
+                && row.cells.len() >= self.cols
+                && row
+                    .cells
+                    .iter()
+                    .take(self.cols)
+                    .enumerate()
+                    .all(|(col, cell)| {
+                        cell_render_key(*cell) == self.snapshot[(dst + 1) * self.cols + col]
+                    })
+        })
+    }
+
+    pub fn translate_up_one(&mut self) {
+        let shift = self.cols.min(self.cap);
+        self.snapshot.copy_within(shift..self.cap, 0);
+        self.change_times.copy_within(shift..self.cap, 0);
+        self.change_ms.copy_within(shift..self.cap, 0);
+        self.snapshot[self.cap - shift..].fill(u64::MAX);
+        self.change_times[self.cap - shift..].fill(NEVER_BITS);
+        self.change_ms[self.cap - shift..].fill(NEVER_MS);
+        self.row_generations.fill(u64::MAX);
+        self.last_change_ms = self
+            .change_ms
+            .iter()
+            .copied()
+            .filter(|value| *value != NEVER_MS)
+            .fold(NEVER_MS, f64::max);
+        self.upload_dirty = true;
+        self.repack();
+    }
+
+    pub fn adopt_rows(&mut self, rows: &[RowDelta]) {
+        for row in rows {
+            let row_index = usize::from(row.row);
+            if row_index >= self.rows {
+                continue;
+            }
+            self.row_generations[row_index] = row.generation;
+            let base = row_index * self.cols;
+            let len = row
+                .cells
+                .len()
+                .min(self.cols)
+                .min(self.cap.saturating_sub(base));
+            for (col, cell) in row.cells.iter().take(len).enumerate() {
+                self.snapshot[base + col] = cell_render_key(*cell);
+                self.change_times[base + col] = NEVER_BITS;
+                self.change_ms[base + col] = NEVER_MS;
+            }
+        }
+        self.last_change_ms = NEVER_MS;
+        self.upload_dirty = true;
+        self.repack();
     }
 
     /// Repack every change time into the rgba8 texel byte layout.
