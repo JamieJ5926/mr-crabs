@@ -583,7 +583,7 @@ fn reader_loop(
         invoke_output_wake(output_wake.as_ref());
         return;
     }
-    let mut chunk = vec![0u8; 8192];
+    let mut chunk = vec![0u8; 64 * 1024];
     'outer: loop {
         if shutdown.load(Ordering::Acquire) {
             break;
