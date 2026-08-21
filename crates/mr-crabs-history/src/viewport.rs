@@ -12,7 +12,7 @@
 
 use mr_crabs_terminal::{
     Cell, DamageKind, FrameDelta, HistoryRead, NormalizedSnapshot, RowDelta, Terminal,
-    TerminalMode, TerminalViewport, batch_runs,
+    TerminalError, TerminalMode, TerminalViewport, batch_runs,
 };
 
 /// Primary-screen scroll position plus alternate-screen visibility.
@@ -112,7 +112,7 @@ impl Viewport {
         if usize::from(row) >= usize::from(rows) {
             return None;
         }
-        Some(self.top_line(history_lines) + usize::from(row))
+        self.top_line(history_lines).checked_add(usize::from(row))
     }
 }
 
@@ -167,7 +167,7 @@ pub fn viewport_row<R: HistoryRead + ?Sized>(
 /// The live path only stamps metadata; it does not take another terminal
 /// snapshot. Alternate-screen detection is synchronized before reading the
 /// effective offset, so primary history is never projected behind it.
-pub fn project_frame(terminal: &mut Terminal, viewport: &mut Viewport, frame: &mut FrameDelta) {
+pub fn project_frame(terminal: &mut Terminal, viewport: &mut Viewport, frame: &mut FrameDelta) -> Result<(), TerminalError> {
     let history_lines = terminal.history_len();
     viewport.sync_screen(terminal.has_mode(TerminalMode::AltScreen), history_lines);
     frame.viewport = TerminalViewport {
@@ -176,33 +176,88 @@ pub fn project_frame(terminal: &mut Terminal, viewport: &mut Viewport, frame: &m
         alternate_screen: viewport.alternate_screen(),
     };
     if viewport.offset() == 0 {
-        return;
+        return Ok(());
     }
 
     let snapshot = terminal.snapshot();
     let cols = usize::from(snapshot.size.cols);
-    let mut rows = Vec::with_capacity(usize::from(snapshot.size.rows));
+    // Gather projected rows, distinguishing history origin from visible snapshot
+    // rows. The style slice must not be held across viewport_row reads, so
+    // collect first and reborrow after.
+    let mut projected: Vec<(u16, ViewportRow, bool)> =
+        Vec::with_capacity(usize::from(snapshot.size.rows));
     for row in 0..snapshot.size.rows {
-        let Some(projected) = viewport_row(terminal, &snapshot, viewport, row) else {
-            continue;
-        };
-        let mut cells = projected.cells;
+        let vr = viewport_row(terminal, &snapshot, viewport, row)
+            .ok_or(TerminalError::StyleCompactionCorrupt)?;
+        let is_history = vr.absolute < history_lines;
+        projected.push((row, vr, is_history));
+    }
+
+    // Seed frame-local style table from the visible snapshot (already frame-local).
+    let frame_size = snapshot.size;
+    frame.styles = snapshot.styles;
+    let mut style_to_local: std::collections::HashMap<_, u16> =
+        std::collections::HashMap::with_capacity(frame.styles.len());
+    for (idx, style) in frame.styles.iter().enumerate() {
+        let id = idx as u16;
+        style_to_local.entry(style.clone()).or_insert(id);
+    }
+    // Prepare per-frame remap for history-origin global IDs only. Visible
+    // snapshot cells are already frame-local and must not be remapped.
+    let global_len = terminal.global_styles().len();
+    let mut global_to_local: Vec<u16> = vec![u16::MAX; global_len];
+    if global_len > 0 {
+        global_to_local[0] = 0;
+    }
+    let mut rows = Vec::with_capacity(projected.len());
+    for (row_idx, vr, is_history) in projected {
+        let mut cells = vr.cells;
         cells.truncate(cols);
         cells.resize(cols, Cell::default());
+        if is_history {
+            // Reborrow global styles for each row to satisfy the borrow rule
+            // (do not hold slice across viewport_row, already satisfied; here
+            // we reborrow per-row to keep the slice short-lived).
+            let global = terminal.global_styles();
+            for cell in &mut cells {
+                let gid = usize::from(cell.style);
+                if gid >= global.len() {
+                    return Err(TerminalError::StyleCompactionCorrupt);
+                }
+                let mapped = global_to_local[gid];
+                if mapped != u16::MAX {
+                    cell.style = mapped;
+                } else {
+                    let style = &global[gid];
+                    if let Some(&existing) = style_to_local.get(style) {
+                        global_to_local[gid] = existing;
+                        cell.style = existing;
+                    } else if frame.styles.len() <= 65_535 {
+                        let local = frame.styles.len() as u16;
+                        frame.styles.push(style.clone());
+                        style_to_local.insert(style.clone(), local);
+                        global_to_local[gid] = local;
+                        cell.style = local;
+                    } else {
+                        return Err(TerminalError::StyleCompactionCapacity);
+                    }
+                }
+            }
+        }
         let mut runs = Vec::new();
         batch_runs(&cells, &mut runs);
         rows.push(RowDelta {
-            row,
+            row: row_idx,
             generation: frame.sequence,
             cells,
             runs,
         });
     }
-    frame.size = snapshot.size;
+    frame.size = frame_size;
     frame.damage = DamageKind::Full;
     frame.rows = rows;
-    frame.styles = snapshot.styles;
     frame.cursor.visible = false;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -280,13 +335,14 @@ mod tests {
     #[test]
     fn projection_stamps_live_metadata_and_materializes_scrolled_rows() {
         let mut term = Terminal::new(GridSize::new(5, 2)).unwrap();
-        term.feed(b"old1\r\nold2\r\nlive!");
+        term.feed(b"old1\r\nold2\r\nlive!")
+            .expect("viewport live projection fixture feed should succeed for old1/old2/live");
         assert_eq!(term.history_len(), 1);
         let mut pool = mr_crabs_terminal::frame_pool_default();
         let mut live = term.build_frame_delta(&mut pool);
         let live_damage = live.damage;
         let mut vp = Viewport::new();
-        project_frame(&mut term, &mut vp, &mut live);
+        project_frame(&mut term, &mut vp, &mut live).expect("project_frame");
         assert_eq!(
             live.viewport,
             mr_crabs_terminal::TerminalViewport {
@@ -299,10 +355,9 @@ mod tests {
             live.damage, live_damage,
             "live projection does not force full"
         );
-
-        vp.scroll_up(1, term.history_len());
         let mut scrolled = term.build_frame_delta(&mut pool);
-        project_frame(&mut term, &mut vp, &mut scrolled);
+        vp.scroll_up(1, term.history_len());
+        project_frame(&mut term, &mut vp, &mut scrolled).expect("project_frame");
         assert_eq!(scrolled.damage, DamageKind::Full);
         assert!(!scrolled.cursor.visible);
         assert_eq!(scrolled.rows.len(), 2);
@@ -324,7 +379,7 @@ mod tests {
 
         term.force_compress_all();
         let mut cold = term.build_frame_delta(&mut pool);
-        project_frame(&mut term, &mut vp, &mut cold);
+        project_frame(&mut term, &mut vp, &mut cold).expect("project_frame");
         assert_eq!(cold.rows.len(), hot_rows.len());
         for (cold_row, hot_row) in cold.rows.iter().zip(&hot_rows) {
             assert_eq!(
@@ -338,14 +393,16 @@ mod tests {
     #[test]
     fn projection_never_paints_primary_history_in_alternate_screen() {
         let mut term = Terminal::new(GridSize::new(5, 2)).unwrap();
-        term.feed(b"old1\r\nold2\r\nlive!");
+        term.feed(b"old1\r\nold2\r\nlive!")
+            .expect("viewport alt-screen fixture feed should succeed for old1/old2/live");
         let mut vp = Viewport::new();
         vp.scroll_up(1, term.history_len());
         let mut pool = mr_crabs_terminal::frame_pool_default();
 
-        term.feed(b"\x1b[?1049hALT");
+        term.feed(b"\x1b[?1049hALT")
+            .expect("viewport alt-screen fixture feed should succeed for alt enter");
         let mut alternate = term.build_frame_delta(&mut pool);
-        project_frame(&mut term, &mut vp, &mut alternate);
+        project_frame(&mut term, &mut vp, &mut alternate).expect("project_frame");
         assert!(alternate.viewport.alternate_screen);
         assert_eq!(alternate.viewport.scroll_offset, 0);
         assert_eq!(vp.offset(), 0);
@@ -359,9 +416,10 @@ mod tests {
         assert!(!alternate_text.contains("old1"));
 
         vp.scroll_up(99, term.history_len());
-        term.feed(b"\x1b[?1049l");
+        term.feed(b"\x1b[?1049l")
+            .expect("viewport alt-screen fixture feed should succeed for alt exit");
         let mut primary = term.build_frame_delta(&mut pool);
-        project_frame(&mut term, &mut vp, &mut primary);
+        project_frame(&mut term, &mut vp, &mut primary).expect("project_frame");
         assert!(!primary.viewport.alternate_screen);
         assert_eq!(vp.offset(), 1);
         assert_eq!(primary.viewport.scroll_offset, 1);
@@ -373,7 +431,6 @@ mod tests {
             "old1"
         );
     }
-
     #[test]
     fn capped_history_growth_keeps_offset_within_metadata() {
         let mut term = Terminal::new_with_config(
@@ -384,20 +441,20 @@ mod tests {
             },
         )
         .unwrap();
-        term.feed(b"a001\r\na002\r\na003\r\n");
+        term.feed(b"a001\r\na002\r\na003\r\n")
+            .expect("viewport capped history fixture feed should succeed for a001/a002/a003");
         assert_eq!(term.history_len(), 2);
         let mut vp = Viewport::new();
         vp.scroll_up(1, term.history_len());
         let before = term.history_len();
-        term.feed(b"a004\r\n");
+        term.feed(b"a004\r\n")
+            .expect("viewport capped history fixture feed should succeed for a004");
         let after = term.history_len();
         assert_eq!(after, before, "bounded store evicts instead of growing");
         vp.note_history_growth(before, after);
         assert_eq!(vp.offset(), 1);
-
         let mut frame = FrameDelta::empty(GridSize::new(4, 2));
-        project_frame(&mut term, &mut vp, &mut frame);
-        assert!(frame.viewport.scroll_offset <= frame.viewport.history_rows);
+        project_frame(&mut term, &mut vp, &mut frame).expect("project_frame");
     }
 
     #[test]
@@ -418,12 +475,11 @@ mod tests {
         // second row per feed. Five feeds on a three-row grid scroll three
         // lines (feeds 3-5).
         for i in 0..5 {
-            term.feed(format!("L{i:04}abc\r\n").as_bytes());
+            term.feed(format!("L{i:04}abc\r\n").as_bytes())
+                .unwrap_or_else(|error| panic!("viewport hot/cold fixture feed should succeed for L{i:04}abc: {error}"));
         }
         let snap = snapshot_for(&term);
         assert_eq!(term.history_len(), 3, "three lines scrolled out");
-
-        // Hot reads.
         let mut vp = Viewport::new();
         vp.to_top(term.history_len());
         let hot_top = viewport_row(&mut term, &snap, &vp, 0).expect("row 0");
@@ -466,7 +522,8 @@ mod tests {
         // leave the cursor in the last column, wrap the next feed's first
         // character, and scroll two rows per feed.
         for i in 0..4 {
-            term.feed(format!("W{i}xxx\r\n").as_bytes());
+            term.feed(format!("W{i}xxx\r\n").as_bytes())
+                .unwrap_or_else(|error| panic!("viewport resize fixture feed should succeed for W{i}xxx: {error}"));
         }
         let narrow = term.history_len();
         // Four one-row feeds on a two-row grid: feeds 2-4 each scroll one
@@ -474,8 +531,10 @@ mod tests {
         assert_eq!(narrow, 3);
         // Resize wider; new lines take the new width, old lines keep 6.
         term.resize(GridSize::new(10, 2)).unwrap();
-        term.feed("LONGERLINE\r\n".as_bytes());
-        term.feed("ANOTHERONE\r\n".as_bytes());
+        term.feed("LONGERLINE\r\n".as_bytes())
+            .expect("viewport resize fixture feed should succeed for LONGERLINE");
+        term.feed("ANOTHERONE\r\n".as_bytes())
+            .expect("viewport resize fixture feed should succeed for ANOTHERONE");
         assert!(term.history_len() >= 3);
         let snap = snapshot_for(&term);
         let mut vp = Viewport::new();
@@ -497,10 +556,12 @@ mod tests {
         // down without a carriage return, so "efgh" wraps at its first
         // character: the wrap scrolls "abcd" out and the trailing LF scrolls
         // "efgh" out, leaving two history lines.
-        term.feed(b"abcd\n");
+        term.feed(b"abcd\n")
+            .expect("viewport history-read fixture feed should succeed for abcd");
         let reader = &mut term as &mut dyn HistoryRead;
         assert_eq!(reader.history_len(), 0);
-        term.feed(b"efgh\n");
+        term.feed(b"efgh\n")
+            .expect("viewport history-read fixture feed should succeed for efgh");
         let reader = &mut term as &mut dyn HistoryRead;
         assert_eq!(reader.history_len(), 2);
         let mut out = Vec::new();

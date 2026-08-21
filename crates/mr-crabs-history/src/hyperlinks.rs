@@ -83,7 +83,8 @@ mod tests {
         let size = GridSize::new(20, 3);
         let mut term = Terminal::new(size).unwrap();
         // OSC 8 link over "link text here" then an unlinked tail.
-        term.feed(b"\x1b]8;;https://example.com\x07link text here\x1b]8;;\x07 and more");
+        term.feed(b"\x1b]8;;https://example.com\x07link text here\x1b]8;;\x07 and more")
+            .expect("hyperlink fixture feed should succeed for OSC8 link with tail");
         let snap = term.snapshot();
         // 14 linked cells + 9 tail cells = 23 chars wrap past the 20-column
         // grid, so the cursor lands on row 1.
@@ -107,12 +108,12 @@ mod tests {
         assert!(hyperlink_at(&term, 99, 0).is_none());
         assert!(hyperlink_at(&term, 0, 99).is_none());
     }
-
     #[test]
     fn hyperlink_with_explicit_id() {
         let size = GridSize::new(12, 2);
         let mut term = Terminal::new(size).unwrap();
-        term.feed(b"\x1b]8;id=42;https://x.example/a\x07abc\x1b]8;;\x07");
+        term.feed(b"\x1b]8;id=42;https://x.example/a\x07abc\x1b]8;;\x07")
+            .expect("hyperlink fixture feed should succeed for OSC8 link with id");
         let hit = hyperlink_at(&term, 0, 1).expect("link");
         assert_eq!(hit.id.as_deref(), Some("42"));
         assert_eq!(hit.uri, "https://x.example/a");
