@@ -24,7 +24,7 @@ use crate::compact::state::{
     TITLE_STACK_MAX, TabStops, clamp_scroll_region, default_cursor_style, map_charset,
 };
 use crate::compact::width::char_width;
-use crate::side_tables::{GraphemeTable, HyperlinkTable, StyleTable};
+use crate::side_tables::{GraphemeTable, HyperlinkTable, StyleRemap, StyleTable};
 use crate::{
     Cell, CombiningMarks, CursorSnapshot, DamageKind, GridSize, HistoryRead, HyperlinkInfo,
     NormalizedSnapshot, SnapshotHyperlink, Style, TerminalError, TerminalMode,
@@ -97,6 +97,17 @@ pub struct CompactEngine {
     recycled_rows: Vec<Arc<[Cell]>>,
     #[cfg(test)]
     next_page_generation: u64,
+}
+
+pub(crate) struct EngineStyleRemap {
+    pub(crate) pen: Pen,
+    pub(crate) primary_saved: SavedCursor,
+    pub(crate) alternate_saved: SavedCursor,
+    pub(crate) primary_active: VecDeque<CompactRow>,
+    pub(crate) primary_history: VecDeque<CompactRow>,
+    pub(crate) alternate_active: VecDeque<CompactRow>,
+    pub(crate) alternate_history: VecDeque<CompactRow>,
+    pub(crate) staged_table: StyleTable,
 }
 
 impl CompactEngine {
@@ -354,6 +365,273 @@ impl CompactEngine {
         self.primary.history.clear();
     }
 
+    pub fn global_styles(&self) -> &[crate::Style] {
+        self.styles.as_slice()
+    }
+
+    pub fn visible_cells_global(&self) -> Vec<Cell> {
+        let cols = usize::from(self.size.cols);
+        let rows = usize::from(self.size.rows);
+        let mut cells = Vec::with_capacity(cols * rows);
+        for row in self.screen().active.iter() {
+            for col in 0..cols {
+                let mut cell = if col < usize::from(row.first_occupied)
+                    || col >= usize::from(row.occupancy)
+                {
+                    Cell::default()
+                } else {
+                    row.cells[col]
+                };
+                cell.flags &= !flags::COMBINING;
+                cells.push(cell);
+            }
+        }
+        debug_assert_eq!(cells.len(), cols * rows);
+        cells
+    }
+
+    pub fn replace_style_table(&mut self, styles: &[Style]) -> Result<(), TerminalError> {
+        let table = StyleTable::from_exact(styles)?;
+        self.styles = table;
+        Ok(())
+    }
+
+    pub(crate) fn style_count(&self) -> usize {
+        self.styles.len()
+    }
+
+    pub(crate) fn style_epoch(&self) -> u64 {
+        self.styles.epoch()
+    }
+
+
+
+    pub(crate) fn stage_style_remap(
+        &self,
+        remap: &StyleRemap,
+    ) -> Result<EngineStyleRemap, TerminalError> {
+        remap.validate_for(self.styles.as_slice())?;
+        let staged_table = self.styles.stage_remapped(remap)?;
+
+        // Remap pens: preserve style_dirty and all other fields, only style id changes.
+        let mut pen = self.pen;
+        pen.style = remap.map(pen.style)?;
+        let mut primary_saved = self.primary.saved;
+        primary_saved.pen.style = remap.map(primary_saved.pen.style)?;
+        let mut alternate_saved = self.alternate.saved;
+        alternate_saved.pen.style = remap.map(alternate_saved.pen.style)?;
+
+        fn remap_rows(
+            src: &VecDeque<CompactRow>,
+            remap: &StyleRemap,
+        ) -> Result<VecDeque<CompactRow>, TerminalError> {
+            let mut out = VecDeque::with_capacity(src.len());
+            for row in src.iter() {
+                let cols = usize::from(row.cols);
+                let len = row.cells.len();
+                let first = usize::from(row.first_occupied.min(row.cols));
+                let mut end = usize::from(row.occupancy.min(row.cols));
+                if row.wrapped && end < cols {
+                    end = cols;
+                }
+                let occupied_empty = first >= end || first >= len;
+                let occ_start = if occupied_empty { cols } else { first };
+                let occ_end = if occupied_empty { cols } else { end.min(len) };
+
+                // Clone backing into new owned buffer; preserve metadata exactly.
+                let mut cells: Vec<Cell> = row.cells.as_ref().to_vec();
+                debug_assert_eq!(cells.len(), len);
+                let mut changed = false;
+                if !occupied_empty {
+                    for cell in cells.iter_mut().take(occ_end).skip(occ_start) {
+                        let old = cell.style;
+                        let mapped = remap.map(old)?;
+                        changed |= mapped != old;
+                        cell.style = mapped;
+                    }
+                    // Sanitize outside occupied range to default cell (covers stale dead ids).
+                    for idx in 0..occ_start.min(cells.len()) {
+                        if !cells[idx].is_default() {
+                            cells[idx] = Cell::default();
+                            changed = true;
+                        } else if cells[idx].style != 0 {
+                            cells[idx].style = 0;
+                            changed = true;
+                        }
+                    }
+                    for cell in cells.iter_mut().skip(occ_end) {
+                        if !cell.is_default() {
+                            *cell = Cell::default();
+                            changed = true;
+                        } else if cell.style != 0 {
+                            cell.style = 0;
+                            changed = true;
+                        }
+                    }
+                } else {
+                    // Visually empty but may hold stale styles; sanitize entire row.
+                    for cell in cells.iter_mut() {
+                        if !cell.is_default() || cell.style != 0 {
+                            *cell = Cell::default();
+                            changed = true;
+                        }
+                    }
+                }
+
+                let generation = if changed {
+                    row.generation.wrapping_add(1)
+                } else {
+                    row.generation
+                };
+                let mut new_row = CompactRow::from_parts(
+                    cells.into(),
+                    row.cols,
+                    row.occupancy,
+                    row.first_occupied,
+                    row.wrapped,
+                    generation,
+                );
+                // Preserve RowExtras exactly (no filtering).
+                new_row.extras = row.extras.clone();
+                // If content changed and generation wasn't bumped (should have), ensure bump already applied.
+                // Generation already set via from_parts; no extra bump needed.
+                out.push_back(new_row);
+            }
+            Ok(out)
+        }
+
+        let primary_active = remap_rows(&self.primary.active, remap)?;
+        let primary_history = remap_rows(&self.primary.history, remap)?;
+        let alternate_active = remap_rows(&self.alternate.active, remap)?;
+        let alternate_history = remap_rows(&self.alternate.history, remap)?;
+
+        Ok(EngineStyleRemap {
+            pen,
+            primary_saved,
+            alternate_saved,
+            primary_active,
+            primary_history,
+            alternate_active,
+            alternate_history,
+            staged_table,
+        })
+    }
+
+    pub(crate) fn commit_style_remap(&mut self, staged: EngineStyleRemap) {
+        // Infallible: field assignments/swaps only, no allocation or fallible calls.
+        self.pen = staged.pen;
+        self.primary.saved = staged.primary_saved;
+        self.alternate.saved = staged.alternate_saved;
+        self.primary.active = staged.primary_active;
+        self.primary.history = staged.primary_history;
+        self.alternate.active = staged.alternate_active;
+        self.alternate.history = staged.alternate_history;
+        self.styles = staged.staged_table;
+        self.recycled_rows.clear();
+        self.mark_full();
+        // Row generations already bumped in staged rows where backing changed.
+    }
+
+    pub(crate) fn collect_live_style_ids(
+        &self,
+        out: &mut std::collections::BTreeSet<u16>,
+    ) {
+        out.insert(self.pen.style);
+        out.insert(self.primary.saved.pen.style);
+        out.insert(self.alternate.saved.pen.style);
+        for row in self
+            .primary
+            .active
+            .iter()
+            .chain(self.primary.history.iter())
+            .chain(self.alternate.active.iter())
+            .chain(self.alternate.history.iter())
+        {
+            let cols = usize::from(row.cols);
+            let first = usize::from(row.first_occupied.min(row.cols));
+            let mut end = usize::from(row.occupancy.min(row.cols));
+            if row.wrapped && end < cols {
+                end = cols;
+            }
+            if first >= end || first >= row.cells.len() {
+                out.insert(0);
+                continue;
+            }
+            for cell in &row.cells[first..end.min(row.cells.len())] {
+                out.insert(cell.style);
+            }
+        }
+    }
+
+    fn validate_visible_grid(
+        &self,
+        cells: &[Cell],
+        styles_len: usize,
+    ) -> Result<(), TerminalError> {
+        let cols = usize::from(self.size.cols);
+        let rows = usize::from(self.size.rows);
+        if cells.len() != cols * rows {
+            return Err(TerminalError::RestoreSizeMismatch);
+        }
+        for cell in cells {
+            if usize::from(cell.style) >= styles_len {
+                return Err(TerminalError::RestoreStyleTable);
+            }
+        }
+        Ok(())
+    }
+
+    fn apply_visible_grid(
+        &mut self,
+        cells: &[Cell],
+        combining_marks: &[CombiningMarks],
+        hyperlinks: &[SnapshotHyperlink],
+    ) {
+        let cols = usize::from(self.size.cols);
+        let rows = usize::from(self.size.rows);
+        self.graphemes = GraphemeTable::new();
+        self.hyperlinks = HyperlinkTable::new();
+        for row in 0..rows {
+            let start = row * cols;
+            let slice = &cells[start..start + cols];
+            let mut built = CompactRow::new(slice.to_vec(), false);
+            if let Some(last) = slice.last() {
+                if last.flags & flags::WRAPLINE != 0 {
+                    built.wrapped = true;
+                }
+            }
+            self.screen_mut().active[row] = built;
+        }
+        for marks in combining_marks {
+            let row = (marks.cell_index as usize) / cols;
+            let col = (marks.cell_index as usize) % cols;
+            if row >= rows {
+                continue;
+            }
+            let id = self.graphemes.intern(marks.codepoints.clone());
+            let row_ref = &mut self.screen_mut().active[row];
+            if let Some(cell) = row_ref.cells_mut().get_mut(col) {
+                cell.flags |= flags::COMBINING;
+            }
+            row_ref.extras_mut().combining.insert(col as u16, id);
+            row_ref.bump();
+        }
+        for link in hyperlinks {
+            let row = (link.cell_index as usize) / cols;
+            let col = (link.cell_index as usize) % cols;
+            if row >= rows {
+                continue;
+            }
+            let id = self
+                .hyperlinks
+                .intern(link.id.clone().unwrap_or_default(), link.uri.clone());
+            let row_ref = &mut self.screen_mut().active[row];
+            row_ref.extras_mut().hyperlinks.insert(col as u16, id);
+            row_ref.bump();
+        }
+        self.mark_full();
+    }
+
     pub fn snapshot(&self) -> NormalizedSnapshot {
         let cols = usize::from(self.size.cols);
         let rows = usize::from(self.size.rows);
@@ -435,58 +713,25 @@ impl CompactEngine {
         combining_marks: &[CombiningMarks],
         hyperlinks: &[SnapshotHyperlink],
     ) -> Result<(), TerminalError> {
-        let cols = usize::from(self.size.cols);
-        let rows = usize::from(self.size.rows);
-        if cells.len() != cols * rows {
-            return Err(TerminalError::RestoreSizeMismatch);
-        }
-        self.styles = StyleTable::new();
-        for style in styles {
-            self.styles.intern(style.clone());
-        }
-        self.graphemes = GraphemeTable::new();
-        self.hyperlinks = HyperlinkTable::new();
-        for row in 0..rows {
-            let start = row * cols;
-            let slice = &cells[start..start + cols];
-            let mut built = CompactRow::new(slice.to_vec(), false);
-            if let Some(last) = slice.last() {
-                if last.flags & flags::WRAPLINE != 0 {
-                    built.wrapped = true;
-                }
-            }
-            self.screen_mut().active[row] = built;
-        }
-        for marks in combining_marks {
-            let row = (marks.cell_index as usize) / cols;
-            let col = (marks.cell_index as usize) % cols;
-            if row >= rows {
-                continue;
-            }
-            let id = self.graphemes.intern(marks.codepoints.clone());
-            let row_ref = &mut self.screen_mut().active[row];
-            if let Some(cell) = row_ref.cells_mut().get_mut(col) {
-                cell.flags |= flags::COMBINING;
-            }
-            row_ref.extras_mut().combining.insert(col as u16, id);
-            row_ref.bump();
-        }
-        for link in hyperlinks {
-            let row = (link.cell_index as usize) / cols;
-            let col = (link.cell_index as usize) % cols;
-            if row >= rows {
-                continue;
-            }
-            let id = self
-                .hyperlinks
-                .intern(link.id.clone().unwrap_or_default(), link.uri.clone());
-            let row_ref = &mut self.screen_mut().active[row];
-            row_ref.extras_mut().hyperlinks.insert(col as u16, id);
-            row_ref.bump();
-        }
-        self.mark_full();
+        self.validate_visible_grid(cells, styles.len())?;
+        let table = StyleTable::from_exact(styles)?;
+        self.styles = table;
+        self.apply_visible_grid(cells, combining_marks, hyperlinks);
         Ok(())
     }
+
+    pub fn restore_visible_grid_global(
+        &mut self,
+        cells: &[Cell],
+        combining_marks: &[CombiningMarks],
+        hyperlinks: &[SnapshotHyperlink],
+    ) -> Result<(), TerminalError> {
+        let styles_len = self.styles.as_slice().len();
+        self.validate_visible_grid(cells, styles_len)?;
+        self.apply_visible_grid(cells, combining_marks, hyperlinks);
+        Ok(())
+    }
+
 
     pub fn restore_cursor(&mut self, cursor: CursorSnapshot) -> Result<(), TerminalError> {
         if cursor.row >= self.size.rows || cursor.col >= self.size.cols {
@@ -1114,6 +1359,150 @@ impl HistoryRead for CompactEngine {
         CompactEngine::read_history_line(self, index, out)
     }
 }
+
+// -------------------------------------------------------------------
+// Style-cardinality census helpers (Wave A). No compaction.
+// -------------------------------------------------------------------
+
+#[cfg(test)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct EngineCensusDiag {
+    pub active_rows: usize,
+    pub history_rows: usize,
+    pub pens: usize,
+    pub total_cells_scanned: usize,
+    pub total_occupied_cells: usize,
+}
+
+impl CompactEngine {
+
+    #[cfg(test)]
+    #[inline]
+    fn occupied_range_from_metadata(row: &crate::compact::row::CompactRow) -> std::ops::Range<usize> {
+        let cols = usize::from(row.cols);
+        let first = usize::from(row.first_occupied.min(row.cols));
+        let mut end = usize::from(row.occupancy.min(row.cols));
+        if row.wrapped && end < cols {
+            end = cols;
+            // Mirror CompactRow::recompute_occupancy wrapped elongation.
+            let first = first.min(cols.saturating_sub(1));
+            if first >= end || first >= row.cells.len() {
+                return 0..0;
+            }
+            return first..end.min(row.cells.len());
+        }
+        if first >= end || first >= row.cells.len() {
+            return 0..0;
+        }
+        first..end.min(row.cells.len())
+    }
+
+    #[inline]
+    #[cfg(test)]
+    fn collect_row_styles(cells: &[Cell], range: std::ops::Range<usize>, out: &mut std::collections::BTreeSet<u16>) {
+        // Single frozen placed-cell rule: style of every placed cell inside the
+        // occupied range, plus style 0 for any blank row. Exhaustive and
+        // optimized must both use this or an inline identical loop.
+        if range.is_empty() {
+            out.insert(0);
+            return;
+        }
+        for cell in &cells[range] { out.insert(cell.style); }
+    }
+    /// Optimized engine census: current pen + primary.saved + alternate.saved
+    /// + primary/alternate active + primary/alternate history. Uses production
+    ///   metadata occupancy; exhaustive uses independent scan-plus-wrap.
+    #[cfg(test)]
+    pub(crate) fn census_engine_styles_optimized(&self, out: &mut std::collections::BTreeSet<u16>) -> EngineCensusDiag {
+        let mut diag = EngineCensusDiag { active_rows: 0, history_rows: 0, pens: 3, total_cells_scanned: 0, total_occupied_cells: 0 };
+        out.insert(self.pen.style);
+        out.insert(self.primary.saved.pen.style);
+        out.insert(self.alternate.saved.pen.style);
+        for row in self.primary.active.iter().chain(self.primary.history.iter()) {
+            diag.total_cells_scanned += row.cells.len();
+            let range = Self::occupied_range_from_metadata(row);
+            if range.is_empty() {
+                Self::collect_row_styles(&row.cells, 0..0, out);
+            } else {
+                diag.total_occupied_cells += range.len();
+                Self::collect_row_styles(&row.cells, range, out);
+            }
+        }
+        diag.active_rows = self.primary.active.len();
+        diag.history_rows = self.primary.history.len();
+        for row in self.alternate.active.iter().chain(self.alternate.history.iter()) {
+            diag.total_cells_scanned += row.cells.len();
+            let range = Self::occupied_range_from_metadata(row);
+            if range.is_empty() {
+                Self::collect_row_styles(&row.cells, 0..0, out);
+            } else {
+                diag.total_occupied_cells += range.len();
+                Self::collect_row_styles(&row.cells, range, out);
+            }
+        }
+        diag.active_rows += self.alternate.active.len();
+        diag.history_rows += self.alternate.history.len();
+        diag
+    }
+
+    /// Exhaustive engine census: independently derived scan, same frozen
+    /// `scan_row_for_styles` occupied rule and `collect_row_styles` placed-cell
+    /// rule. Intentionally duplicates the loop rather than delegating so
+    /// metadata/placement errors diverge between optimized and exhaustive.
+    /// Preserves wrapped-to-full-row semantics: exhaustive scan extends to
+    /// `cells.len()` when `wrapped` is set, matching storage/optimized.
+    #[cfg(test)]
+    pub(crate) fn census_engine_styles_exhaustive(&self, out: &mut std::collections::BTreeSet<u16>) -> EngineCensusDiag {
+        let mut diag = EngineCensusDiag { active_rows: 0, history_rows: 0, pens: 3, total_cells_scanned: 0, total_occupied_cells: 0 };
+        out.insert(self.pen.style);
+        out.insert(self.primary.saved.pen.style);
+        out.insert(self.alternate.saved.pen.style);
+        for row in self.primary.active.iter().chain(self.primary.history.iter()) {
+            diag.total_cells_scanned += row.cells.len();
+            // Inline exhaustive scan (no delegation) — same predicate, separate code path.
+            let range = if row.cells.is_empty() { None } else {
+                let first = row.cells.iter().position(|c| !c.is_default()).unwrap_or(row.cells.len());
+                if first == row.cells.len() { None } else {
+                    let mut last = row.cells.len();
+                    while last > first && row.cells[last - 1].is_default() { last -= 1; }
+                    if row.wrapped { last = row.cells.len(); }
+                    Some(first..last)
+                }
+            };
+            if let Some(r) = range {
+                diag.total_occupied_cells += r.len();
+                for cell in &row.cells[r] { out.insert(cell.style); }
+            } else {
+                out.insert(0);
+            }
+        }
+        diag.active_rows = self.primary.active.len();
+        diag.history_rows = self.primary.history.len();
+        for row in self.alternate.active.iter().chain(self.alternate.history.iter()) {
+            diag.total_cells_scanned += row.cells.len();
+            let range = if row.cells.is_empty() { None } else {
+                let first = row.cells.iter().position(|c| !c.is_default()).unwrap_or(row.cells.len());
+                if first == row.cells.len() { None } else {
+                    let mut last = row.cells.len();
+                    while last > first && row.cells[last - 1].is_default() { last -= 1; }
+                    if row.wrapped { last = row.cells.len(); }
+                    Some(first..last)
+                }
+            };
+            if let Some(r) = range {
+                diag.total_occupied_cells += r.len();
+                for cell in &row.cells[r] { out.insert(cell.style); }
+            } else {
+                out.insert(0);
+            }
+        }
+        diag.active_rows += self.alternate.active.len();
+        diag.history_rows += self.alternate.history.len();
+        diag
+    }
+}
+
+
 
 impl CompactEngine {
     pub(crate) fn input_text_run(&mut self, text: &str) {
