@@ -42,6 +42,7 @@ use crate::{
     selection::selection_rects,
 };
 
+type OnPaintCallback = Arc<dyn Fn(&mut App)>;
 /// A GPUI element that renders a terminal [`FrameDelta`].
 ///
 /// Construct with [`TerminalElement::new`] (owned frame) or
@@ -63,8 +64,6 @@ use crate::{
 /// primitive — glyph, cursor, selection, background, IME — is positioned
 /// from that single origin plus `CellMetrics`; glyphs are anchored to their
 /// terminal cells, never to the shaper's natural advance.
-type OnPaintCallback = Arc<dyn Fn(&mut App)>;
-
 pub struct TerminalElement {
     /// The frame to render; paint borrows this and never touches the engine.
     frame: Option<Arc<FrameDelta>>,
