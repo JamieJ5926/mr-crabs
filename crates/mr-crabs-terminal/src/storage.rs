@@ -1245,15 +1245,37 @@ impl ScrollbackStorage {
                 let page = &self.history[idx];
                 match page.resident.as_ref() {
                     Some(Resident::Flat(cells)) => {
+                        let cols = usize::from(page.cols);
+                        if cols == 0 {
+                            return Err(TerminalError::StyleCompactionCorrupt);
+                        }
                         let mut remapped = cells.to_vec();
-                        remap_cells(&mut remapped, remap)?;
+                        for row in remapped.chunks_mut(cols).take(page.lines) {
+                            let range = Self::occupied_range_by_scan(row, false);
+                            remap_row_cells(row, range, remap)?;
+                        }
+                        let used = page
+                            .lines
+                            .checked_mul(cols)
+                            .ok_or(TerminalError::StyleCompactionCorrupt)?;
+                        remapped
+                            .get_mut(used..)
+                            .ok_or(TerminalError::StyleCompactionCorrupt)?
+                            .fill(Cell::default());
                         Some(Resident::Flat(Arc::from(remapped.into_boxed_slice())))
                     }
                     Some(Resident::Segmented(rows)) => {
                         let mut remapped_rows = Vec::with_capacity(rows.len());
                         for row in rows {
                             let mut cells = row.cells.to_vec();
-                            remap_cells(&mut cells, remap)?;
+                            let range = Self::occupied_range_for_census(
+                                &cells,
+                                usize::from(row.cols),
+                                row.first_occupied,
+                                row.occupancy,
+                                row.wrapped,
+                            );
+                            remap_row_cells(&mut cells, range, remap)?;
                             remapped_rows.push(RowDesc {
                                 cells: Arc::from(cells.into_boxed_slice()),
                                 cols: row.cols,
@@ -1277,7 +1299,23 @@ impl ScrollbackStorage {
                     return Err(TerminalError::StyleCompactionCorrupt);
                 }
                 let mut cells = self.census_cells.clone();
-                remap_cells(&mut cells, remap)?;
+                let page = &self.history[idx];
+                let cols = usize::from(page.cols);
+                if cols == 0 {
+                    return Err(TerminalError::StyleCompactionCorrupt);
+                }
+                for row in cells.chunks_mut(cols).take(page.lines) {
+                    let range = Self::occupied_range_by_scan(row, false);
+                    remap_row_cells(row, range, remap)?;
+                }
+                let used = page
+                    .lines
+                    .checked_mul(cols)
+                    .ok_or(TerminalError::StyleCompactionCorrupt)?;
+                cells
+                    .get_mut(used..)
+                    .ok_or(TerminalError::StyleCompactionCorrupt)?
+                    .fill(Cell::default());
                 let encoded = encode_cold_page(&self.history[idx], &cells)?;
                 let interned = Self::intern_compressed(&mut staged_pool, encoded);
                 Some(interned)
@@ -2038,10 +2076,19 @@ impl Drop for ScrollbackStorage {
         }
     }
 }
-fn remap_cells(cells: &mut [Cell], remap: &StyleRemap) -> Result<(), TerminalError> {
-    for cell in cells {
+fn remap_row_cells(
+    cells: &mut [Cell],
+    range: std::ops::Range<usize>,
+    remap: &StyleRemap,
+) -> Result<(), TerminalError> {
+    if range.start > range.end || range.end > cells.len() {
+        return Err(TerminalError::StyleCompactionCorrupt);
+    }
+    cells[..range.start].fill(Cell::default());
+    for cell in &mut cells[range.clone()] {
         cell.style = remap.map(cell.style)?;
     }
+    cells[range.end..].fill(Cell::default());
     Ok(())
 }
 
@@ -2617,5 +2664,38 @@ mod owned_ingest_tests {
             s.cold_cache.is_none() == cache_none_before || s.cold_cache.is_none(),
             "census must not populate ColdReadCache"
         );
+    }
+    #[test]
+    fn style_remap_ignores_stale_cells_outside_segmented_occupancy() {
+        let mut storage = ScrollbackStorage::new(
+            4,
+            ScrollbackConfig {
+                max_lines: 100,
+                hot_page_lines: 4,
+                max_queued_jobs: 4,
+                max_pending_completions: 4,
+            },
+        );
+        let mut cells = vec![Cell::default(); 4];
+        cells[0].content = u32::from('x');
+        cells[3].style = 1;
+        storage.ingest_owned_rows_with_bounds(std::iter::once((
+            Arc::from(cells.into_boxed_slice()),
+            4,
+            0,
+            1,
+            false,
+            1,
+        )));
+
+        let styles = [crate::Style::default(), crate::Style::default()];
+        let live = std::collections::BTreeSet::from([0]);
+        let remap = StyleRemap::new(&styles, &live).expect("remap");
+        let staged = storage.stage_style_remap(&remap).expect("stage");
+        let Some(Resident::Segmented(rows)) = staged.pages[0].resident.as_ref() else {
+            panic!("segmented page");
+        };
+        assert_eq!(rows[0].cells[0].content, u32::from('x'));
+        assert_eq!(rows[0].cells[3], Cell::default());
     }
 }
