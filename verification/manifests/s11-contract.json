@@ -5,7 +5,7 @@
   "product": {
     "bundle_name": "Mr Crabs.app",
     "bundle_identifier": "dev.jamie.mr-crabs",
-    "executable": "ghostty",
+    "executable": "mr-crabs",
     "minimum_macos": "13.0"
   },
   "owned_paths": [
@@ -14,9 +14,9 @@
   ],
   "resources": "s11-resources.json",
   "acceptance": [
-    "cargo build --release -p mr-crabs-app --bin ghostty",
+    "cargo build --release -p mr-crabs-app --bin mr-crabs",
     "package/macos/package.sh creates the bundle without invoking Zig, xcodebuild, Swift, or libghostty-vt",
-    "Info.plist identity is exact and the internal executable is ghostty",
+    "Info.plist identity is exact and the internal executable is mr-crabs",
     "shell integration, terminfo, icon, and MIT license are staged",
     "codesign --verify --deep --strict succeeds",
     "otool output contains no libghostty, libzig, or libswift dependency",
