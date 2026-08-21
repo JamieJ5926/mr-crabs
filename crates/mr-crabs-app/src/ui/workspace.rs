@@ -923,9 +923,9 @@ fn route_drop_paths(
 fn palette_overlay(palette: &PaletteState, terminal_palette: TerminalPalette) -> impl IntoElement {
     let is_light = terminal_palette.background[0] > 0x80;
     let panel: gpui::Hsla = if is_light {
-        gpui::rgba(0xfafafa_ff).into()
+        gpui::rgba(0xfafa_faff).into()
     } else {
-        gpui::rgba(0x242424_ff).into()
+        gpui::rgba(0x2424_24ff).into()
     };
     let foreground: gpui::Hsla = if is_light {
         gpui::rgb(0x202020).into()
@@ -933,9 +933,9 @@ fn palette_overlay(palette: &PaletteState, terminal_palette: TerminalPalette) ->
         gpui::rgb(0xe5e5e5).into()
     };
     let border: gpui::Hsla = if is_light {
-        gpui::rgba(0x202020_33).into()
+        gpui::rgba(0x2020_2033).into()
     } else {
-        gpui::rgba(0xe5e5e5_33).into()
+        gpui::rgba(0xe5e5_e533).into()
     };
     let selected = terminal_palette.selection_color();
     let mut list = div()
@@ -1618,7 +1618,9 @@ mod tests {
         cx.update(|cx| {
             model.update(cx, |model, _| {
                 if let Some(pane) = model.focused_pane_mut() {
-                    pane.core.feed_terminal_output(b"\x1b[=2u");
+                    pane.core
+                        .feed_terminal_output(b"\x1b[=2u")
+                        .expect("workspace fixture feed should succeed");
                 }
             });
             model.update(cx, |model, _| {
