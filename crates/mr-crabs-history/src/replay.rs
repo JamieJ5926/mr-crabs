@@ -143,11 +143,7 @@ impl TerminalSnapshot {
             term.push_history_line(*cols, cells);
         }
         term.restore_modes(&self.modes);
-        term.restore_visible_grid_global(
-            &self.visible,
-            &self.combining_marks,
-            &self.hyperlinks,
-        )?;
+        term.restore_visible_grid_global(&self.visible, &self.combining_marks, &self.hyperlinks)?;
         term.restore_cursor(self.cursor)?;
         Ok(())
     }
@@ -212,7 +208,11 @@ impl TerminalSnapshot {
         if self.styles[0] != Style::default() {
             return Err(ReplayError::Corrupt);
         }
-        for cell in self.visible.iter().chain(self.history.iter().flat_map(|l| l.iter())) {
+        for cell in self
+            .visible
+            .iter()
+            .chain(self.history.iter().flat_map(|l| l.iter()))
+        {
             if usize::from(cell.style) >= self.styles.len() {
                 return Err(ReplayError::Corrupt);
             }
@@ -525,11 +525,18 @@ mod tests {
         assert!(!snap.styles.is_empty());
         assert!(snap.styles.len() <= 65_536);
         assert_eq!(snap.styles[0], mr_crabs_terminal::Style::default());
-        for cell in snap.visible.iter().chain(snap.history.iter().flat_map(|l| l.iter())) {
+        for cell in snap
+            .visible
+            .iter()
+            .chain(snap.history.iter().flat_map(|l| l.iter()))
+        {
             assert!((cell.style as usize) < snap.styles.len(), "style in range");
         }
         assert!(
-            snap.history.iter().flat_map(|l| l.iter()).any(|c| c.style != 0),
+            snap.history
+                .iter()
+                .flat_map(|l| l.iter())
+                .any(|c| c.style != 0),
             "history retains non-default style"
         );
         let mut restored = Terminal::new(snap.size).expect("fresh");
@@ -579,7 +586,11 @@ mod tests {
         let mut bad_visible = snap.clone();
         bad_visible.visible.pop();
         assert_eq!(bad_visible.restore(&mut term2), Err(ReplayError::Corrupt));
-        assert_eq!(term2.history_len(), orig_len, "no mutation on validation failure");
+        assert_eq!(
+            term2.history_len(),
+            orig_len,
+            "no mutation on validation failure"
+        );
         let mut bad_hist = snap.clone();
         if !bad_hist.history.is_empty() {
             bad_hist.history[0].pop();
@@ -643,10 +654,12 @@ mod tests {
             );
         } else {
             let mut bad_marks = snap.clone();
-            bad_marks.combining_marks.push(mr_crabs_terminal::CombiningMarks {
-                cell_index: expected as u32,
-                codepoints: Vec::new(),
-            });
+            bad_marks
+                .combining_marks
+                .push(mr_crabs_terminal::CombiningMarks {
+                    cell_index: expected as u32,
+                    codepoints: Vec::new(),
+                });
             assert_eq!(
                 bad_marks.encode(DEFAULT_MAX_SNAPSHOT_BYTES),
                 Err(ReplayError::Corrupt)
@@ -675,7 +688,10 @@ mod tests {
         );
         let mut term_cursor = build_term();
         let orig_cursor_len = term_cursor.history_len();
-        assert_eq!(bad_cursor.restore(&mut term_cursor), Err(ReplayError::Corrupt));
+        assert_eq!(
+            bad_cursor.restore(&mut term_cursor),
+            Err(ReplayError::Corrupt)
+        );
         assert_eq!(
             term_cursor.history_len(),
             orig_cursor_len,

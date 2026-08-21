@@ -574,7 +574,9 @@ fn main() {
             "--variant" => {
                 if i + 1 >= args.len() {
                     eprintln!("[phase-runner] --variant requires a value");
-                    eprintln!("usage: phase-runner [--variant sparse|sparse_scrolling|fullscreen|fullscreen_scrolling] [--bytes N] [--chunk N] [--timeout-ms N]");
+                    eprintln!(
+                        "usage: phase-runner [--variant sparse|sparse_scrolling|fullscreen|fullscreen_scrolling] [--bytes N] [--chunk N] [--timeout-ms N]"
+                    );
                     std::process::exit(2);
                 }
                 variant_filter = Some(args[i + 1].clone());
@@ -583,7 +585,9 @@ fn main() {
             "--bytes" => {
                 if i + 1 >= args.len() {
                     eprintln!("[phase-runner] --bytes requires a value");
-                    eprintln!("usage: phase-runner [--variant sparse|sparse_scrolling|fullscreen|fullscreen_scrolling] [--bytes N] [--chunk N] [--timeout-ms N]");
+                    eprintln!(
+                        "usage: phase-runner [--variant sparse|sparse_scrolling|fullscreen|fullscreen_scrolling] [--bytes N] [--chunk N] [--timeout-ms N]"
+                    );
                     std::process::exit(2);
                 }
                 match args[i + 1].parse::<usize>() {
@@ -602,7 +606,9 @@ fn main() {
             "--chunk" => {
                 if i + 1 >= args.len() {
                     eprintln!("[phase-runner] --chunk requires a value");
-                    eprintln!("usage: phase-runner [--variant sparse|sparse_scrolling|fullscreen|fullscreen_scrolling] [--bytes N] [--chunk N] [--timeout-ms N]");
+                    eprintln!(
+                        "usage: phase-runner [--variant sparse|sparse_scrolling|fullscreen|fullscreen_scrolling] [--bytes N] [--chunk N] [--timeout-ms N]"
+                    );
                     std::process::exit(2);
                 }
                 match args[i + 1].parse::<usize>() {
@@ -621,7 +627,9 @@ fn main() {
             "--timeout-ms" => {
                 if i + 1 >= args.len() {
                     eprintln!("[phase-runner] --timeout-ms requires a value");
-                    eprintln!("usage: phase-runner [--variant sparse|sparse_scrolling|fullscreen|fullscreen_scrolling] [--bytes N] [--chunk N] [--timeout-ms N]");
+                    eprintln!(
+                        "usage: phase-runner [--variant sparse|sparse_scrolling|fullscreen|fullscreen_scrolling] [--bytes N] [--chunk N] [--timeout-ms N]"
+                    );
                     std::process::exit(2);
                 }
                 match args[i + 1].parse::<u64>() {
@@ -642,7 +650,9 @@ fn main() {
             }
             other => {
                 eprintln!("[phase-runner] unknown flag: {other}");
-                eprintln!("usage: phase-runner [--variant sparse|sparse_scrolling|fullscreen|fullscreen_scrolling] [--bytes N] [--chunk N] [--timeout-ms N]");
+                eprintln!(
+                    "usage: phase-runner [--variant sparse|sparse_scrolling|fullscreen|fullscreen_scrolling] [--bytes N] [--chunk N] [--timeout-ms N]"
+                );
                 std::process::exit(2);
             }
         }

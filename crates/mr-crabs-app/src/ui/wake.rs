@@ -10,7 +10,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use gpui::{App, AsyncApp, Entity, WeakEntity};
 
-
 use super::workspace::PUMP_CAP_PER_PANE;
 
 struct WakeState {
@@ -41,7 +40,11 @@ pub fn new_output_wake() -> (mr_crabs_pty::OutputWake, Arc<AtomicBool>) {
 
 /// Install the main-thread pump target. Must run on the GPUI thread
 /// **before** `sync_windows` so the first PTY wake can land.
-pub fn install_wake(cx: &mut App, model: Entity<crate::model::app_model::AppModel>, dirty: Arc<AtomicBool>) {
+pub fn install_wake(
+    cx: &mut App,
+    model: Entity<crate::model::app_model::AppModel>,
+    dirty: Arc<AtomicBool>,
+) {
     let async_cx = cx.to_async();
     WAKE.with(|slot| {
         *slot.borrow_mut() = Some(WakeState {
@@ -53,7 +56,10 @@ pub fn install_wake(cx: &mut App, model: Entity<crate::model::app_model::AppMode
 }
 
 /// Convenience used by tests: install TLS and return the wake closure.
-pub fn spawn_wake_task(cx: &mut App, model: Entity<crate::model::app_model::AppModel>) -> mr_crabs_pty::OutputWake {
+pub fn spawn_wake_task(
+    cx: &mut App,
+    model: Entity<crate::model::app_model::AppModel>,
+) -> mr_crabs_pty::OutputWake {
     let (wake, dirty) = new_output_wake();
     install_wake(cx, model, dirty);
     wake
@@ -156,11 +162,7 @@ fn post_to_main_queue() {
     }
 
     unsafe {
-        dispatch_async_f(
-            &raw mut _dispatch_main_q,
-            std::ptr::null_mut(),
-            trampoline,
-        );
+        dispatch_async_f(&raw mut _dispatch_main_q, std::ptr::null_mut(), trampoline);
     }
 }
 

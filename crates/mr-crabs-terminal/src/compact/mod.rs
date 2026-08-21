@@ -9,9 +9,9 @@ pub mod width;
 mod engine;
 
 pub use engine::CompactEngine;
-pub(crate) use engine::EngineStyleRemap;
 #[cfg(test)]
 pub(crate) use engine::EngineCensusDiag;
+pub(crate) use engine::EngineStyleRemap;
 #[cfg(test)]
 pub use row::{CompactPage, CompactRow, RowExtras};
 

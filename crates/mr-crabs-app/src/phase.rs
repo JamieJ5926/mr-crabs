@@ -171,9 +171,9 @@ mod imp {
 }
 
 #[cfg(feature = "phase-timing")]
-pub use imp::{delta_since, enabled, flush_sidecar, record, snapshot, snapshot_map, Guard};
+pub use imp::{Guard, delta_since, enabled, flush_sidecar, record, snapshot, snapshot_map};
 #[cfg(not(feature = "phase-timing"))]
-pub use imp::{delta_since, enabled, flush_sidecar, record, snapshot, snapshot_map, Guard};
+pub use imp::{Guard, delta_since, enabled, flush_sidecar, record, snapshot, snapshot_map};
 
 #[cfg(test)]
 mod tests {
@@ -204,7 +204,10 @@ mod tests {
 
         #[test]
         fn enabled_is_false() {
-            assert!(!enabled(), "without phase-timing feature enabled() must be false");
+            assert!(
+                !enabled(),
+                "without phase-timing feature enabled() must be false"
+            );
         }
 
         #[test]

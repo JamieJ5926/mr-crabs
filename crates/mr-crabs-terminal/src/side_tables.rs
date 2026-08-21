@@ -19,8 +19,14 @@ pub(crate) struct StyleRemap {
 }
 
 impl StyleRemap {
-    pub(crate) fn new(old_styles: &[Style], live_ids: &std::collections::BTreeSet<u16>) -> Result<Self, TerminalError> {
-        if old_styles.is_empty() || old_styles[0] != Style::default() || live_ids.first() != Some(&0) {
+    pub(crate) fn new(
+        old_styles: &[Style],
+        live_ids: &std::collections::BTreeSet<u16>,
+    ) -> Result<Self, TerminalError> {
+        if old_styles.is_empty()
+            || old_styles[0] != Style::default()
+            || live_ids.first() != Some(&0)
+        {
             return Err(TerminalError::StyleCompactionCorrupt);
         }
 

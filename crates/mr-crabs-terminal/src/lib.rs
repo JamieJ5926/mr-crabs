@@ -446,9 +446,8 @@ impl Display for TerminalError {
             Self::StyleCompactionCapacity => formatter.write_str(
                 "terminal style compaction cannot reserve one feed chunk within u16 capacity",
             ),
-            Self::StyleCompactionCorrupt => formatter.write_str(
-                "terminal style compaction found corrupt or inconsistent style state",
-            ),
+            Self::StyleCompactionCorrupt => formatter
+                .write_str("terminal style compaction found corrupt or inconsistent style state"),
         }
     }
 }
@@ -579,13 +578,14 @@ impl Terminal {
         // only after both commits. Implemented via preflight Result
         // closure + match so no fallible call follows a commit.
         let preflight: Result<
-            (crate::storage::StorageStyleRemap, crate::compact::EngineStyleRemap),
+            (
+                crate::storage::StorageStyleRemap,
+                crate::compact::EngineStyleRemap,
+            ),
             TerminalError,
         > = (|| {
             let mut live_ids = std::collections::BTreeSet::new();
-            self.protocol
-                .engine()
-                .collect_live_style_ids(&mut live_ids);
+            self.protocol.engine().collect_live_style_ids(&mut live_ids);
             self.storage.collect_live_style_ids(&mut live_ids)?;
             if live_ids
                 .len()
@@ -619,7 +619,6 @@ impl Terminal {
             }
         }
     }
-
 
     fn ingest_scrolled(&mut self) {
         if self.storage.config().max_lines == 0 {
@@ -674,7 +673,12 @@ impl Terminal {
                     .into_iter()
                     .map(|r| {
                         crate::compact::row::CompactRow::from_parts(
-                            r.cells, r.cols, r.occupancy, r.first_occupied, r.wrapped, r.generation,
+                            r.cells,
+                            r.cols,
+                            r.occupancy,
+                            r.first_occupied,
+                            r.wrapped,
+                            r.generation,
                         )
                     })
                     .collect();
@@ -1066,30 +1070,43 @@ impl Terminal {
         let mut exh_set = std::collections::BTreeSet::new();
         let engine_opt = {
             let mut s = std::collections::BTreeSet::new();
-            let d = self.protocol.engine().census_engine_styles_optimized(&mut s);
+            let d = self
+                .protocol
+                .engine()
+                .census_engine_styles_optimized(&mut s);
             (s, d)
         };
         let engine_exh = {
             let mut s = std::collections::BTreeSet::new();
-            let d = self.protocol.engine().census_engine_styles_exhaustive(&mut s);
+            let d = self
+                .protocol
+                .engine()
+                .census_engine_styles_exhaustive(&mut s);
             (s, d)
         };
         let store_opt_diag = self.storage.census_storage_styles_optimized(&mut opt_set);
         let store_exh_diag = self.storage.census_storage_styles_exhaustive(&mut exh_set);
         // Merge engine + storage into combined probe sets.
         let mut combined_opt = opt_set.clone();
-        for id in engine_opt.0.iter() { combined_opt.insert(*id); }
+        for id in engine_opt.0.iter() {
+            combined_opt.insert(*id);
+        }
         let mut combined_exh = exh_set.clone();
-        for id in engine_exh.0.iter() { combined_exh.insert(*id); }
-        let pending_any = self.storage_stats().pending_completions != 0 || self.storage_stats().queued_jobs != 0;
-        let has_corruption = store_opt_diag.corrupt_cold_pages > 0 || store_exh_diag.corrupt_cold_pages > 0;
+        for id in engine_exh.0.iter() {
+            combined_exh.insert(*id);
+        }
+        let pending_any =
+            self.storage_stats().pending_completions != 0 || self.storage_stats().queued_jobs != 0;
+        let has_corruption =
+            store_opt_diag.corrupt_cold_pages > 0 || store_exh_diag.corrupt_cold_pages > 0;
         // Fail closed on corruption. Barrier A `sets_equal` is the combined semantic
         // live set only (`combined_opt == combined_exh`); storage-only / engine-only
         // partitions are diagnostic and may differ by derivation without failing the
         // gate — only combined divergence or corruption must force not-equal.
         let sets_equal = !has_corruption && combined_opt == combined_exh;
         let live_style_count = combined_opt.len();
-        let promotable = quiesced && !pending_any && !has_corruption && sets_equal && live_style_count <= 60_000;
+        let promotable =
+            quiesced && !pending_any && !has_corruption && sets_equal && live_style_count <= 60_000;
         // Barrier A invariant: promotion is trustworthy only on full gate.
         let trustworthy = promotable;
         StyleProbeReport {
@@ -1133,7 +1150,6 @@ pub(crate) struct StyleProbeReport {
     pub engine_opt_diag: crate::compact::EngineCensusDiag,
     pub engine_exh_diag: crate::compact::EngineCensusDiag,
 }
-
 
 fn map_cursor_shape(shape: VteCursorShape) -> CursorShape {
     match shape {
@@ -1252,14 +1268,16 @@ mod tests {
         );
 
         // Origin mode + scroll margins (DECSTBM), insert mode.
-        term.feed(b"\x1b[?6h\x1b[2;3r\x1b[4h").expect("terminal feed");
+        term.feed(b"\x1b[?6h\x1b[2;3r\x1b[4h")
+            .expect("terminal feed");
         assert!(term.snapshot().modes.contains(&super::TerminalMode::Origin));
         assert!(term.snapshot().modes.contains(&super::TerminalMode::Insert));
         // Reset
         term.feed(b"\x1b[?6l\x1b[r\x1b[4l").expect("terminal feed");
 
         // Tab stops, index/reverse-index, insert/delete chars/lines, scroll.
-        term.feed(b"\t\x1bD\x1bM\x1b[@\x1b[P\x1b[L\x1b[M\x1b[K\x1b[2K\x1b[J").expect("terminal feed");
+        term.feed(b"\t\x1bD\x1bM\x1b[@\x1b[P\x1b[L\x1b[M\x1b[K\x1b[2K\x1b[J")
+            .expect("terminal feed");
         // If we got here without panic, core ops covered. Snapshot must be valid.
         let _ = term.snapshot();
 
@@ -1313,7 +1331,9 @@ mod tests {
 
         // Style interning deduplication: feed multiple colors, styles vec should deduplicate.
         let mut term4 = Terminal::new(size).unwrap();
-        term4.feed(b"\x1b[31mA\x1b[32mB\x1b[31mC\x1b[0mD").expect("terminal feed");
+        term4
+            .feed(b"\x1b[31mA\x1b[32mB\x1b[31mC\x1b[0mD")
+            .expect("terminal feed");
         let snap4 = term4.snapshot();
         // Styles: default + red + green = 3 entries max (red reused for A and C)
         // Exact count depends on reset behavior but must be <=4 and >=2.
@@ -1330,7 +1350,9 @@ mod tests {
 
         // Hyperlink identity is snapshot data, not an incidental cell flag.
         let mut term5 = Terminal::new(size).unwrap();
-        term5.feed(b"\x1b]8;id=docs;https://example.com\x07link\x1b]8;;\x07").expect("terminal feed");
+        term5
+            .feed(b"\x1b]8;id=docs;https://example.com\x07link\x1b]8;;\x07")
+            .expect("terminal feed");
         let snap5 = term5.snapshot();
         assert_eq!(snap5.cells[0].content, u32::from('l'));
         assert_eq!(snap5.hyperlinks.len(), 4);
@@ -1357,7 +1379,9 @@ mod tests {
 
         // Semantic prompt region (OSC 133 etc) — similar stability check.
         let mut term6 = Terminal::new(size).unwrap();
-        term6.feed(b"\x1b]133;A\x07prompt\x1b]133;B\x07").expect("terminal feed");
+        term6
+            .feed(b"\x1b]133;A\x07prompt\x1b]133;B\x07")
+            .expect("terminal feed");
         let snap6 = term6.snapshot();
         assert_eq!(snap6.size, size);
         assert_eq!(
@@ -1399,7 +1423,9 @@ mod tests {
         // Anchors are logical positions; after scroll, they should be clamped to grid bounds.
         // We approximate by checking cursor/snapshot stability across scroll.
         let mut term2 = Terminal::new(GridSize::new(10, 3)).unwrap();
-        term2.feed(b"line1\nline2\nline3\nline4\n").expect("terminal feed");
+        term2
+            .feed(b"line1\nline2\nline3\nline4\n")
+            .expect("terminal feed");
         let snap = term2.snapshot();
         assert_eq!(snap.cursor.row, 2); // bottom row after scrolling 4 lines into 3-row viewport
         // After additional resize, anchors remain bounded.
@@ -1834,7 +1860,9 @@ mod tests {
         for chunk in chunks {
             fast.feed(chunk).expect("terminal feed");
             for byte in *chunk {
-                bytewise.feed(std::slice::from_ref(byte)).expect("terminal feed");
+                bytewise
+                    .feed(std::slice::from_ref(byte))
+                    .expect("terminal feed");
             }
             assert_eq!(fast.snapshot(), bytewise.snapshot());
         }
@@ -2033,7 +2061,8 @@ mod tests {
         config.max_lines = 0;
         term.set_scrollback_config(config);
 
-        term.feed(b"one\ntwo\nthree\nfour\nfive\n").expect("terminal feed");
+        term.feed(b"one\ntwo\nthree\nfour\nfive\n")
+            .expect("terminal feed");
 
         assert_eq!(term.history_len(), 0);
         assert_eq!(term.storage_stats().logical_lines, 0);
@@ -2059,7 +2088,8 @@ mod tests {
         .unwrap();
         let start = std::time::Instant::now();
         for i in 0..100 {
-            term.feed(format!("line {i:03} hello world\n").as_bytes()).expect("terminal feed");
+            term.feed(format!("line {i:03} hello world\n").as_bytes())
+                .expect("terminal feed");
         }
         let elapsed = start.elapsed();
         assert!(
@@ -2370,12 +2400,18 @@ mod tests {
         let gens: Vec<u64> = frame.rows.iter().map(|r| r.generation).collect();
         let survivor_max = *gens[0..24].iter().max().unwrap();
         let new_gens = &gens[24..];
-        assert!(new_gens.iter().all(|g| *g > survivor_max), "new rows non-colliding");
+        assert!(
+            new_gens.iter().all(|g| *g > survivor_max),
+            "new rows non-colliding"
+        );
         let mut new_uniq = new_gens.to_vec();
         new_uniq.sort_unstable();
         new_uniq.dedup();
         assert_eq!(new_uniq.len(), new_gens.len(), "new rows mutually distinct");
-        assert!(*new_gens.iter().min().unwrap() > max_before, "new rows strictly newer than pre-resize max");
+        assert!(
+            *new_gens.iter().min().unwrap() > max_before,
+            "new rows strictly newer than pre-resize max"
+        );
         pool.release(frame);
     }
 
@@ -2431,11 +2467,18 @@ mod tests {
         let gens: Vec<u64> = c.rows.iter().map(|r| r.generation).collect();
         let survivor_max = *gens[0..2].iter().max().unwrap();
         let new_gens = &gens[2..];
-        assert!(new_gens.iter().all(|g| *g > survivor_max), "appended rows non-colliding");
+        assert!(
+            new_gens.iter().all(|g| *g > survivor_max),
+            "appended rows non-colliding"
+        );
         let mut new_uniq = new_gens.to_vec();
         new_uniq.sort_unstable();
         new_uniq.dedup();
-        assert_eq!(new_uniq.len(), new_gens.len(), "appended rows mutually distinct");
+        assert_eq!(
+            new_uniq.len(),
+            new_gens.len(),
+            "appended rows mutually distinct"
+        );
         pool.release(c);
     }
 
@@ -2454,7 +2497,10 @@ mod tests {
         assert!(frame.rows.iter().any(|r| r.row == 0));
         assert_eq!(frame.size, GridSize::new(8, 4));
         // At least the touched row advanced; no spurious truncation.
-        assert_eq!(frame.rows.iter().filter(|r| r.row < 4).count(), frame.rows.len());
+        assert_eq!(
+            frame.rows.iter().filter(|r| r.row < 4).count(),
+            frame.rows.len()
+        );
         // Survivors were the only rows; generation of row 0 advanced by one over before.
         let row0 = frame.rows.iter().find(|r| r.row == 0).unwrap();
         assert_eq!(row0.generation, before[0] + 1);
@@ -2552,7 +2598,8 @@ mod tests {
         assert!(!term.has_mode(super::TerminalMode::FocusInOut));
         assert!(!term.has_mode(super::TerminalMode::BracketedPaste));
 
-        term.feed(b"\x1b[?1h\x1b=\x1b[?1006h\x1b[?1004h\x1b[?2004h").expect("terminal feed");
+        term.feed(b"\x1b[?1h\x1b=\x1b[?1006h\x1b[?1004h\x1b[?2004h")
+            .expect("terminal feed");
         assert!(term.has_mode(super::TerminalMode::AppCursor));
         assert!(term.has_mode(super::TerminalMode::AppKeypad));
         assert!(term.has_mode(super::TerminalMode::SgrMouse));
@@ -2599,7 +2646,8 @@ mod tests {
         assert!(!term.modify_other_keys_2());
         assert!(!term.alt_esc_prefix());
 
-        term.feed(b"\x1b[?67h\x1b[?1035l\x1bc").expect("terminal feed");
+        term.feed(b"\x1b[?67h\x1b[?1035l\x1bc")
+            .expect("terminal feed");
         assert!(!term.backarrow_key_mode());
         assert!(term.ignore_keypad_with_numlock());
         assert!(!term.has_mode(super::TerminalMode::AppCursor));
@@ -2701,21 +2749,36 @@ mod tests {
             let c = format!("row{i}\x1b[38;2;{r};{g};{b}mX\x1b[0m\n");
             term.feed(c.as_bytes()).expect("terminal feed");
         }
-        term.feed(b"\x1b7").expect("terminal feed"); term.feed(b"\x1b[31m").expect("terminal feed"); term.feed(b"\x1b8").expect("terminal feed");
-        term.feed(b"\x1b[?1049h").expect("terminal feed"); term.feed(b"\x1b[32malt\x1b[0m").expect("terminal feed"); term.feed(b"\x1b[?1049l").expect("terminal feed");
+        term.feed(b"\x1b7").expect("terminal feed");
+        term.feed(b"\x1b[31m").expect("terminal feed");
+        term.feed(b"\x1b8").expect("terminal feed");
+        term.feed(b"\x1b[?1049h").expect("terminal feed");
+        term.feed(b"\x1b[32malt\x1b[0m").expect("terminal feed");
+        term.feed(b"\x1b[?1049l").expect("terminal feed");
         let report = term.probe_style_cardinality();
-        assert!(report.quiesced, "must quiesce to zero queued/pending/pending-pages");
-        assert!(!report.pending_any, "pending counters must be zero after quiesce");
+        assert!(
+            report.quiesced,
+            "must quiesce to zero queued/pending/pending-pages"
+        );
+        assert!(
+            !report.pending_any,
+            "pending counters must be zero after quiesce"
+        );
         assert!(!report.has_corruption, "unexpected corruption");
         assert!(
             report.sets_equal,
             "optimized/exhaustive mismatch: opt={:?} exh={:?}",
-            report.optimized_ids,
-            report.exhaustive_ids
+            report.optimized_ids, report.exhaustive_ids
         );
-        assert_eq!(report.optimized_ids, report.exhaustive_ids, "exact ID vectors must match");
+        assert_eq!(
+            report.optimized_ids, report.exhaustive_ids,
+            "exact ID vectors must match"
+        );
         assert_eq!(report.live_style_count, report.optimized_ids.len());
-        assert!(report.promotable || report.live_style_count > 60_000, "promotable must reflect <=60000 threshold when trustworthy");
+        assert!(
+            report.promotable || report.live_style_count > 60_000,
+            "promotable must reflect <=60000 threshold when trustworthy"
+        );
         assert_eq!(report.promotable, report.trustworthy);
         if report.promotable {
             assert!(report.live_style_count <= 60_000);
@@ -2729,7 +2792,8 @@ mod tests {
     #[test]
     fn style_probe_covers_all_three_pens_and_both_screens() {
         let mut term = Terminal::new(GridSize::new(6, 2)).unwrap();
-        term.feed(b"\x1b[31mA\x1b[32mB\x1b7").expect("terminal feed"); // primary current + saved
+        term.feed(b"\x1b[31mA\x1b[32mB\x1b7")
+            .expect("terminal feed"); // primary current + saved
         term.feed(b"\x1b[?1049h\x1b[34mC").expect("terminal feed"); // alternate
         term.feed(b"\x1b7").expect("terminal feed"); // alternate saved
         let report = term.probe_style_cardinality();
@@ -2744,15 +2808,42 @@ mod tests {
     #[test]
     fn style_probe_hot_flat_and_segmented_and_cold() {
         // Hot segmented via terminal feed + force_compress => cold path
-        let mut term = Terminal::new_with_config(GridSize::new(4, 2), ScrollbackConfig { max_lines: 100, hot_page_lines: 2, max_queued_jobs: 4, max_pending_completions: 4 }).unwrap();
-        for _ in 0..10 { term.feed(b"ABCD\n").expect("terminal feed"); }
+        let mut term = Terminal::new_with_config(
+            GridSize::new(4, 2),
+            ScrollbackConfig {
+                max_lines: 100,
+                hot_page_lines: 2,
+                max_queued_jobs: 4,
+                max_pending_completions: 4,
+            },
+        )
+        .unwrap();
+        for _ in 0..10 {
+            term.feed(b"ABCD\n").expect("terminal feed");
+        }
         let r1 = term.probe_style_cardinality();
         assert!(r1.sets_equal);
         assert_eq!(r1.optimized_ids, r1.exhaustive_ids);
         assert!(r1.storage_opt_diag.hot_segmented_pages > 0 || r1.storage_opt_diag.cold_pages > 0);
         // Direct flat path via storage: push_line from another terminal
-        let mut t2 = Terminal::new_with_config(GridSize::new(4, 2), ScrollbackConfig { max_lines: 100, hot_page_lines: 10, max_queued_jobs: 4, max_pending_completions: 4 }).unwrap();
-        t2.push_history_line(4, &[Cell { content: 'Z' as u32, style: 9, flags: 0 }; 4]);
+        let mut t2 = Terminal::new_with_config(
+            GridSize::new(4, 2),
+            ScrollbackConfig {
+                max_lines: 100,
+                hot_page_lines: 10,
+                max_queued_jobs: 4,
+                max_pending_completions: 4,
+            },
+        )
+        .unwrap();
+        t2.push_history_line(
+            4,
+            &[Cell {
+                content: 'Z' as u32,
+                style: 9,
+                flags: 0,
+            }; 4],
+        );
         let r2 = t2.probe_style_cardinality();
         assert!(r2.sets_equal);
         assert_eq!(r2.optimized_ids, r2.exhaustive_ids);
@@ -2762,23 +2853,67 @@ mod tests {
     fn style_probe_cold_corrupt_fails_closed() {
         // Build a real cold page via storage API, corrupt it, and assert probe
         // surfaces corruption as failure rather than silent equality.
-        let mut term = Terminal::new_with_config(GridSize::new(4, 2), ScrollbackConfig { max_lines: 100, hot_page_lines: 1, max_queued_jobs: 4, max_pending_completions: 4 }).unwrap();
-        for _ in 0..4 { term.push_history_line(4, &[Cell { content: 'A' as u32, style: 2, flags: 0 }; 4]); }
+        let mut term = Terminal::new_with_config(
+            GridSize::new(4, 2),
+            ScrollbackConfig {
+                max_lines: 100,
+                hot_page_lines: 1,
+                max_queued_jobs: 4,
+                max_pending_completions: 4,
+            },
+        )
+        .unwrap();
+        for _ in 0..4 {
+            term.push_history_line(
+                4,
+                &[Cell {
+                    content: 'A' as u32,
+                    style: 2,
+                    flags: 0,
+                }; 4],
+            );
+        }
         term.force_compress_all();
         term.drain_compression();
-        assert!(term.storage_stats().compressed_bytes > 0, "expected at least one cold page for corruption test");
+        assert!(
+            term.storage_stats().compressed_bytes > 0,
+            "expected at least one cold page for corruption test"
+        );
         term.corrupt_cold_page_for_probe();
         let report = term.probe_style_cardinality();
-        assert!(report.has_corruption, "corrupt cold page must be surfaced, diags={:?}/{:?}", report.storage_opt_diag, report.storage_exh_diag);
-        assert!(!report.sets_equal, "equality must be withheld on corruption");
-        assert!(!report.promotable && !report.trustworthy, "corrupt state must not be promotable/trustworthy");
-        assert!(report.storage_opt_diag.corrupt_cold_pages >= 1 || report.storage_exh_diag.corrupt_cold_pages >= 1);
+        assert!(
+            report.has_corruption,
+            "corrupt cold page must be surfaced, diags={:?}/{:?}",
+            report.storage_opt_diag, report.storage_exh_diag
+        );
+        assert!(
+            !report.sets_equal,
+            "equality must be withheld on corruption"
+        );
+        assert!(
+            !report.promotable && !report.trustworthy,
+            "corrupt state must not be promotable/trustworthy"
+        );
+        assert!(
+            report.storage_opt_diag.corrupt_cold_pages >= 1
+                || report.storage_exh_diag.corrupt_cold_pages >= 1
+        );
     }
 
     #[test]
     fn style_probe_reproducible() {
-        let mut term = Terminal::new_with_config(GridSize::new(6, 3), ScrollbackConfig { max_lines: 100, hot_page_lines: 2, max_queued_jobs: 4, max_pending_completions: 4 }).unwrap();
-        term.feed(b"\x1b[31mhello\x1b[0m\n\x1b[34mworld\x1b[0m\n").expect("terminal feed");
+        let mut term = Terminal::new_with_config(
+            GridSize::new(6, 3),
+            ScrollbackConfig {
+                max_lines: 100,
+                hot_page_lines: 2,
+                max_queued_jobs: 4,
+                max_pending_completions: 4,
+            },
+        )
+        .unwrap();
+        term.feed(b"\x1b[31mhello\x1b[0m\n\x1b[34mworld\x1b[0m\n")
+            .expect("terminal feed");
         let a = term.probe_style_cardinality();
         let b = term.probe_style_cardinality();
         assert_eq!(a.optimized_ids, b.optimized_ids);
@@ -2802,10 +2937,13 @@ mod tests {
         term.feed(b"\x1b[0mDE\n").expect("terminal feed");
         term.feed(b"FGHIJ\n").expect("terminal feed");
         let r = term.probe_style_cardinality();
-        assert!(r.sets_equal, "wrapped stale-cell census must converge: opt={:?} exh={:?}", r.optimized_ids, r.exhaustive_ids);
+        assert!(
+            r.sets_equal,
+            "wrapped stale-cell census must converge: opt={:?} exh={:?}",
+            r.optimized_ids, r.exhaustive_ids
+        );
         assert_eq!(r.optimized_ids, r.exhaustive_ids);
         assert!(!r.has_corruption);
         assert!(r.quiesced && !r.pending_any);
     }
-
 }

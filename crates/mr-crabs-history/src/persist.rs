@@ -108,10 +108,7 @@ pub struct HistoryFile {
 
 impl HistoryFile {
     /// Capture the full scrollback through the read contract.
-    pub fn capture(
-        term: &mut Terminal,
-        config: &PersistConfig,
-    ) -> Result<Self, PersistError> {
+    pub fn capture(term: &mut Terminal, config: &PersistConfig) -> Result<Self, PersistError> {
         let history_len = term.history_len();
         if history_len > config.max_lines {
             return Err(PersistError::TooManyLines);
@@ -119,14 +116,10 @@ impl HistoryFile {
         let mut cols = Vec::with_capacity(history_len);
         let mut lines = Vec::with_capacity(history_len);
         for index in 0..history_len {
-            let width = term
-                .history_line_cols(index)
-                .ok_or(PersistError::Corrupt)?;
+            let width = term.history_line_cols(index).ok_or(PersistError::Corrupt)?;
             let width = u16::try_from(width).map_err(|_| PersistError::Corrupt)?;
             let mut cells = Vec::new();
-            if !term.read_history_line(index, &mut cells)
-                || cells.len() != usize::from(width)
-            {
+            if !term.read_history_line(index, &mut cells) || cells.len() != usize::from(width) {
                 return Err(PersistError::Corrupt);
             }
             cols.push(width);
@@ -177,8 +170,7 @@ impl HistoryFile {
             .map_err(|_| PersistError::TooLarge)?;
         let style_count = u32::try_from(self.styles.len()).map_err(|_| PersistError::TooLarge)?;
         let style_json = serde_json::to_vec(&self.styles).map_err(|_| PersistError::Corrupt)?;
-        let style_json_len =
-            u32::try_from(style_json.len()).map_err(|_| PersistError::TooLarge)?;
+        let style_json_len = u32::try_from(style_json.len()).map_err(|_| PersistError::TooLarge)?;
 
         // Header: magic(4) + version(4) + flags(1) + chunks(4) + crc(4).
         const HEADER_LEN: usize = 17;
@@ -481,7 +473,9 @@ mod tests {
         for i in 0..40 {
             let color = if i % 2 == 0 { 31 } else { 34 };
             term.feed(format!("\x1b[{color}mpersist line {i:02}\x1b[0m\r\n").as_bytes())
-                .unwrap_or_else(|error| panic!("persist pattern fixture feed should succeed for line {i:02}: {error}"));
+                .unwrap_or_else(|error| {
+                    panic!("persist pattern fixture feed should succeed for line {i:02}: {error}")
+                });
         }
         term.force_compress_all();
         term
@@ -641,12 +635,16 @@ mod tests {
         let mut encoded = file.encode(&plain).expect("encode valid plain history");
         let style_json_len = u32::from_le_bytes(encoded[21..25].try_into().unwrap()) as usize;
         let mut cursor = 25 + style_json_len;
-        let line_count = u32::from_le_bytes(encoded[cursor..cursor + 4].try_into().unwrap()) as usize;
+        let line_count =
+            u32::from_le_bytes(encoded[cursor..cursor + 4].try_into().unwrap()) as usize;
         cursor += 4 + line_count * 2 + 4 + 4;
         encoded[cursor + 4..cursor + 6].copy_from_slice(&u16::MAX.to_le_bytes());
         let crc = crc32(&encoded[17..]);
         encoded[13..17].copy_from_slice(&crc.to_le_bytes());
-        assert_eq!(HistoryFile::decode(&encoded, &plain), Err(PersistError::Corrupt));
+        assert_eq!(
+            HistoryFile::decode(&encoded, &plain),
+            Err(PersistError::Corrupt)
+        );
     }
 
     #[test]

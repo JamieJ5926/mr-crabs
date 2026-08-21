@@ -275,7 +275,11 @@ fn taller_primary_grid_restores_history_and_shifts_live_and_saved_cursor() {
     );
     assert_eq!(term.cursor().row, 4, "live cursor follows restored history");
     feed(&mut term, b"\x1b8");
-    assert_eq!(term.cursor().row, 4, "saved cursor follows restored history");
+    assert_eq!(
+        term.cursor().row,
+        4,
+        "saved cursor follows restored history"
+    );
 }
 
 #[test]

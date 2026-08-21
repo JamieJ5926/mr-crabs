@@ -144,16 +144,18 @@ fn measure_throughput() -> f64 {
     }
     // Warm-up.
     let mut term = Terminal::new(size).expect("valid grid");
-    term.feed(&payload)
-        .expect("harness invariant: warmup throughput payload is bounded 256 KiB deterministic ASCII+SGR");
+    term.feed(&payload).expect(
+        "harness invariant: warmup throughput payload is bounded 256 KiB deterministic ASCII+SGR",
+    );
     let _ = term.snapshot();
     let iterations: usize = 40;
     let start = Instant::now();
     let mut total_bytes: usize = 0;
     for _ in 0..iterations {
         let mut t = Terminal::new(size).expect("valid grid");
-        t.feed(&payload)
-            .expect("harness invariant: throughput payload is bounded 256 KiB deterministic ASCII+SGR");
+        t.feed(&payload).expect(
+            "harness invariant: throughput payload is bounded 256 KiB deterministic ASCII+SGR",
+        );
         total_bytes += payload.len();
         // Snapshot is not part of hot feed path but keep one to prevent DCE.
         let _ = t.snapshot();
@@ -184,8 +186,9 @@ fn measure_scrollback() -> (usize, usize, usize, u64) {
         for _ in 0..batch {
             line_buf.extend_from_slice(b"line\n");
         }
-        term.feed(&line_buf)
-            .expect("harness invariant: scrollback line batch is bounded deterministic `line\\n` records");
+        term.feed(&line_buf).expect(
+            "harness invariant: scrollback line batch is bounded deterministic `line\\n` records",
+        );
         lines_fed += batch;
     }
 
@@ -222,8 +225,9 @@ fn measure_compression_latency() -> f64 {
     // Prepare enough scrollback to trigger at least one cold page if paging exists.
     let payload = vec![b'X'; 80 * 200];
     for _ in 0..16 {
-        term.feed(&payload)
-            .expect("harness invariant: compression latency payload is bounded 80*200 deterministic X fill");
+        term.feed(&payload).expect(
+            "harness invariant: compression latency payload is bounded 80*200 deterministic X fill",
+        );
         term.feed(b"\n")
             .expect("harness invariant: compression latency newline is bounded single-byte deterministic feed");
     }

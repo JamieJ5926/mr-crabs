@@ -19,8 +19,8 @@ mod element;
 mod geometry;
 mod paint_diagnostics;
 mod palette;
-mod selection;
 pub mod phase;
+mod selection;
 
 pub use cache::{CacheAction, Capacities, RectBatch, RenderCache, RowBatch, RunBatch};
 pub use cursor::{
@@ -28,10 +28,10 @@ pub use cursor::{
     needs_blink_animation, needs_blink_animation_with_phase, should_request_animation,
 };
 pub use element::{GraphicsOverlay, TerminalElement, TerminalInputHandler};
-pub use mr_crabs_effects::EffectsConfig;
 pub use geometry::{
     ResizeDeduper, cell_bounds, glyph_cell_cols, glyph_origin, pixel_bounds_to_grid, run_bounds,
 };
+pub use mr_crabs_effects::EffectsConfig;
 pub use mr_crabs_graphics::placement::{Point, TerminalContext};
 pub use paint_diagnostics::{PaintDiagnosticsEvent, PaintDiagnosticsSink, PaintRafReason};
 pub use palette::{
