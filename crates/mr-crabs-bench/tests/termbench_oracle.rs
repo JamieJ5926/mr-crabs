@@ -10,104 +10,24 @@
 //! Small 512-frame FG/FGBG payloads must compact without overflow and retain
 //! sampled final-frame FG/BG semantics identical to the short-prefix oracle.
 
+use mr_crabs_bench::termbench::{
+    TERMBENCH_CELLS_PER_FRAME as CELLS_PER_FRAME, TERMBENCH_COLS as COLS,
+    TERMBENCH_HEIGHT_INCLUSIVE, TERMBENCH_NORMAL_FRAMES as NORMAL_FRAMES, TERMBENCH_ROWS as ROWS,
+    TERMBENCH_SMALL_FRAMES as SMALL_FRAMES, TERMBENCH_WIDTH_INCLUSIVE, TermbenchVariant,
+    expected_bg_rgb, expected_char, expected_fg_rgb, frame_payload as canonical_frame_payload,
+};
 use mr_crabs_terminal::{GridSize, NamedColorValue, NormalizedColor, Terminal};
 
-const WIDTH_INCLUSIVE: u32 = 80;
-const HEIGHT_INCLUSIVE: u32 = 24;
-const COLS: usize = 81;
-const ROWS: usize = 25;
-const CELLS_PER_FRAME: usize = 2025;
-const SMALL_FRAMES: usize = 512;
-const NORMAL_FRAMES: usize = 8192;
-
-#[inline]
-fn expected_fg_rgb(frame: u32, y: u32, x: u32) -> [u8; 3] {
-    [
-        (frame & 255) as u8,
-        ((frame + y) & 255) as u8,
-        ((frame + y + x) & 255) as u8,
-    ]
-}
-
-#[inline]
-fn expected_bg_rgb(frame: u32, y: u32, x: u32) -> [u8; 3] {
-    [
-        ((frame + y + x) & 255) as u8,
-        ((frame + y) & 255) as u8,
-        (frame & 255) as u8,
-    ]
-}
-
-#[inline]
-fn expected_char(frame: u32, y: u32, x: u32) -> u8 {
-    b'a' + (((frame + x + y) % 25) as u8)
-}
-
-#[inline]
-fn append_decimal(out: &mut Vec<u8>, v: u32) {
-    if v == 0 {
-        out.push(b'0');
-        return;
-    }
-    let mut buf = [0u8; 10];
-    let mut len = 0usize;
-    let mut x = v;
-    while x > 0 {
-        buf[len] = b'0' + (x % 10) as u8;
-        x /= 10;
-        len += 1;
-    }
-    for i in (0..len).rev() {
-        out.push(buf[i]);
-    }
-}
-
-#[inline]
-fn append_color(out: &mut Vec<u8>, fg: bool, r: u8, g: u8, b: u8) {
-    if fg {
-        out.extend_from_slice(b"\x1b[38;2;");
-    } else {
-        out.extend_from_slice(b"\x1b[48;2;");
-    }
-    append_decimal(out, r as u32);
-    out.push(b';');
-    append_decimal(out, g as u32);
-    out.push(b';');
-    append_decimal(out, b as u32);
-    out.push(b'm');
-}
-
-#[inline]
-fn append_cup(out: &mut Vec<u8>, x: u32, y: u32) {
-    out.extend_from_slice(b"\x1b[");
-    append_decimal(out, y);
-    out.push(b';');
-    append_decimal(out, x);
-    out.push(b'H');
-}
-
-fn append_frame(out: &mut Vec<u8>, fgbg: bool, frame: u32) {
-    for y in 0..=HEIGHT_INCLUSIVE {
-        append_cup(out, 1, 1 + y);
-        for x in 0..=WIDTH_INCLUSIVE {
-            if fgbg {
-                let [br, bg, bb] = expected_bg_rgb(frame, y, x);
-                let [fr, fg, fb] = expected_fg_rgb(frame, y, x);
-                append_color(out, false, br, bg, bb);
-                append_color(out, true, fr, fg, fb);
-            } else {
-                let [fr, fg, fb] = expected_fg_rgb(frame, y, x);
-                append_color(out, true, fr, fg, fb);
-            }
-            out.push(expected_char(frame, y, x));
-        }
-    }
-}
+const WIDTH_INCLUSIVE: u32 = TERMBENCH_WIDTH_INCLUSIVE as u32;
+const HEIGHT_INCLUSIVE: u32 = TERMBENCH_HEIGHT_INCLUSIVE as u32;
 
 fn frame_payload(fgbg: bool, frame: u32) -> Vec<u8> {
-    let mut out = Vec::with_capacity(80 * 1024);
-    append_frame(&mut out, fgbg, frame);
-    out
+    let variant = if fgbg {
+        TermbenchVariant::FGBGPerChar
+    } else {
+        TermbenchVariant::FGPerChar
+    };
+    canonical_frame_payload(variant, frame)
 }
 
 fn term_81x25() -> Terminal {

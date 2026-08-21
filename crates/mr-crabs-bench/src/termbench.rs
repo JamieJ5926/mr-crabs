@@ -43,13 +43,6 @@ impl TermbenchVariant {
             Self::FGBGPerChar => "fgbg_per_char",
         }
     }
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "fg_per_char" | "FGPerChar" | "fg" => Some(Self::FGPerChar),
-            "fgbg_per_char" | "FGBGPerChar" | "fgbg" => Some(Self::FGBGPerChar),
-            _ => None,
-        }
-    }
 }
 
 impl fmt::Display for TermbenchVariant {
@@ -535,14 +528,9 @@ mod tests {
             // Extract char after each SGR terminator: harder; count 'a'..='y' following 'm'.
             let mut cells = 0usize;
             for i in 0..bytes.len() {
-                if bytes[i] == b'm' {
-                    if i + 1 < bytes.len() && (b'a'..=b'y').contains(&bytes[i + 1]) {
-                        // For FGBG there are two 'm' per cell; only the second precedes char.
-                        // Count when the next byte after 'm' is a cell char and either we are FGPerChar
-                        // or we have seen that the prior char was the bg's 'm' (so two in a row not valid).
-                        // Simpler: count occurrences of pattern "m<a..y>" and divide logic.
-                        cells += 1;
-                    }
+                if bytes[i] == b'm' && i + 1 < bytes.len() && (b'a'..=b'y').contains(&bytes[i + 1])
+                {
+                    cells += 1;
                 }
             }
             // For FGPerChar each cell has exactly one m<char>, so cells ==2025.
