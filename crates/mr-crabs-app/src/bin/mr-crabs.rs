@@ -232,7 +232,7 @@ mod tests {
                         let abs = search + pos;
                         let after = abs + needle.len();
                         let next = line[after..].chars().next();
-                        if next.map_or(true, |c| c != '-') {
+                        if next != Some('-') {
                             n += 1;
                         }
                         search = abs + needle.len();

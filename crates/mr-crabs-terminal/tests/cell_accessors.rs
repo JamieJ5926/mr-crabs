@@ -3,7 +3,8 @@ use mr_crabs_terminal::{CellWidth, GridSize, Terminal, UnderlineStyle};
 #[test]
 fn cell_accessors_report_semantic_width_and_attributes() {
     let mut term = Terminal::new(GridSize::new(8, 2)).unwrap();
-    term.feed("界\x1b[1;3;4;7;9mA".as_bytes());
+    term.feed("界\x1b[1;3;4;7;9mA".as_bytes())
+        .expect("terminal feed");
     let snapshot = term.snapshot();
 
     assert_eq!(snapshot.cells[0].width(), CellWidth::Wide);

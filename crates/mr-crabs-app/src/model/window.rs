@@ -44,11 +44,12 @@ pub struct WindowPumpStats {
     pub bytes: usize,
     pub frames: usize,
     pub pending: bool,
+    pub error: Option<mr_crabs_terminal::TerminalError>,
 }
 
 impl WindowPumpStats {
     pub fn changed(self) -> bool {
-        self.chunks > 0
+        self.chunks > 0 || self.frames > 0
     }
 }
 
@@ -230,7 +231,6 @@ impl WindowModel {
         }
         false
     }
-
     /// Pump every tab's bounded reader queues.
     pub fn pump(&mut self, cap: usize) -> WindowPumpStats {
         let mut stats = WindowPumpStats::default();
@@ -240,6 +240,9 @@ impl WindowModel {
             stats.bytes += pumped.bytes;
             stats.frames += pumped.frames;
             stats.pending |= pumped.pending;
+            if stats.error.is_none() {
+                stats.error = pumped.error;
+            }
         }
         stats
     }

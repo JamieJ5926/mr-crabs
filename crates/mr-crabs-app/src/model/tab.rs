@@ -59,11 +59,12 @@ pub struct TabPumpStats {
     pub bytes: usize,
     pub frames: usize,
     pub pending: bool,
+    pub error: Option<mr_crabs_terminal::TerminalError>,
 }
 
 impl TabPumpStats {
     pub fn changed(self) -> bool {
-        self.chunks > 0
+        self.chunks > 0 || self.frames > 0
     }
 }
 
@@ -278,7 +279,6 @@ impl TabModel {
     pub fn resize_all(&mut self, geometry: SurfaceGeometry) -> usize {
         self.resize_all_with_output_wake(geometry, None)
     }
-
     /// Pump every pane's bounded reader queue; aggregates statistics.
     pub fn pump(&mut self, cap: usize) -> TabPumpStats {
         let mut stats = TabPumpStats::default();
@@ -288,11 +288,15 @@ impl TabModel {
                 bytes,
                 frames,
                 pending,
+                error,
             } = pane.pump(cap);
             stats.chunks += chunks;
             stats.bytes += bytes;
             stats.frames += frames;
             stats.pending |= pending;
+            if stats.error.is_none() {
+                stats.error = error;
+            }
         }
         stats
     }

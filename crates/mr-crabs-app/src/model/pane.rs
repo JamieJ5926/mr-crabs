@@ -105,11 +105,15 @@ pub struct DrainStats {
     pub frames: usize,
     /// Whether more output remains queued after this pass.
     pub pending: bool,
+    /// First TerminalError from a failed chunk in this pass, if any.
+    /// When present, `chunks`/`bytes`/`frames` exclude the failed chunk
+    /// and `pending` is true (failed chunk remains queued, fail-closed).
+    pub error: Option<TerminalError>,
 }
 
 impl DrainStats {
     pub fn changed(self) -> bool {
-        self.chunks > 0
+        self.chunks > 0 || self.frames > 0
     }
 }
 
@@ -364,25 +368,49 @@ impl PaneSession {
     /// Drain up to `cap` chunks into `sink`, in order, then report whether
     /// more output remains queued. Memory stays bounded by the reader
     /// queue; the reader thread backpressures when the app is slow.
-    pub fn drain_output(&mut self, cap: usize, mut sink: impl FnMut(&[u8])) -> DrainStats {
+    /// If `sink` returns `Err`, the failed chunk is consumed/dropped (not
+    /// requeued; FEED_SLICE partial commits would double-feed on replay),
+    /// not counted, `pending` stays fail-closed, and the error is exposed
+    /// through `DrainStats.error` without consuming later chunks.
+    pub fn drain_output(
+        &mut self,
+        cap: usize,
+        mut sink: impl FnMut(&[u8]) -> Result<(), TerminalError>,
+    ) -> DrainStats {
         let mut stats = DrainStats::default();
         if cap == 0 {
             stats.pending = self.peek_pending();
             return stats;
         }
         if let Some(chunk) = self.peeked.take() {
-            stats.chunks += 1;
-            stats.bytes += chunk.len();
-            sink(&chunk);
+            match sink(&chunk) {
+                Ok(()) => {
+                    stats.chunks += 1;
+                    stats.bytes += chunk.len();
+                }
+                Err(err) => {
+                    // Consume/drop the failed read; do not requeue.
+                    stats.pending = self.peek_pending();
+                    stats.error = Some(err);
+                    return stats;
+                }
+            }
         }
         if let Some(reader) = self.reader.as_ref() {
             while stats.chunks < cap {
                 match reader.try_recv() {
-                    Ok(chunk) => {
-                        stats.chunks += 1;
-                        stats.bytes += chunk.len();
-                        sink(&chunk);
-                    }
+                    Ok(chunk) => match sink(&chunk) {
+                        Ok(()) => {
+                            stats.chunks += 1;
+                            stats.bytes += chunk.len();
+                        }
+                        Err(err) => {
+                            // Consume/drop the failed read; stop draining.
+                            stats.pending = self.peek_pending();
+                            stats.error = Some(err);
+                            return stats;
+                        }
+                    },
                     Err(TryRecvError::Empty) => break,
                     Err(TryRecvError::Disconnected) => {
                         self.reader_closed = true;
@@ -391,7 +419,9 @@ impl PaneSession {
                 }
             }
         }
-        stats.pending = self.peek_pending();
+        if stats.error.is_none() {
+            stats.pending = self.peek_pending();
+        }
         stats
     }
 
@@ -655,52 +685,54 @@ struct FeedParts<'a> {
 /// tap and the APC scanner watch the same bytes read-only. At an OSC 1337
 /// or APC string boundary the accumulated stream is flushed to the engine
 /// first, so protocol commands ingest with the terminal cursor current.
-fn feed_chunk_scanned(parts: &mut FeedParts<'_>, chunk: &[u8]) {
+fn feed_chunk_scanned(parts: &mut FeedParts<'_>, chunk: &[u8]) -> Result<(), TerminalError> {
     let mut stream = std::mem::take(parts.scratch);
     for &byte in chunk {
         stream.push(byte);
         match parts.osc_tap.next(byte) {
             TapOut::Stream | TapOut::None => {}
             TapOut::Completed1337(value) => {
-                flush_stream(parts.core, &mut stream);
-                ingest_osc1337(parts, &value);
+                flush_stream(parts.core, &mut stream)?;
+                ingest_osc1337(parts, &value)?;
             }
         }
         match parts.apc_scanner.next(byte) {
             ScanStep::Stream(_) | ScanStep::StreamPair(_, _) | ScanStep::Pending => {}
             ScanStep::Started => {
-                flush_stream(parts.core, &mut stream);
+                flush_stream(parts.core, &mut stream)?;
                 parts.apc_handler.start();
             }
             ScanStep::Payload => parts.apc_handler.feed(byte),
             ScanStep::Ended | ScanStep::Aborted => {
-                flush_stream(parts.core, &mut stream);
+                flush_stream(parts.core, &mut stream)?;
                 let command = parts.apc_handler.end();
                 if let Some(command) = command {
-                    ingest_apc(parts, command);
+                    ingest_apc(parts, command)?;
                 }
             }
         }
     }
-    flush_stream(parts.core, &mut stream);
+    flush_stream(parts.core, &mut stream)?;
     *parts.scratch = stream;
+    Ok(())
 }
 
-fn flush_stream(core: &mut AppCore, stream: &mut Vec<u8>) {
+fn flush_stream(core: &mut AppCore, stream: &mut Vec<u8>) -> Result<(), TerminalError> {
     if !stream.is_empty() {
-        core.feed_terminal_output(stream);
+        core.feed_terminal_output(stream)?;
         stream.clear();
     }
+    Ok(())
 }
 
 /// Execute one completed APC command against the pane's graphics overlay.
-fn ingest_apc(parts: &mut FeedParts<'_>, command: apc::Command) {
+fn ingest_apc(parts: &mut FeedParts<'_>, command: apc::Command) -> Result<(), TerminalError> {
     match command {
         apc::Command::Kitty { payload } => {
             let ctx = graphics_context(parts);
             let mut overlay = parts.graphics.lock();
             overlay.ingest_kitty(&payload, ctx);
-            apply_graphics_effects(parts, &mut overlay);
+            apply_graphics_effects(parts, &mut overlay)?;
         }
         // The protocols APC layer parses glyph requests into pairs and
         // loses the raw payload (register bodies are base64 without a key),
@@ -709,17 +741,19 @@ fn ingest_apc(parts: &mut FeedParts<'_>, command: apc::Command) {
         // configuration. Neither produces painted images.
         apc::Command::Glyph(_) | apc::Command::Unknown { .. } => {}
     }
+    Ok(())
 }
 
 /// Ingest one completed OSC 1337 value (after `1337;`).
-fn ingest_osc1337(parts: &mut FeedParts<'_>, value: &[u8]) {
+fn ingest_osc1337(parts: &mut FeedParts<'_>, value: &[u8]) -> Result<(), TerminalError> {
     let Ok(value) = std::str::from_utf8(value) else {
-        return;
+        return Ok(());
     };
     let ctx = graphics_context(parts);
     let mut overlay = parts.graphics.lock();
     overlay.ingest_iterm(value, ctx);
-    apply_graphics_effects(parts, &mut overlay);
+    apply_graphics_effects(parts, &mut overlay)?;
+    Ok(())
 }
 
 /// Build the terminal context for an ingest: the current cursor/grid from
@@ -759,24 +793,29 @@ fn surface_pixels(cells: u16, measured: Option<f32>, rounded: u16) -> u32 {
 /// requests are applied by feeding CSI through the engine (inline, so
 /// subsequent stream bytes see the moved cursor), and protocol responses
 /// are queued for the session write after the drain pass.
-fn apply_graphics_effects(parts: &mut FeedParts<'_>, overlay: &mut GraphicsOverlay) {
+fn apply_graphics_effects(
+    parts: &mut FeedParts<'_>,
+    overlay: &mut GraphicsOverlay,
+) -> Result<(), TerminalError> {
     for (rows, col) in overlay.drain_cursor_moves() {
-        feed_cursor_move(parts.core, rows, col);
+        feed_cursor_move(parts.core, rows, col)?;
     }
     parts.responses.extend(overlay.drain_responses());
+    Ok(())
 }
 
 /// Apply a kitty `C=0` cursor movement through the engine: `rows` lines
 /// down (CUD, skipped when zero), then set the column (CHA, 1-based).
 /// Oversized values clamp at the grid edges exactly like Ghostty's
 /// `cursorDown`/`cursorSetCol`.
-fn feed_cursor_move(core: &mut AppCore, rows: u32, col: u32) {
+fn feed_cursor_move(core: &mut AppCore, rows: u32, col: u32) -> Result<(), TerminalError> {
     let mut csi = Vec::with_capacity(16);
     if rows > 0 {
         csi.extend_from_slice(format!("\x1b[{rows}B").as_bytes());
     }
     csi.extend_from_slice(format!("\x1b[{}G", col.saturating_add(1)).as_bytes());
-    core.feed_terminal_output(&csi);
+    core.feed_terminal_output(&csi)?;
+    Ok(())
 }
 /// Pending spawn state retained until measured geometry is available.
 struct PendingSpawn {
@@ -821,6 +860,29 @@ pub struct PaneModel {
     osc_tap: Osc1337Tap,
     scan_scratch: Vec<u8>,
     protocol_sink: PaneProtocolSink,
+    pending_graphics_responses: std::collections::VecDeque<Vec<u8>>,
+    /// Latched first TerminalError from a failed feed. Once set, the pane
+    /// is failed-closed: pump returns this error without consuming more
+    /// reader data and never rebuilds a success frame.
+    terminal_error: Option<TerminalError>,
+}
+fn drain_graphics_responses(
+    queue: &mut std::collections::VecDeque<Vec<u8>>,
+    session: &mut PaneSession,
+) -> bool {
+    while let Some(front) = queue.front() {
+        match session.write(front) {
+            Ok(()) => {
+                queue.pop_front();
+            }
+            Err(WriteError::Full) => return true,
+            Err(_) => {
+                queue.clear();
+                return false;
+            }
+        }
+    }
+    false
 }
 
 impl PaneModel {
@@ -855,6 +917,8 @@ impl PaneModel {
             osc_tap: Osc1337Tap::new(),
             scan_scratch: Vec::new(),
             protocol_sink,
+            pending_graphics_responses: std::collections::VecDeque::new(),
+            terminal_error: None,
         }
     }
 
@@ -926,30 +990,48 @@ impl PaneModel {
     /// Graphics protocol commands are not intercepted on this path; use
     /// [`PaneModel::pump`] over a receiver session to exercise the scanned
     /// ingest path.
-    pub fn feed_test_output(&mut self, bytes: &[u8]) {
+    pub fn feed_test_output(&mut self, bytes: &[u8]) -> Result<(), TerminalError> {
         let previous_history = self.core.terminal.history_len();
-        self.core.feed_terminal_output(bytes);
+        self.core.feed_terminal_output(bytes)?;
         self.viewport
             .note_history_growth(previous_history, self.core.terminal.history_len());
         self.sync_title_from_terminal();
         self.invalidate_stale_history_views();
         self.rebuild_frame();
+        Ok(())
     }
     /// Rebuild the shared frame from the engine's pending damage. A nonzero
     /// viewport offset materializes a full frame from paged history plus the
     /// current visible snapshot; the live cursor is hidden while scrolled.
     pub fn rebuild_frame(&mut self) {
-        let mut frame = self.core.build_frame_delta();
-        project_frame(&mut self.core.terminal, &mut self.viewport, &mut frame);
-        if let Some(selection) = self
-            .user_selection_projection()
-            .or_else(|| self.search_selection())
-        {
-            frame.selection = selection;
+        #[cfg(feature = "phase-timing")]
+        let _frame_guard = crate::phase::Guard::new("frame_build");
+        // Return uniquely-owned retired allocations before building replacements.
+        if let Some(previous) = self.latest_frame.take() {
+            if let Ok(frame) = Arc::try_unwrap(previous) {
+                self.core.release_frame(frame);
+            }
         }
-        self.search_frame_matches(&mut frame.search_matches);
-        self.frame_hyperlinks(&mut frame.hyperlinks);
-        self.latest_frame = Some(Arc::new(frame));
+        let mut frame = self.core.build_frame_delta();
+        match project_frame(&mut self.core.terminal, &mut self.viewport, &mut frame) {
+            Ok(()) => {
+                if let Some(selection) = self
+                    .user_selection_projection()
+                    .or_else(|| self.search_selection())
+                {
+                    frame.selection = selection;
+                }
+                self.search_frame_matches(&mut frame.search_matches);
+                self.frame_hyperlinks(&mut frame.hyperlinks);
+                self.latest_frame = Some(Arc::new(frame));
+            }
+            Err(err) => {
+                self.core.release_frame(frame);
+                if self.terminal_error.is_none() {
+                    self.terminal_error = Some(err);
+                }
+            }
+        }
     }
 
     /// Project every active bounded search match that intersects the current
@@ -1415,6 +1497,15 @@ impl PaneModel {
 
     /// Drain output, then expose exit only after the reader queue is empty.
     pub fn pump(&mut self, cap: usize) -> DrainStats {
+        if let Some(err) = self.terminal_error {
+            return DrainStats {
+                error: Some(err),
+                pending: true,
+                ..Default::default()
+            };
+        }
+        #[cfg(feature = "phase-timing")]
+        let _pump_guard = crate::phase::Guard::new("pane_pump");
         let previous_history = self.core.terminal.history_len();
         let cap = cap.min(64);
         let graphics = Arc::clone(&self.graphics);
@@ -1422,7 +1513,11 @@ impl PaneModel {
         let mut stats = if self.lifecycle == PtyLifecycle::Pending {
             DrainStats::default()
         } else {
+            #[cfg(feature = "phase-timing")]
+            let _drain_guard = crate::phase::Guard::new("pane_drain");
             self.session.drain_output(cap, |chunk| {
+                #[cfg(feature = "phase-timing")]
+                let _scan_guard = crate::phase::Guard::new("pane_scan_feed");
                 let mut parts = FeedParts {
                     core: &mut self.core,
                     apc_scanner: &mut self.apc_scanner,
@@ -1435,11 +1530,50 @@ impl PaneModel {
                     cell: self.cell,
                     metrics: self.metrics,
                 };
-                feed_chunk_scanned(&mut parts, chunk);
+                feed_chunk_scanned(&mut parts, chunk)
             })
         };
-        for response in responses {
-            let _ = self.session.write(&response);
+        // Preserve ordering: append newly-drained responses behind retained ones,
+        // then drain from the front. A single helper services both success and
+        // error branches so ordering/backpressure semantics cannot diverge.
+        for response in responses.drain(..) {
+            self.pending_graphics_responses.push_back(response);
+        }
+        // Fail-closed: a TerminalError from the scanned feed means the failed
+        // chunk was consumed/dropped (no requeue; FEED_SLICE partial commits
+        // would double-feed) and not counted. Do not rebuild a success frame.
+        if let Some(err) = stats.error {
+            if self.terminal_error.is_none() {
+                self.terminal_error = Some(err);
+            }
+            if drain_graphics_responses(&mut self.pending_graphics_responses, &mut self.session) {
+                stats.pending = true;
+            }
+            let replies = self.protocol_sink.drain_pty_replies();
+            for (index, reply) in replies.iter().enumerate() {
+                if self.session.write(reply).is_err() {
+                    self.protocol_sink
+                        .requeue_pty_replies(replies[index..].to_vec());
+                    stats.pending = true;
+                    break;
+                }
+            }
+            self.sync_title_from_terminal();
+            self.viewport
+                .note_history_growth(previous_history, self.core.terminal.history_len());
+            if self.search.pending.is_some() {
+                if self.advance_search_slice().is_some() {
+                    stats.frames = 1;
+                }
+                stats.pending |= self.search.pending.is_some();
+            }
+            stats.pending = true;
+            stats.frames = 0;
+            self.refresh_graphics_context();
+            return stats;
+        }
+        if drain_graphics_responses(&mut self.pending_graphics_responses, &mut self.session) {
+            stats.pending = true;
         }
         let replies = self.protocol_sink.drain_pty_replies();
         for (index, reply) in replies.iter().enumerate() {
@@ -1464,6 +1598,9 @@ impl PaneModel {
             }
             stats.pending |= self.search.pending.is_some();
         }
+        // Retain ordering: if graphics responses backpressured, pending stays
+        // true and old-front responses will be retried before newer ones.
+        stats.pending |= !self.pending_graphics_responses.is_empty();
         if self.lifecycle == PtyLifecycle::Live
             && !stats.pending
             && self.session.output_drained()
@@ -1504,7 +1641,6 @@ impl PaneModel {
         graphics.set_context(ctx);
         graphics.prune_history(min_row as u64);
     }
-
     /// Shared frame for the renderer.
     pub fn frame(&self) -> Option<Arc<FrameDelta>> {
         self.latest_frame.clone()
@@ -1708,8 +1844,7 @@ mod tests {
         if !PathBuf::from("/bin/zsh").is_file() {
             return;
         }
-        let tmp =
-            std::env::temp_dir().join(format!("mr-crabs-zsh-resize-{}", std::process::id()));
+        let tmp = std::env::temp_dir().join(format!("mr-crabs-zsh-resize-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&tmp);
         std::fs::create_dir_all(&tmp).expect("tmpdir");
         std::fs::write(tmp.join(".zshrc"), "PROMPT='PROMPT_MARKER> '\n").expect("write zshrc");
@@ -2011,7 +2146,7 @@ mod tests {
         );
         // No output ever arrives.
         assert!(!session.has_pending());
-        let stats = session.drain_output(16, |_| panic!("no chunks expected"));
+        let stats = session.drain_output(16, |_| Ok::<(), TerminalError>(()));
         assert_eq!(stats, DrainStats::default());
     }
 
@@ -2025,7 +2160,8 @@ mod tests {
 
         let mut fed: Vec<String> = Vec::new();
         let stats = session.drain_output(2, |chunk| {
-            fed.push(String::from_utf8_lossy(chunk).into_owned())
+            fed.push(String::from_utf8_lossy(chunk).into_owned());
+            Ok::<(), TerminalError>(())
         });
         assert_eq!(stats.chunks, 2);
         assert_eq!(stats.bytes, 10);
@@ -2033,7 +2169,8 @@ mod tests {
         assert_eq!(fed, vec!["hello".to_string(), "world".to_string()]);
 
         let stats = session.drain_output(2, |chunk| {
-            fed.push(String::from_utf8_lossy(chunk).into_owned())
+            fed.push(String::from_utf8_lossy(chunk).into_owned());
+            Ok::<(), TerminalError>(())
         });
         assert_eq!(stats.chunks, 1);
         assert!(!stats.pending);
@@ -2045,15 +2182,14 @@ mod tests {
         let (tx, rx) = sync_channel::<Vec<u8>>(8);
         tx.send(b"x".to_vec()).expect("send");
         let mut session = PaneSession::from_receivers(GridSize::new(80, 24), Some(rx), None);
-        let stats = session.drain_output(0, |_| panic!("cap zero must not feed"));
+        let stats = session.drain_output(0, |_| Ok::<(), TerminalError>(()));
         assert_eq!(stats.chunks, 0);
         assert!(stats.pending);
         // The peeked chunk is delivered by the next real drain.
-        let stats = session.drain_output(4, |_| {});
+        let stats = session.drain_output(4, |_| Ok::<(), TerminalError>(()));
         assert_eq!(stats.chunks, 1);
         assert!(!stats.pending);
     }
-
     #[test]
     fn exit_status_is_cached_after_first_read() {
         let (_, rx) = sync_channel::<Vec<u8>>(1);
@@ -2083,7 +2219,8 @@ mod tests {
     fn pane_pump_feeds_terminal_and_publishes_frame() {
         let mut pane = PaneModel::detached(PaneId::new(1), GridSize::new(80, 24)).expect("pane");
         assert!(pane.frame().is_none());
-        pane.feed_test_output(b"hi");
+        pane.feed_test_output(b"hi")
+            .expect("pane fixture feed should succeed");
         let frame = pane.frame().expect("frame after feed");
         assert_eq!(frame.size, GridSize::new(80, 24));
         assert_eq!(pane.core.terminal_snapshot().size, GridSize::new(80, 24));
@@ -2128,6 +2265,25 @@ mod tests {
         pane.lifecycle = PtyLifecycle::Detached;
         pane.rebuild_frame();
         (pane, reader_tx, writer_rx)
+    }
+    #[test]
+    fn graphics_response_retry_stops_when_writer_closes() {
+        let (writer_tx, writer_rx) = sync_channel::<Vec<u8>>(1);
+        writer_tx.send(vec![0]).expect("fill writer queue");
+        let mut session = PaneSession::from_receivers_with_writer(
+            GridSize::new(80, 24),
+            None,
+            None,
+            Some(writer_tx),
+        );
+        let mut responses = std::collections::VecDeque::from([vec![1]]);
+
+        assert!(drain_graphics_responses(&mut responses, &mut session));
+        assert_eq!(responses.front(), Some(&vec![1]));
+
+        drop(writer_rx);
+        assert!(!drain_graphics_responses(&mut responses, &mut session));
+        assert!(responses.is_empty());
     }
 
     #[test]
@@ -2269,7 +2425,8 @@ mod tests {
     #[test]
     fn user_selection_projects_across_history_and_visible_rows_and_copies() {
         let mut pane = PaneModel::detached(PaneId::new(1), GridSize::new(5, 2)).expect("pane");
-        pane.feed_test_output(b"old1\r\nold2\r\nlive!");
+        pane.feed_test_output(b"old1\r\nold2\r\nlive!")
+            .expect("pane fixture feed should succeed");
         assert_eq!(pane.core.terminal.history_len(), 1);
         pane.scroll_viewport_up(1);
         pane.begin_selection(0, 0, SelectionGesture::Cell);
@@ -2284,7 +2441,8 @@ mod tests {
     #[test]
     fn viewport_frame_metadata_pins_scrollback_and_tracks_alternate_screen() {
         let mut pane = PaneModel::detached(PaneId::new(1), GridSize::new(5, 2)).expect("pane");
-        pane.feed_test_output(b"old1\r\nold2\r\nlive!");
+        pane.feed_test_output(b"old1\r\nold2\r\nlive!")
+            .expect("pane fixture feed should succeed");
         let history_before = pane.core.terminal.history_len();
         assert_eq!(history_before, 1);
         let live = pane.frame().expect("live frame");
@@ -2305,7 +2463,8 @@ mod tests {
             "old1"
         );
 
-        pane.feed_test_output(b"\r\nnext");
+        pane.feed_test_output(b"\r\nnext")
+            .expect("pane fixture feed should succeed");
         let history_after = pane.core.terminal.history_len();
         assert!(history_after > history_before);
         assert_eq!(
@@ -2331,7 +2490,8 @@ mod tests {
         );
 
         let saved_primary_offset = pane.viewport_offset();
-        pane.feed_test_output(b"\x1b[?1049hALT");
+        pane.feed_test_output(b"\x1b[?1049hALT")
+            .expect("pane fixture feed should succeed");
         let alternate = pane.frame().expect("alternate frame");
         assert!(alternate.viewport.alternate_screen);
         assert_eq!(alternate.viewport.scroll_offset, 0);
@@ -2340,7 +2500,8 @@ mod tests {
         pane.scroll_viewport_down(usize::MAX);
         assert_eq!(pane.viewport_offset(), 0, "alternate scrolling is isolated");
 
-        pane.feed_test_output(b"\x1b[?1049l");
+        pane.feed_test_output(b"\x1b[?1049l")
+            .expect("pane fixture feed should succeed");
         let primary = pane.frame().expect("primary frame");
         assert!(!primary.viewport.alternate_screen);
         assert_eq!(pane.viewport_offset(), saved_primary_offset);
@@ -2359,7 +2520,8 @@ mod tests {
     #[test]
     fn search_selects_visible_match_and_sets_selection() {
         let mut pane = PaneModel::detached(PaneId::new(1), GridSize::new(80, 24)).expect("pane");
-        pane.feed_test_output(b"alpha\r\nbeta\r\nalpha\r\n");
+        pane.feed_test_output(b"alpha\r\nbeta\r\nalpha\r\n")
+            .expect("pane fixture feed should succeed");
         assert_eq!(
             pane.search(b"alpha", true),
             SearchApply::Selected { line: 2, col: 0 }
@@ -2374,7 +2536,8 @@ mod tests {
     #[test]
     fn search_next_wraps_and_previous_goes_back() {
         let mut pane = PaneModel::detached(PaneId::new(1), GridSize::new(80, 24)).expect("pane");
-        pane.feed_test_output(b"alpha\r\nbeta\r\nalpha\r\n");
+        pane.feed_test_output(b"alpha\r\nbeta\r\nalpha\r\n")
+            .expect("pane fixture feed should succeed");
         assert_eq!(
             pane.search(b"alpha", true),
             SearchApply::Selected { line: 2, col: 0 }
@@ -2396,7 +2559,8 @@ mod tests {
     #[test]
     fn search_no_match_and_empty_needle_clear_selection() {
         let mut pane = PaneModel::detached(PaneId::new(1), GridSize::new(80, 24)).expect("pane");
-        pane.feed_test_output(b"alpha\n");
+        pane.feed_test_output(b"alpha\n")
+            .expect("pane fixture feed should succeed");
         assert_eq!(pane.search(b"zzz", true), SearchApply::NoMatch);
         assert!(!pane.search.active);
         assert_eq!(pane.search(b"", true), SearchApply::NoNeedle);
@@ -2409,7 +2573,8 @@ mod tests {
         let mut pane = PaneModel::detached(PaneId::new(1), GridSize::new(10, 3)).expect("pane");
         // Scroll 6 lines through a 3-row grid: 4 lines land in history
         // (the trailing newline also scrolls the cursor line into view).
-        pane.feed_test_output(b"a\nb\nc\nd\ne\nf\n");
+        pane.feed_test_output(b"a\nb\nc\nd\ne\nf\n")
+            .expect("pane fixture feed should succeed");
         assert_eq!(pane.core.terminal.history_len(), 4);
         // The oldest match is in history; the viewport scrolls to show it.
         assert_eq!(
@@ -2434,7 +2599,8 @@ mod tests {
         for _ in 0..4_200 {
             output.extend_from_slice(b"filler\r\n");
         }
-        pane.feed_test_output(&output);
+        pane.feed_test_output(&output)
+            .expect("pane fixture feed should succeed");
         assert!(pane.core.terminal.history_len() > SEARCH_SLICE_BUDGET);
         assert_eq!(pane.search(b"needle", true), SearchApply::Searching);
         assert!(pane.search.pending.is_some());
@@ -2606,7 +2772,8 @@ mod tests {
     #[test]
     fn frame_search_matches_emits_all_visible_sorted_half_open() {
         let mut pane = PaneModel::detached(PaneId::new(1), GridSize::new(20, 4)).expect("pane");
-        pane.feed_test_output(b"alpha\r\nbeta\r\nalpha\r\ngamma");
+        pane.feed_test_output(b"alpha\r\nbeta\r\nalpha\r\ngamma")
+            .expect("pane fixture feed should succeed");
         assert_eq!(
             pane.search(b"alpha", true),
             SearchApply::Selected { line: 2, col: 0 }
@@ -2641,7 +2808,8 @@ mod tests {
     #[test]
     fn frame_search_matches_clips_and_omits_when_scrolled() {
         let mut pane = PaneModel::detached(PaneId::new(1), GridSize::new(10, 3)).expect("pane");
-        pane.feed_test_output(b"zero\r\none\r\ntwo\r\nthree\r\nfour\r\nfive\r\n");
+        pane.feed_test_output(b"zero\r\none\r\ntwo\r\nthree\r\nfour\r\nfive\r\n")
+            .expect("pane fixture feed should succeed");
         let history = pane.core.terminal.history_len();
         assert!(history >= 2);
         pane.viewport.scroll_up(1, history);
@@ -2694,7 +2862,8 @@ mod tests {
     #[test]
     fn selection_kind_block_is_rectangular_others_linear() {
         let mut pane = PaneModel::detached(PaneId::new(1), GridSize::new(10, 3)).expect("pane");
-        pane.feed_test_output(b"hello world\r\nsecond line\r\nthird line");
+        pane.feed_test_output(b"hello world\r\nsecond line\r\nthird line")
+            .expect("pane fixture feed should succeed");
         pane.begin_selection(0, 0, SelectionGesture::Block);
         pane.update_selection(1, 2);
         assert_eq!(
@@ -2717,7 +2886,8 @@ mod tests {
         );
         pane.clear_selection();
         // Search fallback is linear.
-        pane.feed_test_output(b"\r\nalpha");
+        pane.feed_test_output(b"\r\nalpha")
+            .expect("pane fixture feed should succeed");
         pane.search(b"alpha", true);
         assert_eq!(
             pane.frame().expect("frame").selection.kind,
@@ -2728,7 +2898,8 @@ mod tests {
     #[test]
     fn frame_hyperlinks_visible_half_open_and_unlinked_none() {
         let mut pane = PaneModel::detached(PaneId::new(1), GridSize::new(40, 3)).expect("pane");
-        pane.feed_test_output(b"\x1b]8;;https://example.com\x07link\x1b]8;;\x07 plain");
+        pane.feed_test_output(b"\x1b]8;;https://example.com\x07link\x1b]8;;\x07 plain")
+            .expect("pane fixture feed should succeed");
         let frame = pane.frame().expect("frame");
         assert_eq!(frame.hyperlinks.len(), 1);
         assert_eq!(
@@ -2739,17 +2910,19 @@ mod tests {
         assert_eq!(frame.hyperlinks[0].uri, "https://example.com");
         // Unlinked pane has no hyperlinks.
         let mut plain = PaneModel::detached(PaneId::new(2), GridSize::new(40, 3)).expect("pane");
-        plain.feed_test_output(b"plain text no links");
+        plain
+            .feed_test_output(b"plain text no links")
+            .expect("pane fixture feed should succeed");
         assert!(plain.frame().expect("frame").hyperlinks.is_empty());
     }
-
     #[test]
     fn frame_hyperlinks_scrolled_history_fail_closed() {
         let mut pane = PaneModel::detached(PaneId::new(1), GridSize::new(20, 2)).expect("pane");
         // Link on first line, then enough lines to push it into history.
         pane.feed_test_output(
             b"\x1b]8;;https://example.com\x07histlink\x1b]8;;\x07\r\na\r\nb\r\nc\r\n",
-        );
+        )
+        .expect("pane fixture feed should succeed");
         // History contains the link line; live frame (bottom) has no links.
         assert!(
             pane.frame().expect("frame").hyperlinks.is_empty(),
@@ -2767,8 +2940,10 @@ mod tests {
     #[test]
     fn frame_hyperlinks_alternate_screen_maps_to_viewport_rows() {
         let mut pane = PaneModel::detached(PaneId::new(1), GridSize::new(40, 3)).expect("pane");
-        pane.feed_test_output(b"\x1b[?1049h");
-        pane.feed_test_output(b"\x1b]8;;https://example.com/alt\x07altlink\x1b]8;;\x07");
+        pane.feed_test_output(b"\x1b[?1049h")
+            .expect("pane fixture feed should succeed");
+        pane.feed_test_output(b"\x1b]8;;https://example.com/alt\x07altlink\x1b]8;;\x07")
+            .expect("pane fixture feed should succeed");
         let frame = pane.frame().expect("frame");
         assert!(frame.viewport.alternate_screen);
         assert_eq!(frame.hyperlinks.len(), 1);

@@ -152,6 +152,7 @@ pub struct ImageDeltaPlaceholder {
 #[derive(Clone, Debug)]
 pub struct FrameDelta {
     pub sequence: u64,
+    pub style_epoch: u64,
     pub size: GridSize,
     pub damage: DamageKind,
     pub rows: Vec<RowDelta>,
@@ -168,6 +169,7 @@ pub struct FrameDelta {
 impl PartialEq for FrameDelta {
     fn eq(&self, other: &Self) -> bool {
         self.sequence == other.sequence
+            && self.style_epoch == other.style_epoch
             && self.size == other.size
             && self.damage == other.damage
             && self.rows == other.rows
@@ -185,6 +187,7 @@ impl FrameDelta {
     pub fn empty(size: GridSize) -> Self {
         Self {
             sequence: 0,
+            style_epoch: 0,
             size,
             damage: DamageKind::Clean,
             rows: Vec::new(),
@@ -455,6 +458,7 @@ mod tests {
     fn clear_for_reuse_retains_row_and_style_capacities() {
         let mut frame = FrameDelta {
             sequence: 7,
+            style_epoch: 0,
             size: GridSize::new(8, 3),
             damage: DamageKind::Full,
             rows: vec![
@@ -562,6 +566,7 @@ mod tests {
     fn take_row_reuses_retired_slot() {
         let mut frame = FrameDelta {
             sequence: 1,
+            style_epoch: 0,
             size: GridSize::new(8, 3),
             damage: DamageKind::Clean,
             rows: Vec::new(),

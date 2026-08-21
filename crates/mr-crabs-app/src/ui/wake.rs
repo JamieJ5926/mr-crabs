@@ -10,7 +10,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use gpui::{App, AsyncApp, Entity, WeakEntity};
 
-
 use super::workspace::PUMP_CAP_PER_PANE;
 
 struct WakeState {
@@ -41,7 +40,11 @@ pub fn new_output_wake() -> (mr_crabs_pty::OutputWake, Arc<AtomicBool>) {
 
 /// Install the main-thread pump target. Must run on the GPUI thread
 /// **before** `sync_windows` so the first PTY wake can land.
-pub fn install_wake(cx: &mut App, model: Entity<crate::model::app_model::AppModel>, dirty: Arc<AtomicBool>) {
+pub fn install_wake(
+    cx: &mut App,
+    model: Entity<crate::model::app_model::AppModel>,
+    dirty: Arc<AtomicBool>,
+) {
     let async_cx = cx.to_async();
     WAKE.with(|slot| {
         *slot.borrow_mut() = Some(WakeState {
@@ -53,7 +56,10 @@ pub fn install_wake(cx: &mut App, model: Entity<crate::model::app_model::AppMode
 }
 
 /// Convenience used by tests: install TLS and return the wake closure.
-pub fn spawn_wake_task(cx: &mut App, model: Entity<crate::model::app_model::AppModel>) -> mr_crabs_pty::OutputWake {
+pub fn spawn_wake_task(
+    cx: &mut App,
+    model: Entity<crate::model::app_model::AppModel>,
+) -> mr_crabs_pty::OutputWake {
     let (wake, dirty) = new_output_wake();
     install_wake(cx, model, dirty);
     wake
@@ -72,10 +78,10 @@ pub fn drain_scheduled(cx: &mut App) {
     let _ = pump_output(cx);
 }
 
-/// Pure helper: re-arm exactly once when pending, never otherwise.
+/// Pure helper: re-arm exactly once for pending work unless pumping failed.
 #[inline]
-pub fn should_rearm(pending: bool) -> bool {
-    pending
+pub fn should_rearm(pending: bool, failed: bool) -> bool {
+    pending && !failed
 }
 
 fn schedule_main_pump() {
@@ -105,9 +111,14 @@ fn pump_now_inner(cx: &mut App) -> bool {
     let Some(model) = model.upgrade() else {
         return false;
     };
-    let (changed, pending, should_quit) = model.update(cx, |model, _| {
+    let (changed, pending, failed, should_quit) = model.update(cx, |model, _| {
         let stats = model.pump(PUMP_CAP_PER_PANE);
-        (stats.changed(), stats.pending, model.should_quit())
+        (
+            stats.changed(),
+            stats.pending,
+            stats.error.is_some(),
+            model.should_quit(),
+        )
     });
     if changed {
         cx.refresh_windows();
@@ -116,7 +127,7 @@ fn pump_now_inner(cx: &mut App) -> bool {
         cx.quit();
         return changed;
     }
-    if should_rearm(pending) {
+    if should_rearm(pending, failed) {
         dirty.store(true, Ordering::Release);
         cx.defer(|cx| {
             let _ = pump_now(cx);
@@ -151,11 +162,7 @@ fn post_to_main_queue() {
     }
 
     unsafe {
-        dispatch_async_f(
-            &raw mut _dispatch_main_q,
-            std::ptr::null_mut(),
-            trampoline,
-        );
+        dispatch_async_f(&raw mut _dispatch_main_q, std::ptr::null_mut(), trampoline);
     }
 }
 
@@ -174,9 +181,10 @@ mod tests {
     use crate::ui::shell::AppShell;
 
     #[test]
-    fn rearm_only_when_pending() {
-        assert!(should_rearm(true));
-        assert!(!should_rearm(false));
+    fn rearm_only_for_pending_success() {
+        assert!(should_rearm(true, false));
+        assert!(!should_rearm(false, false));
+        assert!(!should_rearm(true, true));
     }
 
     #[test]
@@ -189,10 +197,10 @@ mod tests {
         let dirty = Arc::new(AtomicBool::new(false));
         assert!(!dirty.swap(true, Ordering::AcqRel));
         assert!(dirty.swap(true, Ordering::AcqRel));
-        assert!(should_rearm(true));
+        assert!(should_rearm(true, false));
         dirty.store(false, Ordering::Release);
         assert!(!dirty.swap(true, Ordering::AcqRel));
-        assert!(!should_rearm(false));
+        assert!(!should_rearm(false, false));
     }
 
     #[gpui::test]
@@ -224,7 +232,7 @@ mod tests {
 
         reader_tx.send(b"LATE".to_vec()).expect("queue output");
         wake();
-        cx.update(|cx| drain_scheduled(cx));
+        cx.update(drain_scheduled);
         cx.run_until_parked();
         cx.update(|cx| {
             let frame = model

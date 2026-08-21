@@ -31,7 +31,7 @@ pub struct DiagnosticPumpEvent {
 
 impl DiagnosticPumpEvent {
     pub fn changed(&self) -> bool {
-        self.chunks > 0
+        self.chunks > 0 || self.frames > 0
     }
 }
 
