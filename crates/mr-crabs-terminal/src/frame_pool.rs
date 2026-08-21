@@ -35,6 +35,7 @@ impl FramePool {
     pub fn acquire(&mut self, sequence: u64, size: GridSize) -> FrameDelta {
         let mut frame = self.pool.pop().unwrap_or_else(|| FrameDelta {
             sequence,
+            style_epoch: 0,
             size,
             damage: DamageKind::Clean,
             rows: Vec::new(),
@@ -49,6 +50,7 @@ impl FramePool {
         });
         // Re-stamp identity regardless of prior reuse.
         frame.sequence = sequence;
+        frame.style_epoch = 0;
         frame.size = size;
         frame.damage = DamageKind::Clean;
         frame.cursor = CursorState::default();
@@ -111,6 +113,7 @@ mod tests {
         for i in 0..8 {
             pool.release(crate::FrameDelta {
                 sequence: i,
+                style_epoch: 0,
                 size: GridSize::new(8, 3),
                 damage: DamageKind::Clean,
                 rows: Vec::new(),

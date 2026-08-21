@@ -52,6 +52,8 @@ pub mod error;
 pub mod platform;
 /// Declare the bounded writer/reader channels and capacities.
 pub mod queue;
+/// Declare the optional phase-timing probes.
+pub mod phase;
 /// Declare the PTY session lifecycle ([`PtySession`], [`PtyConfig`],
 /// [`ExitStatus`]).
 pub mod session;

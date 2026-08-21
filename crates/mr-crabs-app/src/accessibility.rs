@@ -381,7 +381,7 @@ mod tests {
         model
             .focused_pane_mut()
             .expect("pane")
-            .feed_test_output(&output);
+            .feed_test_output(&output).expect("accessibility fixture feed should succeed");
         let snapshot = model.accessibility_snapshot();
         let pane_node = snapshot.root.children[0].children[0]
             .children
