@@ -122,6 +122,8 @@ impl RenderCache {
     /// `frame.rows` must be in ascending row order (the terminal lane emits
     /// row deltas top-down).
     pub fn apply_frame(&mut self, frame: &FrameDelta) -> CacheAction {
+        #[cfg(feature = "phase-timing")]
+        let _g = crate::phase::Guard::new("render_cache_apply");
         let needs_animation = frame.cursor.visible && frame.cursor.blinking;
 
         if frame.damage == DamageKind::Clean && self.last_sequence == Some(frame.sequence) {
