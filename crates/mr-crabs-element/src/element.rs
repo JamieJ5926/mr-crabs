@@ -60,6 +60,8 @@ use crate::{
 /// primitive — glyph, cursor, selection, background, IME — is positioned
 /// from that single origin plus `CellMetrics`; glyphs are anchored to their
 /// terminal cells, never to the shaper's natural advance.
+type OnPaintCallback = Arc<dyn Fn(&mut App)>;
+
 pub struct TerminalElement {
     /// The frame to render; paint borrows this and never touches the engine.
     frame: Option<Arc<FrameDelta>>,
@@ -97,7 +99,7 @@ pub struct TerminalElement {
     element_id: Option<ElementId>,
     /// Optional main-thread hook invoked at the start of paint so the app
     /// can drain PTY output on frames that already run (cursor blink).
-    on_paint: Option<Arc<dyn Fn(&mut App)>>,
+    on_paint: Option<OnPaintCallback>,
     borrowed_focus: bool,
     /// Live text/trail effects. `None` keeps the disabled fast path.
     effects: Option<EffectsConfig>,

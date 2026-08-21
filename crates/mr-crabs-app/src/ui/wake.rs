@@ -232,7 +232,7 @@ mod tests {
 
         reader_tx.send(b"LATE".to_vec()).expect("queue output");
         wake();
-        cx.update(|cx| drain_scheduled(cx));
+        cx.update(drain_scheduled);
         cx.run_until_parked();
         cx.update(|cx| {
             let frame = model
