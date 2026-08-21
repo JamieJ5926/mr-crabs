@@ -157,18 +157,16 @@ impl AppShell {
             ($($gpui:ident => $shell:ident),* $(,)?) => {
                 $(
                     {
-                        let weak = shell.downgrade();
+                        let shell = shell.clone();
                         cx.on_action::<$gpui>(move |_, cx| {
-                            let should_quit = weak
-                                .update(cx, |shell, cx| {
-                                    shell.model.update(cx, |model, _| {
-                                        model.dispatch(AppAction::$shell);
-                                    });
-                                    shell.sync_windows(cx);
-                                    cx.refresh_windows();
-                                    shell.model.read(cx).should_quit()
-                                })
-                                .unwrap_or(false);
+                            let should_quit = shell.update(cx, |shell, cx| {
+                                shell.model.update(cx, |model, _| {
+                                    model.dispatch(AppAction::$shell);
+                                });
+                                shell.sync_windows(cx);
+                                cx.refresh_windows();
+                                shell.model.read(cx).should_quit()
+                            });
                             if should_quit {
                                 cx.quit();
                                 std::process::exit(0);
@@ -203,6 +201,10 @@ impl AppShell {
             SearchNext => SearchNext,
             SearchPrevious => SearchPrevious,
             Quit => Quit,
+            SetTextAnimationNone => SetTextAnimationNone,
+            SetTextAnimationStreaming => SetTextAnimationStreaming,
+            SetTextAnimationTypewriter => SetTextAnimationTypewriter,
+            ToggleCursorTrail => ToggleCursorTrail,
         );
     }
 
@@ -351,6 +353,25 @@ mod tests {
             assert!(should_quit);
             assert!(model.read(cx).windows.is_empty());
             assert!(shell.read(cx).windows_snapshot().is_empty());
+        });
+    }
+
+    #[gpui::test]
+    fn registered_actions_retain_shell_after_startup_scope(cx: &mut TestAppContext) {
+        let model = cx.update(|cx| {
+            let model = cx.new(|_| AppModel::headless());
+            let shell = cx.new(|_| AppShell::new(model.clone()));
+            AppShell::register_actions(&shell, cx);
+            drop(shell);
+            model
+        });
+
+        cx.update(|cx| {
+            cx.dispatch_action(&crate::ui::actions::TogglePalette);
+        });
+        cx.run_until_parked();
+        cx.update(|cx| {
+            assert!(model.read(cx).palette.is_open());
         });
     }
 }

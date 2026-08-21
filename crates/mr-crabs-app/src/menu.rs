@@ -232,8 +232,21 @@ mod tests {
         assert!(model.find("File").is_some());
         assert!(model.find("View").is_some());
         assert!(model.find("Window").is_some());
+        const PALETTE_ONLY: [AppAction; 4] = [
+            AppAction::SetTextAnimationNone,
+            AppAction::SetTextAnimationStreaming,
+            AppAction::SetTextAnimationTypewriter,
+            AppAction::ToggleCursorTrail,
+        ];
         for action in AppAction::ALL {
-            assert!(model.contains_action(action), "menu must expose {action:?}");
+            if PALETTE_ONLY.contains(&action) {
+                assert!(
+                    !model.contains_action(action),
+                    "palette-only action must stay out of production menus: {action:?}"
+                );
+            } else {
+                assert!(model.contains_action(action), "menu must expose {action:?}");
+            }
         }
     }
 

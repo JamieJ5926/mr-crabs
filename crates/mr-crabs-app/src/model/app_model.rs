@@ -31,6 +31,8 @@ use crate::palette::{CommandRegistry, PaletteState};
 use crate::platform::PlatformCapabilities;
 use crate::quick_terminal::QuickTerminalState;
 use crate::restore::{RestoreError, RestoreStore, ShellStateV1};
+use mr_crabs_config::SettingKey;
+
 use crate::secure_input::SecureInputState;
 use crate::settings::{SettingsError, SettingsStore};
 use crate::updates::{UpdateCheckResult, UpdateService};
@@ -909,6 +911,24 @@ impl AppModel {
         AccessibilitySnapshot::from_model(self)
     }
 
+    fn apply_runtime_animation_setting(
+        &mut self,
+        key: SettingKey,
+        value: &str,
+    ) -> Result<(), SettingsError> {
+        self.settings.apply_runtime_value(key, value)?;
+        let animation = self.settings.current().animation_defaults();
+        for window in self.windows.values_mut() {
+            for tab in window.tabs.values_mut() {
+                for pane in tab.panes.values_mut() {
+                    pane.core.set_animation_defaults(animation);
+                }
+            }
+        }
+        self.generation += 1;
+        Ok(())
+    }
+
     // ── dispatch ──
 
     /// Dispatch one shell action with full cascade semantics.
@@ -1160,6 +1180,45 @@ impl AppModel {
                     }
                     Some(SearchApply::NoNeedle) | None => {
                         ActionResult::ignored("no search query set")
+                    }
+                }
+            }
+            AppAction::SetTextAnimationNone => {
+                match self.apply_runtime_animation_setting(SettingKey::TextAnimation, "none") {
+                    Ok(()) => ActionResult::performed("text animation set to none"),
+                    Err(error) => {
+                        ActionResult::ignored(format!("animation setting update failed: {error}"))
+                    }
+                }
+            }
+            AppAction::SetTextAnimationStreaming => {
+                match self.apply_runtime_animation_setting(SettingKey::TextAnimation, "streaming") {
+                    Ok(()) => ActionResult::performed("text animation set to streaming"),
+                    Err(error) => {
+                        ActionResult::ignored(format!("animation setting update failed: {error}"))
+                    }
+                }
+            }
+            AppAction::SetTextAnimationTypewriter => {
+                match self.apply_runtime_animation_setting(SettingKey::TextAnimation, "typewriter")
+                {
+                    Ok(()) => ActionResult::performed("text animation set to typewriter"),
+                    Err(error) => {
+                        ActionResult::ignored(format!("animation setting update failed: {error}"))
+                    }
+                }
+            }
+            AppAction::ToggleCursorTrail => {
+                let enabled = !self.settings.current().cursor_trail;
+                let value = if enabled { "true" } else { "false" };
+                match self.apply_runtime_animation_setting(SettingKey::CursorTrail, value) {
+                    Ok(()) => ActionResult::performed(if enabled {
+                        "cursor trail enabled"
+                    } else {
+                        "cursor trail disabled"
+                    }),
+                    Err(error) => {
+                        ActionResult::ignored(format!("animation setting update failed: {error}"))
                     }
                 }
             }
@@ -1997,5 +2056,176 @@ mod tests {
             model.pump(8);
             std::thread::sleep(std::time::Duration::from_millis(50));
         }
+    }
+
+    // ── live animation controls ──
+
+    #[test]
+    fn live_animation_typewriter_applies_to_current_and_future_panes_and_bumps_generation() {
+        use mr_crabs_config::TextAnimation;
+        let mut model = headless();
+        // Ensure at least two panes exist.
+        model.dispatch(AppAction::NewSplitRight);
+        let window_id = model.active_window.expect("window");
+        let tab = model
+            .windows
+            .get(&window_id)
+            .expect("window")
+            .tabs
+            .values()
+            .next()
+            .expect("tab");
+        assert_eq!(tab.pane_count(), 2);
+
+        let settings_gen_before = model.settings.generation;
+        let model_gen_before = model.generation;
+
+        let result = model.dispatch(AppAction::SetTextAnimationTypewriter);
+        assert!(result.performed);
+        assert_eq!(result.note, "text animation set to typewriter");
+
+        // Settings snapshot reflects the runtime overlay.
+        assert_eq!(model.settings.current().text_animation, "typewriter");
+        assert_eq!(model.settings.generation, settings_gen_before + 1);
+        assert_eq!(model.generation, model_gen_before + 1);
+
+        // Every existing pane received the new defaults.
+        for window in model.windows.values() {
+            for tab in window.tabs.values() {
+                for pane in tab.panes.values() {
+                    assert_eq!(
+                        pane.core.animation_defaults().text_animation,
+                        TextAnimation::Typewriter
+                    );
+                }
+            }
+        }
+
+        // Future panes inherit through construction.
+        let size = model.settings.current().default_grid;
+        let new_pane = model.new_pane_with_id(PaneId::new(9999), size);
+        assert_eq!(
+            new_pane.core.animation_defaults().text_animation,
+            TextAnimation::Typewriter
+        );
+    }
+
+    #[test]
+    fn live_animation_none_then_streaming_exact_notes_and_pane_state() {
+        use mr_crabs_config::TextAnimation;
+        let mut model = headless();
+        model.dispatch(AppAction::NewSplitRight);
+
+        let r1 = model.dispatch(AppAction::SetTextAnimationNone);
+        assert!(r1.performed);
+        assert_eq!(r1.note, "text animation set to none");
+        assert_eq!(model.settings.current().text_animation, "none");
+        for window in model.windows.values() {
+            for tab in window.tabs.values() {
+                for pane in tab.panes.values() {
+                    assert_eq!(
+                        pane.core.animation_defaults().text_animation,
+                        TextAnimation::Disabled
+                    );
+                }
+            }
+        }
+
+        let r2 = model.dispatch(AppAction::SetTextAnimationStreaming);
+        assert!(r2.performed);
+        assert_eq!(r2.note, "text animation set to streaming");
+        assert_eq!(model.settings.current().text_animation, "streaming");
+        for window in model.windows.values() {
+            for tab in window.tabs.values() {
+                for pane in tab.panes.values() {
+                    assert_eq!(
+                        pane.core.animation_defaults().text_animation,
+                        TextAnimation::Streaming
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn live_animation_toggle_cursor_trail_twice_flips_and_restores() {
+        let mut model = headless();
+        model.dispatch(AppAction::NewSplitRight);
+        let initial = model.settings.current().cursor_trail;
+        let settings_gen_before = model.settings.generation;
+        let model_gen_before = model.generation;
+
+        let r1 = model.dispatch(AppAction::ToggleCursorTrail);
+        assert!(r1.performed);
+        let expected_first = if !initial {
+            "cursor trail enabled"
+        } else {
+            "cursor trail disabled"
+        };
+        assert_eq!(r1.note, expected_first);
+        assert_eq!(model.settings.current().cursor_trail, !initial);
+        assert_eq!(model.settings.generation, settings_gen_before + 1);
+        assert_eq!(model.generation, model_gen_before + 1);
+        for window in model.windows.values() {
+            for tab in window.tabs.values() {
+                for pane in tab.panes.values() {
+                    assert_eq!(pane.core.animation_defaults().cursor_trail, !initial);
+                }
+            }
+        }
+
+        let r2 = model.dispatch(AppAction::ToggleCursorTrail);
+        assert!(r2.performed);
+        let expected_second = if initial {
+            "cursor trail enabled"
+        } else {
+            "cursor trail disabled"
+        };
+        assert_eq!(r2.note, expected_second);
+        assert_eq!(model.settings.current().cursor_trail, initial);
+        assert_eq!(model.settings.generation, settings_gen_before + 2);
+        assert_eq!(model.generation, model_gen_before + 2);
+        for window in model.windows.values() {
+            for tab in window.tabs.values() {
+                for pane in tab.panes.values() {
+                    assert_eq!(pane.core.animation_defaults().cursor_trail, initial);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn live_animation_runtime_over_file_precedence_after_reload() {
+        use mr_crabs_config::TextAnimation;
+        let mut model = headless();
+        model.dispatch(AppAction::NewSplitRight);
+        let r = model.dispatch(AppAction::SetTextAnimationTypewriter);
+        assert!(r.performed);
+        assert_eq!(model.settings.current().text_animation, "typewriter");
+
+        // Reload a file layer requesting none; runtime overlay must survive.
+        model
+            .settings
+            .reload_json(r#"{"text_animation": "none"}"#, "test")
+            .expect("reload");
+        assert_eq!(model.settings.current().text_animation, "typewriter");
+        for window in model.windows.values() {
+            for tab in window.tabs.values() {
+                for pane in tab.panes.values() {
+                    assert_eq!(
+                        pane.core.animation_defaults().text_animation,
+                        TextAnimation::Typewriter
+                    );
+                }
+            }
+        }
+
+        // Future panes also inherit the runtime value after the reload.
+        let size = model.settings.current().default_grid;
+        let new_pane = model.new_pane_with_id(PaneId::new(10001), size);
+        assert_eq!(
+            new_pane.core.animation_defaults().text_animation,
+            TextAnimation::Typewriter
+        );
     }
 }

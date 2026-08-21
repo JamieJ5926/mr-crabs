@@ -340,8 +340,8 @@ pub struct CliOverrides {
     pub show_default: bool,
     pub docs: bool,
     pub version: bool,
+    pub help: bool,
 }
-
 impl CliOverrides {
     /// Parse Ghostty-style `--flag=value`, `--flag value`, and boolean `--flag`.
     pub fn parse(args: &[String]) -> Result<Self, SettingsError> {
@@ -366,6 +366,11 @@ impl CliOverrides {
             }
             if arg == "--default" {
                 cli.show_default = true;
+                index += 1;
+                continue;
+            }
+            if arg == "--help" || arg == "-h" {
+                cli.help = true;
                 index += 1;
                 continue;
             }
@@ -1126,6 +1131,97 @@ mod tests {
         assert_eq!(settings.text_animation, "typewriter");
         assert_eq!(settings.text_animation_duration_ms, 90);
         assert_eq!(settings.text_animation_intensity, 0.4);
+    }
+
+    #[test]
+    fn cli_help_long_sets_only_help() {
+        let cli = CliOverrides::parse(&["--help".into()]).expect("parse --help");
+        assert!(cli.help);
+        assert!(!cli.show_config);
+        assert!(!cli.version);
+        assert!(!cli.docs);
+        assert!(!cli.show_default);
+        assert!(cli.config_file.is_none());
+        assert!(cli.overlay.is_empty());
+    }
+
+    #[test]
+    fn cli_help_short_sets_only_help() {
+        let cli = CliOverrides::parse(&["-h".into()]).expect("parse -h");
+        assert!(cli.help);
+        assert!(!cli.show_config);
+        assert!(!cli.version);
+        assert!(!cli.docs);
+        assert!(!cli.show_default);
+        assert!(cli.config_file.is_none());
+        assert!(cli.overlay.is_empty());
+    }
+
+    #[test]
+    fn cli_help_alongside_other_flags_preserves_both() {
+        let cli = CliOverrides::parse(&["--help".into(), "--font-size".into(), "14".into()])
+            .expect("parse --help with value flag");
+        assert!(cli.help);
+        // Other flag still applies; help does not suppress parsing.
+        let settings = load_effective_from_cli(&cli).expect("effective");
+        assert_eq!(settings.font_size, 14.0);
+    }
+
+    #[test]
+    fn cli_help_short_alongside_config_flag() {
+        let cli = CliOverrides::parse(&["-h".into(), "--theme".into(), "dark".into()])
+            .expect("parse -h with flag");
+        assert!(cli.help);
+        let settings = load_effective_from_cli(&cli).expect("effective");
+        assert_eq!(settings.theme, "dark");
+    }
+
+    #[test]
+    fn cli_help_rejects_plus_help() {
+        let err = CliOverrides::parse(&["+help".into()]).expect_err("+help must be invalid");
+        assert!(matches!(err, SettingsError::Invalid(_)));
+        assert!(err.to_string().contains("+help"));
+    }
+
+    #[test]
+    fn cli_help_rejects_help_value_form() {
+        let err = CliOverrides::parse(&["--help=value".into()]).expect_err("--help=value invalid");
+        assert!(matches!(err, SettingsError::Invalid(_)));
+    }
+
+    #[test]
+    fn cli_help_rejects_help_equals_empty() {
+        let err = CliOverrides::parse(&["--help=".into()]).expect_err("--help= invalid");
+        assert!(matches!(err, SettingsError::Invalid(_)));
+    }
+
+    #[test]
+    fn cli_help_positional_args_remain_ignored() {
+        let cli = CliOverrides::parse(&["--help".into(), "positional".into(), "-h".into()])
+            .expect("positional ignored");
+        assert!(cli.help);
+        assert!(!cli.show_config);
+    }
+
+    #[test]
+    fn cli_help_unknown_flags_still_error() {
+        let err = CliOverrides::parse(&["--help".into(), "--definitely-unknown".into()])
+            .expect_err("unknown flag still errors with --help");
+        assert!(matches!(err, SettingsError::Invalid(_)));
+    }
+
+    #[test]
+    fn cli_help_does_not_set_unrelated_cli_overrides_when_alone() {
+        for flag in ["--help", "-h"] {
+            let cli = CliOverrides::parse(&[flag.into()]).expect("parse help");
+            assert!(cli.help, "{flag} sets help");
+            assert!(!cli.show_config, "{flag} leaves show_config false");
+            assert!(!cli.version, "{flag} leaves version false");
+            assert!(!cli.docs, "{flag} leaves docs false");
+            assert!(!cli.show_default, "{flag} leaves show_default false");
+            assert!(cli.keybindings.is_none(), "{flag} leaves keybindings none");
+            assert!(cli.overlay.is_empty(), "{flag} leaves overlay empty");
+        }
     }
 
     #[test]

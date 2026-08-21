@@ -73,11 +73,19 @@ pub enum AppAction {
     SearchPrevious,
     /// Quit the application, shutting down every session deterministically.
     Quit,
+    /// Set text animation to none for this process.
+    SetTextAnimationNone,
+    /// Set text animation to streaming for this process.
+    SetTextAnimationStreaming,
+    /// Set text animation to typewriter for this process.
+    SetTextAnimationTypewriter,
+    /// Toggle the cursor trail for this process.
+    ToggleCursorTrail,
 }
 
 impl AppAction {
     /// Every shell action in declaration order.
-    pub const ALL: [AppAction; 23] = [
+    pub const ALL: [AppAction; 27] = [
         AppAction::NewWindow,
         AppAction::CloseWindow,
         AppAction::NewTab,
@@ -101,6 +109,10 @@ impl AppAction {
         AppAction::SearchNext,
         AppAction::SearchPrevious,
         AppAction::Quit,
+        AppAction::SetTextAnimationNone,
+        AppAction::SetTextAnimationStreaming,
+        AppAction::SetTextAnimationTypewriter,
+        AppAction::ToggleCursorTrail,
     ];
 
     /// Stable machine name (used for palette command ids and serialization).
@@ -129,6 +141,10 @@ impl AppAction {
             AppAction::SearchNext => "search_next",
             AppAction::SearchPrevious => "search_previous",
             AppAction::Quit => "quit",
+            AppAction::SetTextAnimationNone => "set_text_animation_none",
+            AppAction::SetTextAnimationStreaming => "set_text_animation_streaming",
+            AppAction::SetTextAnimationTypewriter => "set_text_animation_typewriter",
+            AppAction::ToggleCursorTrail => "toggle_cursor_trail",
         }
     }
 
@@ -158,6 +174,10 @@ impl AppAction {
             AppAction::SearchNext => "Search Next",
             AppAction::SearchPrevious => "Search Previous",
             AppAction::Quit => "Quit",
+            AppAction::SetTextAnimationNone => "Text Animation: None",
+            AppAction::SetTextAnimationStreaming => "Text Animation: Streaming",
+            AppAction::SetTextAnimationTypewriter => "Text Animation: Typewriter",
+            AppAction::ToggleCursorTrail => "Toggle Cursor Trail",
         }
     }
 
@@ -181,7 +201,11 @@ impl AppAction {
             | AppAction::ToggleSecureInput
             | AppAction::ReloadConfig
             | AppAction::SearchNext
-            | AppAction::SearchPrevious => "View",
+            | AppAction::SearchPrevious
+            | AppAction::SetTextAnimationNone
+            | AppAction::SetTextAnimationStreaming
+            | AppAction::SetTextAnimationTypewriter
+            | AppAction::ToggleCursorTrail => "View",
             AppAction::CheckForUpdates | AppAction::Quit => "App",
         }
     }
@@ -199,7 +223,7 @@ mod tests {
     #[test]
     fn all_covers_every_parity_id_exactly_once() {
         // One entry per variant, no duplicates, and every variant is in ALL.
-        assert_eq!(AppAction::ALL.len(), 23);
+        assert_eq!(AppAction::ALL.len(), 27);
         let mut names: Vec<&str> = AppAction::ALL.iter().map(|a| a.name()).collect();
         names.sort_unstable();
         let mut dedup = names.clone();

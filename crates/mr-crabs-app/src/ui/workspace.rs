@@ -175,6 +175,9 @@ impl WindowView {
 
     fn drain_ime_commits(&mut self, cx: &mut Context<Self>) {
         while let Ok((pane_id, text)) = self.ime_rx.try_recv() {
+            if self.model.read(cx).palette.is_open() {
+                continue;
+            }
             let bytes = encode_ime(&text, false);
             if !bytes.is_empty() {
                 self.model
@@ -547,7 +550,7 @@ impl Render for WindowView {
             root = root.child(surface.child(element));
         }
         if palette.is_open() {
-            root = root.child(palette_overlay(&palette));
+            root = root.child(palette_overlay(&palette, terminal_palette));
         }
         if secure_input {
             root = root.child(
@@ -917,7 +920,24 @@ fn route_drop_paths(
 /// The command-palette overlay: a popover listing the current search
 /// results. Navigation is keyboard-driven (`palette_key`), matching the
 /// keyboard-only-operation contract.
-fn palette_overlay(palette: &PaletteState) -> impl IntoElement {
+fn palette_overlay(palette: &PaletteState, terminal_palette: TerminalPalette) -> impl IntoElement {
+    let is_light = terminal_palette.background[0] > 0x80;
+    let panel: gpui::Hsla = if is_light {
+        gpui::rgba(0xfafafa_ff).into()
+    } else {
+        gpui::rgba(0x242424_ff).into()
+    };
+    let foreground: gpui::Hsla = if is_light {
+        gpui::rgb(0x202020).into()
+    } else {
+        gpui::rgb(0xe5e5e5).into()
+    };
+    let border: gpui::Hsla = if is_light {
+        gpui::rgba(0x202020_33).into()
+    } else {
+        gpui::rgba(0xe5e5e5_33).into()
+    };
+    let selected = terminal_palette.selection_color();
     let mut list = div()
         .absolute()
         .top(px(8.0))
@@ -926,6 +946,12 @@ fn palette_overlay(palette: &PaletteState) -> impl IntoElement {
         .flex()
         .flex_col()
         .gap(px(4.0))
+        .p(px(8.0))
+        .rounded(px(8.0))
+        .border_1()
+        .border_color(border)
+        .bg(panel)
+        .text_color(foreground)
         .id(ElementId::Name(SharedString::from("command-palette")))
         .role(Role::Menu);
     for (index, result) in palette.results.iter().enumerate() {
@@ -935,15 +961,20 @@ fn palette_overlay(palette: &PaletteState) -> impl IntoElement {
             "  "
         };
         let label = format!("{marker}{}", result.title);
-        list = list.child(
-            div()
-                .id(ElementId::Name(SharedString::from(format!(
-                    "palette-item-{}",
-                    result.id
-                ))))
-                .role(Role::ListItem)
-                .child(label),
-        );
+        let mut item = div()
+            .id(ElementId::Name(SharedString::from(format!(
+                "palette-item-{}",
+                result.id
+            ))))
+            .w_full()
+            .p(px(4.0))
+            .rounded(px(4.0))
+            .role(Role::ListItem)
+            .child(label);
+        if index == palette.selection {
+            item = item.bg(selected);
+        }
+        list = list.child(item);
     }
     list
 }
@@ -979,13 +1010,14 @@ fn handle_key_event(
     let paste_text = is_paste
         .then(|| cx.read_from_clipboard().and_then(|item| item.text()))
         .flatten();
-    model.update(cx, |shell_model, _| {
+    model.update(cx, |shell_model, model_cx| {
         if shell_model.palette.is_open() {
             if event.keystroke.modifiers.modified() {
                 let keystroke = shell_keystroke(&event.keystroke);
                 if let Some(action) = shell_model.keymap_resolver().resolve(&keystroke, "") {
                     shell_model.dispatch(action);
                     refresh_immediately = true;
+                    model_cx.stop_propagation();
                     return;
                 }
             }
@@ -994,6 +1026,7 @@ fn handle_key_event(
                 printable_text(&event.keystroke).as_deref(),
             );
             refresh_immediately = true;
+            model_cx.stop_propagation();
             return;
         }
         if is_copy {
@@ -1077,7 +1110,11 @@ fn handle_key_event(
 }
 
 fn handle_key_release(model: &Entity<AppModel>, event: &KeyUpEvent, cx: &mut App) {
-    model.update(cx, |shell_model, _| {
+    model.update(cx, |shell_model, cx| {
+        if shell_model.palette.is_open() {
+            cx.stop_propagation();
+            return;
+        }
         let Some(pane_id) = shell_model.focused_pane_id() else {
             return;
         };
@@ -1198,7 +1235,7 @@ fn to_input_key_event(keystroke: &Keystroke, action: InputKeyAction) -> Option<I
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gpui::Modifiers;
+    use gpui::{AppContext as _, Modifiers};
     use mr_crabs_terminal::GridSize;
 
     fn keystroke(key: &str, modifiers: gpui::Modifiers) -> Keystroke {
@@ -1428,6 +1465,199 @@ mod tests {
                 InputKeyAction::Press,
             ),
             None
+        );
+    }
+    #[gpui::test]
+    fn palette_printable_keys_do_not_leak_to_pty_writer(cx: &mut gpui::TestAppContext) {
+        use crate::model::app_model::AppModel;
+        use crate::model::pane::PaneSession;
+        use crate::ui::shell::AppShell;
+        use gpui::Keystroke;
+        use std::sync::mpsc::sync_channel;
+
+        let (model, shell, writer_rx, _reader_tx) = cx.update(|cx| {
+            let model = cx.new(|_| AppModel::headless());
+            let window_id = model.read(cx).active_window.expect("active window");
+            let pane_id = model.read(cx).focused_pane_id().expect("focused pane");
+            let size = model.read(cx).windows[&window_id]
+                .active_tab()
+                .expect("active tab")
+                .panes[&pane_id]
+                .last_size;
+            let (reader_tx, reader_rx) = sync_channel::<Vec<u8>>(8);
+            let (writer_tx, writer_rx) = sync_channel::<Vec<u8>>(8);
+            model.update(cx, |model, _| {
+                let pane = model
+                    .windows
+                    .get_mut(&window_id)
+                    .unwrap()
+                    .active_tab_mut()
+                    .unwrap()
+                    .panes
+                    .get_mut(&pane_id)
+                    .unwrap();
+                pane.session = PaneSession::from_receivers_with_writer(
+                    size,
+                    Some(reader_rx),
+                    None,
+                    Some(writer_tx),
+                );
+            });
+            let shell = cx.new(|_| AppShell::new(model.clone()));
+            shell.update(cx, |shell, cx| shell.sync_windows(cx));
+            (model, shell, writer_rx, reader_tx)
+        });
+        // Keep shell alive for window lifecycle.
+        let _keep_shell = shell;
+
+        let handle = cx.windows().into_iter().next().expect("one window");
+        // Force draw so WindowView key listeners and terminal input handler are installed.
+        cx.update_window(handle, |_, window, cx| {
+            window.draw(cx).clear(cx);
+        })
+        .unwrap();
+
+        let assert_writer_empty = |rx: &std::sync::mpsc::Receiver<Vec<u8>>| {
+            assert!(
+                rx.try_recv().is_err(),
+                "PTY writer must stay empty while palette is open"
+            );
+        };
+
+        // Cmd+Shift+P opens the palette.
+        cx.dispatch_keystroke(handle, Keystroke::parse("cmd-shift-p").unwrap());
+        assert!(
+            cx.update(|cx| model.read(cx).palette.is_open()),
+            "palette should be open after cmd-shift-p"
+        );
+        cx.update_window(handle, |_, window, cx| {
+            window.draw(cx).clear(cx);
+        })
+        .unwrap();
+        assert_writer_empty(&writer_rx);
+
+        // Printable `a` updates palette query but must not leak to PTY writer.
+        cx.dispatch_keystroke(handle, Keystroke::parse("a").unwrap());
+        cx.update_window(handle, |_, window, cx| {
+            window.draw(cx).clear(cx);
+        })
+        .unwrap();
+        assert_eq!(
+            cx.update(|cx| model.read(cx).palette.query.clone()),
+            "a",
+            "palette query should be 'a'"
+        );
+        assert_writer_empty(&writer_rx);
+
+        // Down mutates palette selection but must not leak.
+        let sel_before = cx.update(|cx| model.read(cx).palette.selection);
+        cx.dispatch_keystroke(handle, Keystroke::parse("down").unwrap());
+        cx.update_window(handle, |_, window, cx| {
+            window.draw(cx).clear(cx);
+        })
+        .unwrap();
+        assert!(
+            cx.update(|cx| model.read(cx).palette.is_open()),
+            "palette should stay open after Down"
+        );
+        assert_eq!(
+            cx.update(|cx| model.read(cx).palette.query.clone()),
+            "a",
+            "Down must not change query"
+        );
+        if cx.update(|cx| model.read(cx).palette.results.len() > 1) {
+            let sel_after = cx.update(|cx| model.read(cx).palette.selection);
+            assert_ne!(sel_before, sel_after, "Down should move selection");
+        }
+        assert_writer_empty(&writer_rx);
+
+        // Backspace mutates palette state but must not leak.
+        cx.dispatch_keystroke(handle, Keystroke::parse("backspace").unwrap());
+        cx.update_window(handle, |_, window, cx| {
+            window.draw(cx).clear(cx);
+        })
+        .unwrap();
+        assert_eq!(
+            cx.update(|cx| model.read(cx).palette.query.clone()),
+            "",
+            "Backspace should clear query"
+        );
+        assert_writer_empty(&writer_rx);
+
+        // Escape closes the palette.
+        cx.dispatch_keystroke(handle, Keystroke::parse("escape").unwrap());
+        cx.update_window(handle, |_, window, cx| {
+            window.draw(cx).clear(cx);
+        })
+        .unwrap();
+        assert!(
+            !cx.update(|cx| model.read(cx).palette.is_open()),
+            "Escape should close palette"
+        );
+        assert_writer_empty(&writer_rx);
+
+        // After close, printable `b` must reach the PTY writer (IME drain needs a draw).
+        cx.dispatch_keystroke(handle, Keystroke::parse("b").unwrap());
+        cx.update_window(handle, |_, window, cx| {
+            window.draw(cx).clear(cx);
+        })
+        .unwrap();
+        cx.update_window(handle, |_, window, cx| {
+            window.draw(cx).clear(cx);
+        })
+        .unwrap();
+        let bytes = writer_rx
+            .try_recv()
+            .expect("b must reach PTY writer after palette closed");
+        assert!(!bytes.is_empty(), "writer bytes must be non-empty");
+        assert!(
+            bytes.contains(&b'b'),
+            "writer should contain b, got {bytes:?}"
+        );
+
+        cx.update(|cx| {
+            model.update(cx, |model, _| {
+                if let Some(pane) = model.focused_pane_mut() {
+                    pane.core.feed_terminal_output(b"\x1b[=2u");
+                }
+            });
+            model.update(cx, |model, _| {
+                model.dispatch(crate::action::AppAction::TogglePalette);
+            });
+        });
+        assert!(
+            cx.update(|cx| model.read(cx).palette.is_open()),
+            "palette should be open after TogglePalette with ReportEventTypes enabled"
+        );
+        cx.update(|cx| {
+            let event = gpui::KeyUpEvent {
+                keystroke: gpui::Keystroke::parse("a").unwrap(),
+            };
+            handle_key_release(&model, &event, cx);
+        });
+        assert_writer_empty(&writer_rx);
+
+        cx.update(|cx| {
+            model.update(cx, |model, _| {
+                model.dispatch(crate::action::AppAction::TogglePalette);
+            });
+        });
+        assert!(
+            !cx.update(|cx| model.read(cx).palette.is_open()),
+            "palette should be closed after second TogglePalette"
+        );
+        cx.update(|cx| {
+            let event = gpui::KeyUpEvent {
+                keystroke: gpui::Keystroke::parse("a").unwrap(),
+            };
+            handle_key_release(&model, &event, cx);
+        });
+        let release_bytes = writer_rx.try_recv().expect(
+            "KeyUp release must reach PTY writer after palette closed with ReportEventTypes",
+        );
+        assert!(
+            !release_bytes.is_empty(),
+            "release bytes must be non-empty, got {release_bytes:?}"
         );
     }
 }
