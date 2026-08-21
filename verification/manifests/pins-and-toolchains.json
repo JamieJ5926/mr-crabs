@@ -16,7 +16,7 @@
     "product": {
       "bundle_name": "Mr Crabs.app",
       "bundle_id": "dev.jamie.mr-crabs",
-      "executable": "ghostty"
+      "executable": "mr-crabs"
     },
     "defaults": {
       "cursor_trail": true,
