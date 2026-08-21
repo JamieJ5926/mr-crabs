@@ -1173,7 +1173,9 @@ mod tests {
         for i in 0..40 {
             // CRLF keeps each feed's two rows ("target NN " and "filler")
             // aligned at column 0; bare LF would drift the columns.
-            hot_term.feed(format!("target {i:02} filler\r\n").as_bytes());
+            hot_term
+                .feed(format!("target {i:02} filler\r\n").as_bytes())
+                .unwrap_or_else(|error| panic!("search compression fixture feed should succeed for target {i:02} (hot): {error}"));
         }
         let mut cold_term = Terminal::new_with_config(
             size,
@@ -1186,7 +1188,9 @@ mod tests {
         )
         .unwrap();
         for i in 0..40 {
-            cold_term.feed(format!("target {i:02} filler\r\n").as_bytes());
+            cold_term
+                .feed(format!("target {i:02} filler\r\n").as_bytes())
+                .unwrap_or_else(|error| panic!("search compression fixture feed should succeed for target {i:02} (cold): {error}"));
         }
         cold_term.force_compress_all();
         assert!(cold_term.storage_stats().compressed_bytes > 0);
@@ -1360,7 +1364,8 @@ mod tests {
         let mut term = Terminal::new(size).unwrap();
         // CRLF so "three" starts at column 0 of the second visible row
         // (a bare LF would leave the cursor at column 7 and wrap the row).
-        term.feed(b"one two\r\nthree\r\n");
+        term.feed(b"one two\r\nthree\r\n")
+            .expect("search visible-rows fixture feed should succeed for one two / three");
         let snap = term.snapshot();
         let visible = crate::visible_rows(&snap);
         let mut req = req("three", SearchDirection::Forward, SearchStart::Top, 10);
