@@ -811,12 +811,6 @@ impl ScrollbackStorage {
     }
 
     fn maybe_enqueue_full_pages(&mut self) {
-        if self.queued_jobs.load(Ordering::Acquire) >= self.config.max_queued_jobs.max(1)
-            || self.pending_completions.load(Ordering::Acquire)
-                >= self.config.max_pending_completions.max(1)
-        {
-            return;
-        }
         // Keep the last page hot for mutation; enqueue earlier full hot pages.
         let len = self.history.len();
         if len <= 1 {
