@@ -405,4 +405,92 @@ mod tests {
             Some("shell.new_tab")
         );
     }
+    #[test]
+    fn animation_commands_are_discoverable_with_frozen_ids() {
+        let mut registry = CommandRegistry::new();
+        registry.install_shell_commands();
+
+        let matches = registry.search("Text Animation", 10);
+        let ids: Vec<&str> = matches.iter().map(|result| result.id.as_str()).collect();
+        assert_eq!(
+            ids,
+            vec![
+                "shell.set_text_animation_none",
+                "shell.set_text_animation_streaming",
+                "shell.set_text_animation_typewriter",
+            ]
+        );
+
+        let trail = registry.search("Toggle Cursor Trail", 10);
+        assert_eq!(trail.len(), 1);
+        assert_eq!(trail[0].id, "shell.toggle_cursor_trail");
+    }
+
+    #[test]
+    fn palette_activation_applies_typewriter_through_real_dispatch() {
+        use mr_crabs_config::TextAnimation;
+
+        let mut model = AppModel::headless();
+        model.palette.toggle(&model.commands);
+        model
+            .palette
+            .set_query("Text Animation: Typewriter", &model.commands);
+        assert_eq!(
+            model.palette.selected().map(|result| result.id.as_str()),
+            Some("shell.set_text_animation_typewriter")
+        );
+
+        let dispatched = model.activate_palette_selection();
+        assert_eq!(
+            dispatched.as_deref(),
+            Some("shell.set_text_animation_typewriter")
+        );
+        assert!(!model.palette.is_open());
+        assert_eq!(
+            model.palette.last_dispatched.as_deref(),
+            Some("shell.set_text_animation_typewriter")
+        );
+        assert_eq!(model.settings.current().text_animation, "typewriter");
+        assert_eq!(
+            model
+                .focused_pane()
+                .expect("focused pane")
+                .core
+                .animation_defaults()
+                .text_animation,
+            TextAnimation::Typewriter
+        );
+    }
+
+    #[test]
+    fn palette_activation_toggles_cursor_trail_through_real_dispatch() {
+        let mut model = AppModel::headless();
+        let before = model.settings.current().cursor_trail;
+        model.palette.toggle(&model.commands);
+        model
+            .palette
+            .set_query("Toggle Cursor Trail", &model.commands);
+        assert_eq!(
+            model.palette.selected().map(|result| result.id.as_str()),
+            Some("shell.toggle_cursor_trail")
+        );
+
+        let dispatched = model.activate_palette_selection();
+        assert_eq!(dispatched.as_deref(), Some("shell.toggle_cursor_trail"));
+        assert!(!model.palette.is_open());
+        assert_eq!(
+            model.palette.last_dispatched.as_deref(),
+            Some("shell.toggle_cursor_trail")
+        );
+        assert_eq!(model.settings.current().cursor_trail, !before);
+        assert_eq!(
+            model
+                .focused_pane()
+                .expect("focused pane")
+                .core
+                .animation_defaults()
+                .cursor_trail,
+            !before
+        );
+    }
 }
