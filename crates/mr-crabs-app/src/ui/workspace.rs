@@ -52,6 +52,7 @@ use crate::model::geometry::{PaddingPx, SurfaceGeometry};
 use crate::model::input_dock::{
     InputDockLayout, InputDockSnapshot, InputDockState, PointF, hit_test_dock, remap_pointer,
 };
+use crate::model::presentation::{ConversationEvent, SurfaceMode};
 use crate::model::split::{GridRect, PaneId};
 use crate::model::window::WindowId;
 use crate::palette::PaletteState;
@@ -424,6 +425,16 @@ impl Render for WindowView {
                 snap,
             })
         });
+        let focused_pane_bounds = bundles.iter().find(|bundle| bundle.focused).map(|bundle| {
+            (
+                f32::from(bundle.geometry.padding.left)
+                    + f32::from(bundle.rect.x) * bundle.pane_geometry.metrics.width,
+                f32::from(bundle.geometry.padding.top)
+                    + f32::from(bundle.rect.y) * bundle.pane_geometry.metrics.height,
+                bundle.pane_geometry.content.width,
+                bundle.pane_geometry.content.height,
+            )
+        });
 
         let key_model = self.model.clone();
         let key_shell = self.shell.clone();
@@ -618,26 +629,75 @@ impl Render for WindowView {
                     let dock_pane = pane_id;
                     let dock_geometry = pane_geometry;
                     let dock_layout = layout;
-                    root = root.child(input_dock_mask(layout, tokens).on_any_mouse_down(
-                        move |event, _, cx| {
-                            route_dock_mouse(
-                                &dock_model,
-                                DockMouseRoute {
-                                    pane_id: dock_pane,
-                                    geometry: dock_geometry,
-                                    layout: dock_layout,
-                                    window_x: f32::from(event.position.x),
-                                    window_y: f32::from(event.position.y),
-                                    button: Some(input_mouse_button(event.button)),
-                                    action: InputMouseAction::Press,
-                                    modifiers: event.modifiers,
-                                    click_count: event.click_count,
-                                },
-                                cx,
-                            );
-                        },
-                    ));
+                    let mask_move_model = self.model.clone();
+                    let mask_up_model = self.model.clone();
+                    root = root.child(
+                        input_dock_mask(layout, tokens)
+                            .on_any_mouse_down(move |event, _, cx| {
+                                route_dock_mouse(
+                                    &dock_model,
+                                    DockMouseRoute {
+                                        pane_id: dock_pane,
+                                        geometry: dock_geometry,
+                                        layout: dock_layout,
+                                        window_x: f32::from(event.position.x),
+                                        window_y: f32::from(event.position.y),
+                                        button: Some(input_mouse_button(event.button)),
+                                        action: InputMouseAction::Press,
+                                        modifiers: event.modifiers,
+                                        click_count: event.click_count,
+                                    },
+                                    cx,
+                                );
+                            })
+                            .on_mouse_move(move |event, _, cx| {
+                                route_dock_mouse(
+                                    &mask_move_model,
+                                    DockMouseRoute {
+                                        pane_id: dock_pane,
+                                        geometry: dock_geometry,
+                                        layout: dock_layout,
+                                        window_x: f32::from(event.position.x),
+                                        window_y: f32::from(event.position.y),
+                                        button: event.pressed_button.map(input_mouse_button),
+                                        action: InputMouseAction::Motion,
+                                        modifiers: event.modifiers,
+                                        click_count: 0,
+                                    },
+                                    cx,
+                                );
+                            })
+                            .on_mouse_up(gpui::MouseButton::Left, move |event, _, cx| {
+                                route_dock_mouse(
+                                    &mask_up_model,
+                                    DockMouseRoute {
+                                        pane_id: dock_pane,
+                                        geometry: dock_geometry,
+                                        layout: dock_layout,
+                                        window_x: f32::from(event.position.x),
+                                        window_y: f32::from(event.position.y),
+                                        button: Some(input_mouse_button(event.button)),
+                                        action: InputMouseAction::Release,
+                                        modifiers: event.modifiers,
+                                        click_count: 0,
+                                    },
+                                    cx,
+                                );
+                            }),
+                    );
                     root = root.child(input_dock_separator(layout, tokens));
+                    let overlay_move_model = self.model.clone();
+                    let overlay_move_pane = pane_id;
+                    let overlay_move_geometry = pane_geometry;
+                    let overlay_move_layout = layout;
+                    let overlay_up_model = self.model.clone();
+                    let overlay_up_pane = pane_id;
+                    let overlay_up_geometry = pane_geometry;
+                    let overlay_up_layout = layout;
+                    let overlay_scroll_model = self.model.clone();
+                    let overlay_scroll_pane = pane_id;
+                    let overlay_scroll_geometry = pane_geometry;
+                    let overlay_scroll_layout = layout;
                     let overlay_model = self.model.clone();
                     let overlay_pane = pane_id;
                     let overlay_geometry = pane_geometry;
@@ -654,6 +714,7 @@ impl Render for WindowView {
                                 .clone(),
                             font_size: px(settings.font_size),
                             metrics: pane_geometry.metrics,
+                            terminal_palette,
                             focused: true,
                             focus: Some(self.focus.clone()),
                             ime_tx: Some(ime_tx),
@@ -675,11 +736,149 @@ impl Render for WindowView {
                                 },
                                 cx,
                             );
+                        })
+                        .on_mouse_move(move |event, _, cx| {
+                            route_dock_mouse(
+                                &overlay_move_model,
+                                DockMouseRoute {
+                                    pane_id: overlay_move_pane,
+                                    geometry: overlay_move_geometry,
+                                    layout: overlay_move_layout,
+                                    window_x: f32::from(event.position.x),
+                                    window_y: f32::from(event.position.y),
+                                    button: event.pressed_button.map(input_mouse_button),
+                                    action: InputMouseAction::Motion,
+                                    modifiers: event.modifiers,
+                                    click_count: 0,
+                                },
+                                cx,
+                            );
+                        })
+                        .on_mouse_up(gpui::MouseButton::Left, move |event, _, cx| {
+                            route_dock_mouse(
+                                &overlay_up_model,
+                                DockMouseRoute {
+                                    pane_id: overlay_up_pane,
+                                    geometry: overlay_up_geometry,
+                                    layout: overlay_up_layout,
+                                    window_x: f32::from(event.position.x),
+                                    window_y: f32::from(event.position.y),
+                                    button: Some(input_mouse_button(event.button)),
+                                    action: InputMouseAction::Release,
+                                    modifiers: event.modifiers,
+                                    click_count: 0,
+                                },
+                                cx,
+                            );
+                        })
+                        .on_scroll_wheel(move |event, _, cx| {
+                            // Scroll on dock: pass through to viewport when not remapped, else handle via route_dock_mouse remap
+                            let delta = match event.delta {
+                                gpui::ScrollDelta::Pixels(d) => {
+                                    f32::from(d.y) / overlay_scroll_geometry.metrics.height.max(1.0)
+                                }
+                                gpui::ScrollDelta::Lines(d) => d.y,
+                            };
+                            if delta == 0.0 {
+                                return;
+                            }
+                            // Use same hit logic: if over dock cells, scroll viewport via remapped coords not needed; just passthrough scroll handling on pane
+                            route_dock_mouse(
+                                &overlay_scroll_model,
+                                DockMouseRoute {
+                                    pane_id: overlay_scroll_pane,
+                                    geometry: overlay_scroll_geometry,
+                                    layout: overlay_scroll_layout,
+                                    window_x: f32::from(event.position.x),
+                                    window_y: f32::from(event.position.y),
+                                    button: None,
+                                    action: InputMouseAction::Press,
+                                    modifiers: event.modifiers,
+                                    click_count: 0,
+                                },
+                                cx,
+                            );
                         }),
                     );
                     root = root.child(input_dock_footer(&snap, layout, tokens));
                 }
             }
+        }
+
+        // Chat presentation: per-pane preference, effective mode fails closed.
+        // TerminalElement remains mounted underneath; chat is a read-only overlay
+        // clipped to the pane geometry, not a replacement.
+        let chat_info = {
+            let model = self.model.read(cx);
+            let focused_pane_id = model.focused_pane_id();
+            focused_pane_id.and_then(|pid| {
+                model
+                    .active_tab()
+                    .and_then(|tab| tab.panes.get(&pid))
+                    .map(|pane| {
+                        let effective = pane.effective_mode(palette.is_open(), false);
+                        let events = pane.conversation_events(palette.is_open(), false);
+                        (effective, events, pid)
+                    })
+            })
+        };
+        let chat_active = chat_info
+            .as_ref()
+            .is_some_and(|(mode, _, _)| *mode == SurfaceMode::Chat);
+        if chat_active {
+            if let (Some((_, events, _)), Some((left, top, width, height))) =
+                (chat_info, focused_pane_bounds)
+            {
+                root = root.child(chat_overlay(
+                    &events,
+                    terminal_palette,
+                    left,
+                    top,
+                    width,
+                    height,
+                ));
+            }
+        }
+
+        // Top-right Chat toggle button (visible, shares ToggleChatPresentation action).
+        {
+            let chat_model = self.model.clone();
+            let chat_shell = self.shell.clone();
+            let label = if chat_active { "Chat: On" } else { "Chat" };
+            root = root.child(
+                div()
+                    .absolute()
+                    .top(px(8.0))
+                    .right(px(84.0))
+                    .id(ElementId::Name(SharedString::from("chat-toggle")))
+                    .role(Role::Button)
+                    .bg(gpui::rgba(0x333333ff))
+                    .text_color(gpui::rgb(0xffffff))
+                    .p(px(4.0))
+                    .rounded(px(4.0))
+                    .child(label)
+                    .on_mouse_down(gpui::MouseButton::Left, move |_event, _window, cx| {
+                        let should_quit = chat_shell
+                            .update(cx, |shell, cx| {
+                                shell.model.update(cx, |model, _| {
+                                    model
+                                        .dispatch(crate::action::AppAction::ToggleChatPresentation);
+                                });
+                                shell.sync_windows(cx);
+                                cx.refresh_windows();
+                                shell.model.read(cx).should_quit()
+                            })
+                            .unwrap_or(false);
+                        // Stop propagation so the click does not also route to terminal mouse handling.
+                        cx.stop_propagation();
+                        if should_quit {
+                            cx.quit();
+                            std::process::exit(0);
+                        }
+                    }),
+            );
+            // Keyboard shortcut cmd+shift+j is handled via global keymap; button shares same AppAction.
+            let _ = chat_model;
         }
 
         if palette.is_open() {
@@ -1079,6 +1278,75 @@ fn route_drop_paths(
     });
 }
 
+fn chat_overlay(
+    events: &[ConversationEvent],
+    terminal_palette: TerminalPalette,
+    pane_left: f32,
+    pane_top: f32,
+    pane_width: f32,
+    pane_height: f32,
+) -> impl gpui::IntoElement {
+    let is_light = terminal_palette.background[0] > 0x80;
+    let panel: gpui::Hsla = if is_light {
+        gpui::rgba(0xfafa_faff).into()
+    } else {
+        gpui::rgba(0x2424_24ff).into()
+    };
+    let foreground: gpui::Hsla = if is_light {
+        gpui::rgb(0x202020).into()
+    } else {
+        gpui::rgb(0xe5e5e5).into()
+    };
+    let border: gpui::Hsla = if is_light {
+        gpui::rgba(0x2020_2033).into()
+    } else {
+        gpui::rgba(0xe5e5_e533).into()
+    };
+    let mut list = gpui::div()
+        .absolute()
+        .left(gpui::px(pane_left + 8.0))
+        .top(gpui::px(pane_top + 48.0))
+        .w(gpui::px((pane_width - 16.0).max(0.0)))
+        .h(gpui::px((pane_height - 56.0).max(0.0)))
+        .flex()
+        .flex_col()
+        .gap(gpui::px(6.0))
+        .p(gpui::px(10.0))
+        .rounded(gpui::px(8.0))
+        .border_1()
+        .border_color(border)
+        .bg(panel)
+        .text_color(foreground)
+        .id(gpui::ElementId::Name(gpui::SharedString::from(
+            "chat-overlay",
+        )))
+        .role(gpui::Role::Region);
+    if events.is_empty() {
+        list = list.child(gpui::div().child("No conversation yet"));
+    } else {
+        for ev in events {
+            let label = match ev.kind {
+                crate::model::presentation::ConversationKind::Input => "› ",
+                crate::model::presentation::ConversationKind::Output => "",
+            };
+            let content = format!("{}{}", label, ev.text);
+            list = list.child(
+                gpui::div()
+                    .id(gpui::ElementId::Name(gpui::SharedString::from(format!(
+                        "chat-event-{}",
+                        ev.id
+                    ))))
+                    .w_full()
+                    .p(gpui::px(4.0))
+                    .rounded(gpui::px(4.0))
+                    .role(gpui::Role::ListItem)
+                    .child(content),
+            );
+        }
+    }
+    list
+}
+
 /// The command-palette overlay: a popover listing the current search
 /// results. Navigation is keyboard-driven (`palette_key`), matching the
 /// keyboard-only-operation contract.
@@ -1232,6 +1500,7 @@ fn handle_key_event(
         if let Some(action) = shell_model.keymap_resolver().resolve(&keystroke, "") {
             shell_model.dispatch(action);
             refresh_immediately = true;
+            model_cx.stop_propagation();
             return;
         }
         let action = if event.is_held {

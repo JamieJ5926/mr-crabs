@@ -108,6 +108,10 @@ impl MenuModel {
                 AppAction::TogglePalette,
             ))
             .item(MenuItemDef::action(
+                "Chat Presentation",
+                AppAction::ToggleChatPresentation,
+            ))
+            .item(MenuItemDef::action(
                 "Reload Configuration",
                 AppAction::ReloadConfig,
             ))

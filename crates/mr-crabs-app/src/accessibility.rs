@@ -221,6 +221,54 @@ impl AccessibilitySnapshot {
             root.children.push(popover);
         }
 
+        // Chat presentation overlay when any pane has effective Chat mode.
+        if let Some(pid) = model.focused_pane_id() {
+            if let Some((window_id, tab_id)) = model.locate_pane(pid) {
+                if let Some(pane) = model
+                    .window(window_id)
+                    .and_then(|w| w.tabs.get(&tab_id))
+                    .and_then(|t| t.pane(pid))
+                {
+                    if pane.effective_mode(model.palette.is_open(), false)
+                        == crate::model::presentation::SurfaceMode::Chat
+                    {
+                        let events = pane.conversation_events(model.palette.is_open(), false);
+                        let mut chat =
+                            AccessibilityNode::new(next_id, AccessibilityRole::Popover, "Chat");
+                        paths.insert(next_id, NodePath::Root);
+                        next_id += 1;
+                        let mut list = AccessibilityNode::new(
+                            next_id,
+                            AccessibilityRole::List,
+                            "Conversation",
+                        );
+                        paths.insert(next_id, NodePath::Root);
+                        next_id += 1;
+                        for ev in &events {
+                            let label = format!("{:?}: {}", ev.kind, ev.text);
+                            let node =
+                                AccessibilityNode::new(next_id, AccessibilityRole::ListItem, label)
+                                    .with_actions(vec![]);
+                            paths.insert(next_id, NodePath::Root);
+                            next_id += 1;
+                            list.children.push(node);
+                        }
+                        if list.children.is_empty() {
+                            let node = AccessibilityNode::new(
+                                next_id,
+                                AccessibilityRole::ListItem,
+                                "No conversation yet",
+                            );
+                            paths.insert(next_id, NodePath::Root);
+                            list.children.push(node);
+                        }
+                        chat.children.push(list);
+                        root.children.push(chat);
+                    }
+                }
+            }
+        }
+
         root.actions = vec![AccessibleAction::Focus];
         Self {
             root,
@@ -444,4 +492,46 @@ mod tests {
         assert_eq!(model.active_window().unwrap().tabs.len(), tabs_before + 1);
         assert!(!model.palette.is_open(), "activation closes the palette");
     }
+}
+
+#[test]
+fn chat_overlay_appears_when_effective_chat() {
+    let mut model = crate::model::app_model::AppModel::headless();
+    // Make pane eligible: feed OSC133 A and put cursor at bottom row with prompt
+    model
+        .focused_pane_mut()
+        .expect("pane")
+        .feed_test_output(b"\x1b]133;A\x07\x1b]133;B\x07hello")
+        .expect("feed");
+    // Toggle chat
+    let res = model.dispatch(crate::action::AppAction::ToggleChatPresentation);
+    assert!(
+        res.performed,
+        "chat toggle should succeed when eligible: {}",
+        res.note
+    );
+    let snapshot = model.accessibility_snapshot();
+    assert!(
+        snapshot.root.children.iter().any(|n| n.label == "Chat"),
+        "chat popover should appear in a11y tree"
+    );
+    // Toggle back
+    let res2 = model.dispatch(crate::action::AppAction::ToggleChatPresentation);
+    assert!(res2.performed);
+    let snapshot2 = model.accessibility_snapshot();
+    assert!(
+        !snapshot2.root.children.iter().any(|n| n.label == "Chat"),
+        "chat should hide after second toggle"
+    );
+}
+
+#[test]
+fn chat_toggle_fails_closed_when_not_eligible() {
+    let mut model = crate::model::app_model::AppModel::headless();
+    // No OSC133, so not eligible
+    let res = model.dispatch(crate::action::AppAction::ToggleChatPresentation);
+    assert!(
+        !res.performed,
+        "chat toggle must fail closed when not eligible"
+    );
 }
