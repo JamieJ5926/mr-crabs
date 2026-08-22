@@ -840,46 +840,7 @@ impl Render for WindowView {
             }
         }
 
-        // Top-right Chat toggle button (visible, shares ToggleChatPresentation action).
-        {
-            let chat_model = self.model.clone();
-            let chat_shell = self.shell.clone();
-            let label = if chat_active { "Chat: On" } else { "Chat" };
-            root = root.child(
-                div()
-                    .absolute()
-                    .top(px(8.0))
-                    .right(px(84.0))
-                    .id(ElementId::Name(SharedString::from("chat-toggle")))
-                    .role(Role::Button)
-                    .bg(gpui::rgba(0x333333ff))
-                    .text_color(gpui::rgb(0xffffff))
-                    .p(px(4.0))
-                    .rounded(px(4.0))
-                    .child(label)
-                    .on_mouse_down(gpui::MouseButton::Left, move |_event, _window, cx| {
-                        let should_quit = chat_shell
-                            .update(cx, |shell, cx| {
-                                shell.model.update(cx, |model, _| {
-                                    model
-                                        .dispatch(crate::action::AppAction::ToggleChatPresentation);
-                                });
-                                shell.sync_windows(cx);
-                                cx.refresh_windows();
-                                shell.model.read(cx).should_quit()
-                            })
-                            .unwrap_or(false);
-                        // Stop propagation so the click does not also route to terminal mouse handling.
-                        cx.stop_propagation();
-                        if should_quit {
-                            cx.quit();
-                            std::process::exit(0);
-                        }
-                    }),
-            );
-            // Keyboard shortcut cmd+shift+j is handled via global keymap; button shares same AppAction.
-            let _ = chat_model;
-        }
+        // Chat is toggled only by cmd+shift+j (ToggleChatPresentation).
 
         if palette.is_open() {
             root = root.child(palette_overlay(&palette, terminal_palette));
@@ -1305,9 +1266,9 @@ fn chat_overlay(
     let mut list = gpui::div()
         .absolute()
         .left(gpui::px(pane_left + 8.0))
-        .top(gpui::px(pane_top + 48.0))
+        .top(gpui::px(pane_top + 8.0))
         .w(gpui::px((pane_width - 16.0).max(0.0)))
-        .h(gpui::px((pane_height - 56.0).max(0.0)))
+        .h(gpui::px((pane_height - 16.0).max(0.0)))
         .flex()
         .flex_col()
         .gap(gpui::px(6.0))
@@ -1321,28 +1282,19 @@ fn chat_overlay(
             "chat-overlay",
         )))
         .role(gpui::Role::Region);
-    if events.is_empty() {
-        list = list.child(gpui::div().child("No conversation yet"));
-    } else {
-        for ev in events {
-            let label = match ev.kind {
-                crate::model::presentation::ConversationKind::Input => "› ",
-                crate::model::presentation::ConversationKind::Output => "",
-            };
-            let content = format!("{}{}", label, ev.text);
-            list = list.child(
-                gpui::div()
-                    .id(gpui::ElementId::Name(gpui::SharedString::from(format!(
-                        "chat-event-{}",
-                        ev.id
-                    ))))
-                    .w_full()
-                    .p(gpui::px(4.0))
-                    .rounded(gpui::px(4.0))
-                    .role(gpui::Role::ListItem)
-                    .child(content),
-            );
-        }
+    for ev in events {
+        list = list.child(
+            gpui::div()
+                .id(gpui::ElementId::Name(gpui::SharedString::from(format!(
+                    "chat-event-{}",
+                    ev.id
+                ))))
+                .w_full()
+                .p(gpui::px(4.0))
+                .rounded(gpui::px(4.0))
+                .role(gpui::Role::ListItem)
+                .child(ev.text.clone()),
+        );
     }
     list
 }
@@ -2091,6 +2043,150 @@ mod tests {
         assert!(
             !release_bytes.is_empty(),
             "release bytes must be non-empty, got {release_bytes:?}"
+        );
+    }
+
+    #[gpui::test]
+    fn cmd_shift_j_toggles_chat_once_without_pty_leak(cx: &mut gpui::TestAppContext) {
+        use crate::model::app_model::AppModel;
+        use crate::model::pane::PaneSession;
+        use crate::model::presentation::SurfaceMode;
+        use crate::ui::shell::AppShell;
+        use gpui::Keystroke;
+        use std::sync::mpsc::sync_channel;
+
+        let (model, shell, writer_rx, _reader_tx) = cx.update(|cx| {
+            let model = cx.new(|_| AppModel::headless());
+            let window_id = model.read(cx).active_window.expect("active window");
+            let pane_id = model.read(cx).focused_pane_id().expect("focused pane");
+            let size = model.read(cx).windows[&window_id]
+                .active_tab()
+                .expect("active tab")
+                .panes[&pane_id]
+                .last_size;
+            let (reader_tx, reader_rx) = sync_channel::<Vec<u8>>(8);
+            let (writer_tx, writer_rx) = sync_channel::<Vec<u8>>(8);
+            model.update(cx, |model, _| {
+                let pane = model
+                    .windows
+                    .get_mut(&window_id)
+                    .unwrap()
+                    .active_tab_mut()
+                    .unwrap()
+                    .panes
+                    .get_mut(&pane_id)
+                    .unwrap();
+                pane.session = PaneSession::from_receivers_with_writer(
+                    size,
+                    Some(reader_rx),
+                    None,
+                    Some(writer_tx),
+                );
+            });
+            let shell = cx.new(|_| AppShell::new(model.clone()));
+            cx.bind_keys(crate::ui::actions::key_bindings(
+                &crate::keymap::default_keybindings(),
+            ));
+            AppShell::register_actions(&shell, cx);
+            shell.update(cx, |shell, cx| shell.sync_windows(cx));
+            (model, shell, writer_rx, reader_tx)
+        });
+        let _keep_shell = shell;
+
+        let handle = cx.windows().into_iter().next().expect("one window");
+        cx.update_window(handle, |_, window, cx| {
+            window.draw(cx).clear(cx);
+        })
+        .unwrap();
+
+        cx.update(|cx| {
+            model.update(cx, |model, _| {
+                model
+                    .focused_pane_mut()
+                    .expect("pane")
+                    .feed_test_output(b"\x1b]133;A\x07hello")
+                    .expect("feed OSC133");
+            });
+        });
+
+        let (generation_before, preferred_before) = cx.update(|cx| {
+            let model = model.read(cx);
+            let pane = model.focused_pane().expect("pane");
+            (model.generation, pane.preferred_mode)
+        });
+        assert_eq!(
+            preferred_before,
+            SurfaceMode::Terminal,
+            "idle eligible pane stays terminal until shortcut"
+        );
+
+        cx.dispatch_keystroke(handle, Keystroke::parse("cmd-shift-j").unwrap());
+        cx.update_window(handle, |_, window, cx| {
+            window.draw(cx).clear(cx);
+        })
+        .unwrap();
+        assert!(
+            writer_rx.try_recv().is_err(),
+            "cmd-shift-j must not write PTY bytes"
+        );
+        let (generation_after_open, preferred_after_open, effective_after_open) = cx.update(|cx| {
+            let model = model.read(cx);
+            let pane = model.focused_pane().expect("pane");
+            (
+                model.generation,
+                pane.preferred_mode,
+                pane.effective_mode(false, false),
+            )
+        });
+        assert_eq!(
+            preferred_after_open,
+            SurfaceMode::Chat,
+            "first cmd-shift-j must prefer chat"
+        );
+        assert_eq!(
+            effective_after_open,
+            SurfaceMode::Chat,
+            "first cmd-shift-j must toggle chat on"
+        );
+        assert_eq!(
+            generation_after_open,
+            generation_before + 1,
+            "double dispatch would restore Terminal and bump generation by 2"
+        );
+
+        cx.dispatch_keystroke(handle, Keystroke::parse("cmd-shift-j").unwrap());
+        cx.update_window(handle, |_, window, cx| {
+            window.draw(cx).clear(cx);
+        })
+        .unwrap();
+        assert!(
+            writer_rx.try_recv().is_err(),
+            "second cmd-shift-j must not write PTY bytes"
+        );
+        let (generation_after_close, preferred_after_close, effective_after_close) =
+            cx.update(|cx| {
+                let model = model.read(cx);
+                let pane = model.focused_pane().expect("pane");
+                (
+                    model.generation,
+                    pane.preferred_mode,
+                    pane.effective_mode(false, false),
+                )
+            });
+        assert_eq!(
+            preferred_after_close,
+            SurfaceMode::Terminal,
+            "second cmd-shift-j must restore terminal preference"
+        );
+        assert_eq!(
+            effective_after_close,
+            SurfaceMode::Terminal,
+            "second cmd-shift-j must restore terminal"
+        );
+        assert_eq!(
+            generation_after_close,
+            generation_before + 2,
+            "each press must increment generation exactly once"
         );
     }
 }
