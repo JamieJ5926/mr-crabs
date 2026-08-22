@@ -1751,6 +1751,33 @@ mod tests {
     }
 
     #[test]
+    fn chat_toggle_preserves_live_writer_and_scrollback() {
+        let mut model = headless();
+        let window_id = model.active_window.expect("window");
+        let pane_id = model.focused_pane_id().expect("focused pane");
+        let (reader_tx, writer_rx) = install_fake_session(&mut model);
+        reader_tx
+            .send(b"\x1b]133;A\x07existing output".to_vec())
+            .expect("feed semantic output");
+        assert!(model.pump(64).changed());
+        let sequence_before = model
+            .focused_frame(window_id)
+            .expect("focused frame")
+            .sequence;
+
+        assert!(model.dispatch(AppAction::ToggleChatPresentation).performed);
+        assert!(model.write_to_pane(pane_id, b"after-toggle"));
+        assert_eq!(writer_rx.try_recv(), Ok(b"after-toggle".to_vec()));
+        assert_eq!(
+            model
+                .focused_frame(window_id)
+                .expect("focused frame")
+                .sequence,
+            sequence_before
+        );
+    }
+
+    #[test]
     fn queued_echo_publishes_text_and_cursor_without_speculative_polling() {
         let mut model = headless();
         let window_id = model.active_window.expect("window");
