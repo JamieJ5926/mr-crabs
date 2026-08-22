@@ -108,10 +108,6 @@ impl MenuModel {
                 AppAction::TogglePalette,
             ))
             .item(MenuItemDef::action(
-                "Chat Presentation",
-                AppAction::ToggleChatPresentation,
-            ))
-            .item(MenuItemDef::action(
                 "Reload Configuration",
                 AppAction::ReloadConfig,
             ))
@@ -236,17 +232,18 @@ mod tests {
         assert!(model.find("File").is_some());
         assert!(model.find("View").is_some());
         assert!(model.find("Window").is_some());
-        const PALETTE_ONLY: [AppAction; 4] = [
+        const HIDDEN_FROM_MENUS: [AppAction; 5] = [
             AppAction::SetTextAnimationNone,
             AppAction::SetTextAnimationStreaming,
             AppAction::SetTextAnimationTypewriter,
             AppAction::ToggleCursorTrail,
+            AppAction::ToggleChatPresentation,
         ];
         for action in AppAction::ALL {
-            if PALETTE_ONLY.contains(&action) {
+            if HIDDEN_FROM_MENUS.contains(&action) {
                 assert!(
                     !model.contains_action(action),
-                    "palette-only action must stay out of production menus: {action:?}"
+                    "hidden action must stay out of production menus: {action:?}"
                 );
             } else {
                 assert!(model.contains_action(action), "menu must expose {action:?}");
