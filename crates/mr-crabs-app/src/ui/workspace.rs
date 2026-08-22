@@ -332,12 +332,12 @@ impl Render for WindowView {
             });
         }
 
-        // 2. Drain PTY output on every view rebuild. Cursor-blink frames
-        //    notify this view via request_animation_frame.
+        // 2. Drain PTY output on every view rebuild. Cursor-blink and
+        //    effect frames request animation via `TerminalElement`; idle
+        //    output only needs a refresh when new bytes arrived.
         if super::wake::pump_output(cx) {
             window.refresh();
         }
-        window.request_animation_frame();
 
         // 3. Keep the native title in sync with the shell model.
         let title = self
