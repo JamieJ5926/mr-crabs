@@ -130,7 +130,6 @@ pub enum ClickMode {
 /// The terminal integration applies the returned [`SemanticAction`]s to its
 /// semantic region table; this struct tracks the pure state transitions
 /// (Ghostty `Terminal.semanticPrompt` + `cursorSetSemanticContent`).
-#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SemanticPromptState {
     /// The semantic content at the cursor.
     pub content: SemanticContent,
@@ -140,6 +139,14 @@ pub struct SemanticPromptState {
     pub shell_redraws_prompt: RedrawState,
     /// The click-handling mode from the last prompt start.
     pub click: Option<ClickMode>,
+    /// OSC 133 `k=` prompt kind from the last A/P/N, if present.
+    pub prompt_kind: Option<super::semantic_prompt::PromptKind>,
+    /// Viewport column of the input start, set on OSC 133 B/I.
+    pub input_start_col: Option<u16>,
+    /// Viewport row of the input start, set on OSC 133 B/I.
+    pub input_start_row: Option<u16>,
+    /// Last OSC 133 D exit code, when the option was present and valid.
+    pub last_exit_code: Option<i32>,
 }
 
 /// The `redraw` option value (Ghostty `Redraw`); defaults to true.
@@ -175,12 +182,25 @@ impl SemanticPromptState {
             row: RowSemantic::None,
             shell_redraws_prompt: RedrawState::True,
             click: None,
+            prompt_kind: None,
+            input_start_col: None,
+            input_start_row: None,
+            last_exit_code: None,
         }
     }
 
     /// Apply an OSC 133 command, returning the actions the terminal must
     /// perform in order.
-    pub fn apply(&mut self, cmd: &super::semantic_prompt::SemanticPrompt) -> Vec<SemanticAction> {
+    ///
+    /// `cursor_col`/`cursor_row` are the live viewport cursor at the moment
+    /// the command is applied. OSC 133 B/I record those as
+    /// [`Self::input_start_col`]/[`Self::input_start_row`].
+    pub fn apply(
+        &mut self,
+        cmd: &super::semantic_prompt::SemanticPrompt,
+        cursor_col: u16,
+        cursor_row: u16,
+    ) -> Vec<SemanticAction> {
         use super::semantic_prompt::{Action, Option as Opt, OptionValue};
         match cmd.action {
             Action::FreshLine => vec![SemanticAction::FreshLine],
@@ -201,21 +221,37 @@ impl SemanticPromptState {
                     } else {
                         None
                     };
+                if let Some(OptionValue::PromptKind(kind)) = cmd.read_option(Opt::PromptKind) {
+                    self.prompt_kind = Some(kind);
+                } else {
+                    self.prompt_kind = None;
+                }
+                self.input_start_col = None;
+                self.input_start_row = None;
                 self.content = SemanticContent::Prompt;
                 self.row = RowSemantic::Prompt;
                 actions
             }
             Action::PromptStart => {
+                if let Some(OptionValue::PromptKind(kind)) = cmd.read_option(Opt::PromptKind) {
+                    self.prompt_kind = Some(kind);
+                } else {
+                    self.prompt_kind = None;
+                }
                 self.content = SemanticContent::Prompt;
                 self.row = RowSemantic::Prompt;
                 vec![SemanticAction::MarkPrompt]
             }
             Action::EndPromptStartInput => {
                 self.content = SemanticContent::Input;
+                self.input_start_col = Some(cursor_col);
+                self.input_start_row = Some(cursor_row);
                 vec![SemanticAction::MarkInput]
             }
             Action::EndPromptStartInputTerminateEol => {
                 self.content = SemanticContent::Input;
+                self.input_start_col = Some(cursor_col);
+                self.input_start_row = Some(cursor_row);
                 vec![SemanticAction::ClearInputEol]
             }
             Action::EndInputStartOutput => {
@@ -228,10 +264,18 @@ impl SemanticPromptState {
                 }
                 self.content = SemanticContent::Output;
                 self.row = RowSemantic::None;
+                self.input_start_col = None;
+                self.input_start_row = None;
                 actions
             }
             Action::EndCommand => {
+                if let Some(OptionValue::ExitCode(code)) = cmd.read_option(Opt::ExitCode) {
+                    self.last_exit_code = Some(code);
+                }
                 self.content = SemanticContent::Output;
+                self.row = RowSemantic::None;
+                self.input_start_col = None;
+                self.input_start_row = None;
                 vec![SemanticAction::MarkOutput]
             }
         }
@@ -326,46 +370,71 @@ mod tests {
         assert!(!s.cursor_is_at_prompt());
 
         // A: prompt starts
-        s.apply(&sp(Action::FreshLineNewPrompt, "k=i;redraw=1"));
+        s.apply(&sp(Action::FreshLineNewPrompt, "k=i;redraw=1"), 0, 0);
         assert_eq!(s.content, SemanticContent::Prompt);
         assert_eq!(s.row, RowSemantic::Prompt);
+        assert_eq!(
+            s.prompt_kind,
+            Some(crate::semantic_prompt::PromptKind::Initial)
+        );
         assert!(s.cursor_is_at_prompt());
         assert_eq!(s.shell_redraws_prompt, RedrawState::True);
 
         // P: explicit prompt start with kind
-        s.apply(&sp(Action::PromptStart, "k=s"));
+        s.apply(&sp(Action::PromptStart, "k=s"), 0, 0);
         assert_eq!(s.row, RowSemantic::Prompt);
+        assert_eq!(
+            s.prompt_kind,
+            Some(crate::semantic_prompt::PromptKind::Secondary)
+        );
 
         // B: input starts
-        s.apply(&sp(Action::EndPromptStartInput, ""));
+        s.apply(&sp(Action::EndPromptStartInput, ""), 2, 1);
         assert_eq!(s.content, SemanticContent::Input);
+        assert_eq!(s.input_start_col, Some(2));
+        assert_eq!(s.input_start_row, Some(1));
         assert!(s.cursor_is_at_prompt());
 
         // C: output starts
-        s.apply(&sp(Action::EndInputStartOutput, ""));
+        s.apply(&sp(Action::EndInputStartOutput, ""), 2, 1);
         assert_eq!(s.content, SemanticContent::Output);
+        assert_eq!(s.row, RowSemantic::None);
         assert!(!s.cursor_is_at_prompt());
 
-        // D: command end
-        s.apply(&sp(Action::EndCommand, "42"));
+        // D: command end clears the stuck-active A,B,D row
+        s.apply(&sp(Action::EndCommand, "42"), 0, 0);
         assert_eq!(s.content, SemanticContent::Output);
+        assert_eq!(s.row, RowSemantic::None);
+        assert_eq!(s.last_exit_code, Some(42));
+        assert!(!s.cursor_is_at_prompt());
 
         // redraw=last
-        s.apply(&sp(Action::FreshLineNewPrompt, "redraw=last"));
+        s.apply(&sp(Action::FreshLineNewPrompt, "redraw=last"), 0, 0);
         assert_eq!(s.shell_redraws_prompt, RedrawState::Last);
 
         // click options
-        s.apply(&sp(Action::FreshLineNewPrompt, "click_events=2"));
+        s.apply(&sp(Action::FreshLineNewPrompt, "click_events=2"), 0, 0);
         assert_eq!(
             s.click,
             Some(ClickMode::ClickEvents(
                 super::super::semantic_prompt::ClickEvents::Relative
             ))
         );
-        s.apply(&sp(Action::FreshLineNewPrompt, "cl=line"));
+        s.apply(&sp(Action::FreshLineNewPrompt, "cl=line"), 0, 0);
         assert_eq!(
             s.click,
             Some(ClickMode::Cl(super::super::semantic_prompt::Click::Line))
         );
+    }
+
+    #[test]
+    fn end_command_clears_row_after_a_b_d() {
+        let mut s = SemanticPromptState::new();
+        s.apply(&sp(Action::FreshLineNewPrompt, "k=i"), 0, 0);
+        s.apply(&sp(Action::EndPromptStartInput, ""), 1, 0);
+        s.apply(&sp(Action::EndCommand, "0"), 0, 0);
+        assert_eq!(s.row, RowSemantic::None);
+        assert_eq!(s.content, SemanticContent::Output);
+        assert!(!s.cursor_is_at_prompt());
     }
 }

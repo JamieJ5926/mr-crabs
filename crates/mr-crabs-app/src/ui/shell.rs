@@ -123,6 +123,12 @@ impl AppShell {
         }
     }
 
+    pub fn refresh_windows(&self, cx: &mut Context<Self>) {
+        for handle in self.windows.values() {
+            let _ = handle.update(cx, |_, _, cx| cx.notify());
+        }
+    }
+
     fn open_native_window(
         &mut self,
         window_id: WindowId,

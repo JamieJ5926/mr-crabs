@@ -146,7 +146,7 @@ fn main() {
         let (output_wake, dirty) = ui::new_output_wake();
         let model = cx.new(|_| AppModel::new_with_settings_and_output_wake(settings, output_wake));
         let shell = cx.new(|_| AppShell::new(model.clone()));
-        ui::install_wake(cx, model.clone(), dirty);
+        ui::install_wake(cx, model.clone(), shell.clone(), dirty);
 
         cx.set_menus(ui::menus::gpui_menus(&model.read(cx).menus));
         let bindings = ui::actions::key_bindings(&model.read(cx).settings.current().keybindings);

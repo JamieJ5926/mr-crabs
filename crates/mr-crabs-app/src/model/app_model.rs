@@ -339,6 +339,11 @@ impl AppModel {
             if let Some(dir) = terminfo.terminfo_dir {
                 env.insert("TERMINFO".to_string(), dir.display().to_string());
             }
+            super::shell_integration::inject_shell_integration_env(
+                &mut env,
+                settings.shell.as_ref().map(PathBuf::from).as_deref(),
+                settings.cursor_blink,
+            );
             let config = PtySpawnConfig {
                 size,
                 shell: settings.shell.as_ref().map(PathBuf::from),
