@@ -209,7 +209,12 @@ fn large_partial_bypass_preserves_existing_reveal_and_ignores_new_cells() {
         rows.push(row_at(
             row_index,
             1,
-            &[u32::from('X'), u32::from(' '), u32::from(' '), u32::from(' ')],
+            &[
+                u32::from('X'),
+                u32::from(' '),
+                u32::from(' '),
+                u32::from(' '),
+            ],
         ));
     }
     let large = frame_with_damage(size, 2, DamageKind::Partial, rows);
