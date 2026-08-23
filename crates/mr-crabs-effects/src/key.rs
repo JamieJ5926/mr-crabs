@@ -5,7 +5,10 @@
 //! `src/renderer/generic.zig`, new-file lines 48-80 and 730-811): a hash of
 //! the rendered-relevant content of a terminal cell decides which cells
 //! changed between rebuilds so the built-in text animation only animates
-//! newly changed glyph output.
+//! newly changed glyph output. When a rebuilt row has a new generation but
+//! the same final render keys, drawable glyphs are timestamped again: the
+//! generation proves a fresh write cycle occurred even when repeated output
+//! collapsed to an identical final snapshot.
 //!
 //! The Rust compact cell (`mr_crabs_terminal::Cell`) is exactly 8 bytes —
 //! `content: u32, style: u16, flags: u16` — so the render key is the raw
@@ -44,11 +47,22 @@ pub const fn unpack_time_bits(bits: u32) -> f64 {
 pub const NEVER_BITS: u32 = pack_time_ms(NEVER_MS);
 
 /// A stable render key for a terminal cell: the raw 8-byte cell pattern
-/// (content scalar, style index, flags). Equal keys mean the rendered
-/// content did not change; the key is stable across frames so unchanged
-/// rows never re-animate.
+/// (content scalar, style index, flags). Equal keys mean the final rendered
+/// content is identical; a new row generation can still re-time drawable
+/// glyphs when repeated output produced that same final snapshot.
 pub fn cell_render_key(cell: Cell) -> u64 {
     u64::from(cell.content) | (u64::from(cell.style) << 32) | (u64::from(cell.flags) << 48)
+}
+
+/// True when a cell contributes a drawable glyph to the text pass.
+///
+/// This mirrors the render cache's glyph filter: spaces, NULs, and the
+/// trailing spacer of a wide character do not consume a repeated-write
+/// timestamp. Genuine key changes continue to stamp every changed cell,
+/// including spaces, exactly as before.
+fn cell_paints_glyph(cell: Cell) -> bool {
+    cell.flags & Cell::WIDE_SPACER == 0
+        && char::from_u32(cell.content).is_some_and(|ch| ch != ' ' && ch != '\0')
 }
 
 /// Bounded, dense per-cell change store.
@@ -60,8 +74,9 @@ pub fn cell_render_key(cell: Cell) -> u64 {
 ///   [`NEVER_BITS`] = never changed),
 /// * `packed` — the same timestamps repacked as rgba8 texel bytes for GPU
 ///   upload (little-endian bit pattern, oracle `textAnimationUpload`),
-/// * `row_generations` — the last-seen row generation for the fast path:
-///   a row whose generation is unchanged is not diffed at all.
+/// * `row_generations` — the last-seen row generation for both the fast path
+///   (an unchanged generation is skipped) and repeated-write detection (a
+///   new generation with identical final keys re-times drawable glyphs).
 ///
 /// The tracker is explicitly bounded: it never stores more than
 /// `min(cols * rows, max_cells)` cells (the row-major prefix), so every
@@ -163,7 +178,9 @@ impl ChangeTracker {
     /// changed cells. `anim_ms` is the rebuild time shared by every change
     /// in streaming mode; when `schedule` is active (typewriter), changed
     /// cells consume staggered timestamps from the persistent burst
-    /// schedule instead. Only rebuilt rows are diffed — rows absent from
+    /// schedule instead. If a new row generation has no final key changes,
+    /// drawable glyphs are re-timestamped so repeated identical output still
+    /// receives one reveal. Only rebuilt rows are diffed — rows absent from
     /// the frame are unchanged by definition (oracle
     /// `textAnimationUpdateRow`).
     pub fn update_row(
@@ -198,22 +215,49 @@ impl ChangeTracker {
                 continue;
             }
             self.snapshot[i] = key;
-            let t = if schedule.is_active() {
-                schedule.next_timestamp()
-            } else {
-                anim_ms
-            };
-            self.change_times[i] = pack_time_ms(t);
-            self.change_ms[i] = t;
-            if t > last {
-                last = t;
-            }
+            self.stamp_change(i, anim_ms, schedule, &mut last);
             changed = true;
         }
+
+        // A terminal row generation advances when the engine observes a new
+        // write cycle. If that cycle produced the same final cell keys (for
+        // example, running the same printf twice), the key diff alone cannot
+        // see it. Re-time only drawable glyph cells in that otherwise
+        // identical row; spaces and wide spacers remain untouched, and the
+        // same generation still returns through the fast path above.
+        if !changed {
+            for (x, cell) in cells.iter().take(len).enumerate() {
+                if !cell_paints_glyph(*cell) {
+                    continue;
+                }
+                self.stamp_change(base + x, anim_ms, schedule, &mut last);
+                changed = true;
+            }
+        }
+
         if changed {
             self.last_change_ms = last;
             self.upload_dirty = true;
             self.repack();
+        }
+    }
+
+    fn stamp_change(
+        &mut self,
+        index: usize,
+        anim_ms: f64,
+        schedule: &mut TypewriterSchedule,
+        last: &mut f64,
+    ) {
+        let timestamp = if schedule.is_active() {
+            schedule.next_timestamp()
+        } else {
+            anim_ms
+        };
+        self.change_times[index] = pack_time_ms(timestamp);
+        self.change_ms[index] = timestamp;
+        if timestamp > *last {
+            *last = timestamp;
         }
     }
 
@@ -375,7 +419,7 @@ mod tests {
     }
 
     #[test]
-    fn streaming_stamps_every_change_at_rebuild_time() {
+    fn streaming_stamps_changes_and_repeated_identical_glyph_writes() {
         let mut t = ChangeTracker::new(4, 2, 16);
         let mut sched = TypewriterSchedule::new(0.0);
         let row = vec![
@@ -400,23 +444,41 @@ mod tests {
         t.update_row(0, 1, &row, 2000.0, &mut sched);
         assert_eq!(t.last_change_ms(), 1000.0);
 
-        // New generation but identical content: no restamp either.
+        // A new generation with the same final cells represents a fresh
+        // write cycle. Re-time drawable glyphs, but not spaces.
         t.update_row(0, 2, &row, 2000.0, &mut sched);
-        assert_eq!(t.last_change_ms(), 1000.0);
-        assert_eq!(t.change_ms_at(0), 1000.0);
+        assert_eq!(t.last_change_ms(), 2000.0);
+        assert_eq!(t.change_ms_at(0), 2000.0);
+        assert_eq!(t.change_ms_at(1), 2000.0);
+        assert_eq!(t.change_ms_at(2), 1000.0);
+        assert_eq!(t.change_ms_at(3), 1000.0);
 
-        // A real change restamps only the changed cell.
+        // A real key change still restamps only the changed cell.
         let row2 = vec![
             cell(90, 0, 0),
             cell(66, 0, 0),
             cell(32, 0, 0),
             cell(32, 0, 0),
         ];
-        t.update_row(0, 3, &row2, 2000.0, &mut sched);
-        assert_eq!(t.last_change_ms(), 2000.0);
-        assert_eq!(t.change_ms_at(0), 2000.0);
-        assert_eq!(t.change_ms_at(1), 1000.0);
+        t.update_row(0, 3, &row2, 3000.0, &mut sched);
+        assert_eq!(t.last_change_ms(), 3000.0);
+        assert_eq!(t.change_ms_at(0), 3000.0);
+        assert_eq!(t.change_ms_at(1), 2000.0);
         assert_eq!(t.change_ms_at(2), 1000.0);
+    }
+
+    #[test]
+    fn identical_blank_row_does_not_restart_animation() {
+        let mut t = ChangeTracker::new(4, 1, 16);
+        let mut sched = TypewriterSchedule::new(0.0);
+        let row = vec![cell(32, 0, 0); 4];
+        t.update_row(0, 1, &row, 1000.0, &mut sched);
+        t.update_row(0, 2, &row, 2000.0, &mut sched);
+        assert_eq!(t.last_change_ms(), 1000.0);
+        assert!(
+            (0..4).all(|index| t.change_ms_at(index) == 1000.0),
+            "spaces must not be re-timed by the identical-row fallback"
+        );
     }
 
     #[test]
