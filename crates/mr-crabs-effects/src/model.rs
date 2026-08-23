@@ -249,6 +249,24 @@ impl EffectsModel {
                                 break;
                             }
                         }
+                    } else if is_full && !can_translate {
+                        for target_row in 0..self.size.rows {
+                            let Some(rd) = frame.rows.iter().find(|rd| rd.row == target_row) else {
+                                continue;
+                            };
+                            if let Some(region) = anim_region {
+                                if rd.row >= region.row && rd.row < region.row + region.size.rows {
+                                    continue;
+                                }
+                            }
+                            tracker.reconcile_full_row(
+                                rd.row,
+                                rd.generation,
+                                &rd.cells,
+                                now,
+                                &mut self.schedule,
+                            );
+                        }
                     } else {
                         for rd in &frame.rows {
                             if let Some(region) = anim_region {
@@ -256,23 +274,13 @@ impl EffectsModel {
                                     continue;
                                 }
                             }
-                            if is_full && !can_translate {
-                                tracker.reconcile_full_row(
-                                    rd.row,
-                                    rd.generation,
-                                    &rd.cells,
-                                    now,
-                                    &mut self.schedule,
-                                );
-                            } else {
-                                tracker.update_row(
-                                    rd.row,
-                                    rd.generation,
-                                    &rd.cells,
-                                    now,
-                                    &mut self.schedule,
-                                );
-                            }
+                            tracker.update_row(
+                                rd.row,
+                                rd.generation,
+                                &rd.cells,
+                                now,
+                                &mut self.schedule,
+                            );
                         }
                     }
                 } else if is_alt || size_changed {
@@ -785,6 +793,46 @@ mod tests {
         let changed = &f.revealing[0];
         assert_eq!(changed.pos, CellPos::new(0, 0));
         assert_eq!(changed.change_ms, 3000.0);
+    }
+
+    #[test]
+    fn typewriter_full_frame_stamps_rows_in_visual_order() {
+        let size = GridSize::new(4, 3);
+        let mut m = model(TextAnimation::Typewriter, 4, 3);
+        let cursor = CursorState::default();
+        let mut baseline = frame_at(
+            size,
+            1,
+            vec![
+                row(0, 1, &[65, 32, 32, 32]),
+                row(1, 1, &[32, 32, 32, 32]),
+                row(2, 1, &[32, 32, 32, 32]),
+            ],
+            cursor,
+        );
+        baseline.damage = DamageKind::Full;
+        let _ = m.apply_frame(&baseline, 1000, true);
+
+        let mut output_and_prompt = frame_at(
+            size,
+            2,
+            vec![row(2, 2, &[80, 32, 32, 32]), row(1, 2, &[69, 32, 32, 32])],
+            cursor,
+        );
+        output_and_prompt.damage = DamageKind::Full;
+        let frame = m.apply_frame(&output_and_prompt, 2000, true);
+
+        assert!(
+            frame
+                .revealing
+                .iter()
+                .any(|reveal| reveal.pos == CellPos::new(1, 0)),
+            "the earlier output row must reveal first"
+        );
+        assert!(
+            frame.pending.contains(&CellPos::new(2, 0)),
+            "the following prompt row must remain pending"
+        );
     }
 
     #[test]
