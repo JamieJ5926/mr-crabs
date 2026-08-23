@@ -8,12 +8,194 @@ permissions:
   contents: write
 
 jobs:
-  run-red-tests:
+  implement-and-verify-bypass-fix:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: fix/issue-19-text-animation-render-dedup
       - uses: dtolnay/rust-toolchain@stable
-      - name: Run issue 19 regressions
-        run: cargo test -p mr-crabs-effects --test issue_19_repeated_output
+        with:
+          components: rustfmt, clippy
+      - name: Implement retained reveal synchronization
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          key_path = Path("crates/mr-crabs-effects/src/key.rs")
+          key_source = key_path.read_text()
+          if "pub fn sync_rows_without_stamping" not in key_source:
+              marker = "    pub fn adopt_rows(&mut self, rows: &[RowDelta]) {\n"
+              insert = '''    /// Synchronize bypassed rows without assigning fresh reveal stamps.
+              ///
+              /// Existing timestamps survive where the final render key is
+              /// unchanged, so an in-flight reveal can finish across a large or
+              /// Full frame. Cells whose bypassed content changed have their old
+              /// timestamp cleared so stale overlays never conceal replacement
+              /// text. New cells therefore enter the snapshot without animating.
+              pub fn sync_rows_without_stamping(&mut self, rows: &[RowDelta]) {
+                  let mut timestamps_changed = false;
+                  for row in rows {
+                      let row_index = usize::from(row.row);
+                      if row_index >= self.rows {
+                          continue;
+                      }
+                      self.row_generations[row_index] = row.generation;
+                      let base = row_index * self.cols;
+                      let len = row
+                          .cells
+                          .len()
+                          .min(self.cols)
+                          .min(self.cap.saturating_sub(base));
+                      for (col, cell) in row.cells.iter().take(len).enumerate() {
+                          let index = base + col;
+                          let key = cell_render_key(*cell);
+                          if self.snapshot[index] == key {
+                              continue;
+                          }
+                          self.snapshot[index] = key;
+                          if self.change_times[index] != NEVER_BITS {
+                              self.change_times[index] = NEVER_BITS;
+                              self.change_ms[index] = NEVER_MS;
+                              timestamps_changed = true;
+                          }
+                      }
+                  }
+                  if timestamps_changed {
+                      self.last_change_ms = self
+                          .change_ms
+                          .iter()
+                          .copied()
+                          .filter(|value| *value != NEVER_MS)
+                          .fold(NEVER_MS, f64::max);
+                      self.upload_dirty = true;
+                      self.repack();
+                  }
+              }
+
+              /// Clear every retained reveal timestamp while preserving cell
+              /// snapshots and row generations. Used when a resize or alternate
+              /// screen transition invalidates the old cell coordinate space.
+              pub fn clear_changes(&mut self) {
+                  self.change_times.fill(NEVER_BITS);
+                  self.change_ms.fill(NEVER_MS);
+                  self.last_change_ms = NEVER_MS;
+                  self.upload_dirty = true;
+                  self.repack();
+              }
+
+          '''
+              if marker not in key_source:
+                  raise SystemExit("key.rs adopt_rows marker not found")
+              key_path.write_text(key_source.replace(marker, insert + marker, 1))
+
+          model_path = Path("crates/mr-crabs-effects/src/model.rs")
+          model_source = model_path.read_text()
+          if "let frame_reveal_eligible" not in model_source:
+              start_marker = "            let process_rows = !is_full || can_translate;\n"
+              end_marker = "            if tracker.last_change_ms() != NEVER_MS {\n"
+              start = model_source.index(start_marker)
+              end = model_source.index(end_marker, start)
+              replacement = '''            let process_rows = !is_full || can_translate;
+              let mut translated = false;
+              let mut bottom_only = false;
+              if is_full && can_translate {
+                  tracker.translate_up_one();
+                  translated = true;
+                  bottom_only = true;
+              }
+              let frame_reveal_eligible =
+                  !is_alt && !size_changed && (translated || (!is_full && !is_large));
+              out.text_reveal_allowed = frame_reveal_eligible;
+
+              if is_full && !can_translate {
+                  if is_alt || size_changed {
+                      tracker.clear_changes();
+                      tracker.adopt_rows(&frame.rows);
+                  } else {
+                      tracker.sync_rows_without_stamping(&frame.rows);
+                  }
+                  self.schedule = TypewriterSchedule::new(
+                      if self.config.text_animation == TextAnimation::Typewriter {
+                          duration_ms / 8.0
+                      } else {
+                          0.0
+                      },
+                  );
+              } else if process_rows {
+                  if frame_reveal_eligible {
+                      self.schedule.begin_build(now, duration_ms);
+                      if bottom_only {
+                          let target = self.size.rows.saturating_sub(1);
+                          for rd in &frame.rows {
+                              if rd.row == target {
+                                  tracker.update_row(
+                                      rd.row,
+                                      rd.generation,
+                                      &rd.cells,
+                                      now,
+                                      &mut self.schedule,
+                                  );
+                                  break;
+                              }
+                          }
+                      } else {
+                          for rd in &frame.rows {
+                              tracker.update_row(
+                                  rd.row,
+                                  rd.generation,
+                                  &rd.cells,
+                                  now,
+                                  &mut self.schedule,
+                              );
+                          }
+                      }
+                  } else if is_alt || size_changed {
+                      tracker.clear_changes();
+                      tracker.adopt_rows(&frame.rows);
+                  } else {
+                      tracker.sync_rows_without_stamping(&frame.rows);
+                  }
+              }
+          '''
+              model_source = model_source[:start] + replacement + model_source[end:]
+              collect = '''            collect_reveals(tracker, self.config.text_animation, duration_ms, now, out);
+          '''
+              retained = '''            collect_reveals(tracker, self.config.text_animation, duration_ms, now, out);
+              if !out.text_reveal_allowed
+                  && !is_alt
+                  && !size_changed
+                  && (!out.revealing.is_empty() || !out.pending.is_empty())
+              {
+                  // The current frame bypassed new reveal stamping, but
+                  // unchanged cells from an earlier eligible frame are still
+                  // active. Keep painting and scheduling only those retained
+                  // timestamps until their bounded reveal window expires.
+                  out.text_reveal_allowed = true;
+              }
+          '''
+              if collect not in model_source:
+                  raise SystemExit("model.rs collect_reveals marker not found")
+              model_path.write_text(model_source.replace(collect, retained, 1))
+          PY
+      - name: Format changes
+        run: cargo fmt --all
+      - name: Commit implementation
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "Implementation already present"
+          else
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git add crates/mr-crabs-effects/src/key.rs crates/mr-crabs-effects/src/model.rs
+            git commit -m "fix: preserve active reveals through burst bypass"
+            git push origin HEAD:fix/issue-19-text-animation-render-dedup
+          fi
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Lint changed crate
+        run: cargo clippy -p mr-crabs-effects --all-targets --no-deps -- -D warnings
+      - name: Run effects tests
+        run: cargo test -p mr-crabs-effects
