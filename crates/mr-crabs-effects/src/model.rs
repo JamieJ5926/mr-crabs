@@ -797,42 +797,66 @@ mod tests {
 
     #[test]
     fn typewriter_full_frame_stamps_rows_in_visual_order() {
-        let size = GridSize::new(4, 3);
-        let mut m = model(TextAnimation::Typewriter, 4, 3);
-        let cursor = CursorState::default();
-        let mut baseline = frame_at(
-            size,
-            1,
-            vec![
-                row(0, 1, &[65, 32, 32, 32]),
-                row(1, 1, &[32, 32, 32, 32]),
-                row(2, 1, &[32, 32, 32, 32]),
-            ],
-            cursor,
-        );
-        baseline.damage = DamageKind::Full;
-        let _ = m.apply_frame(&baseline, 1000, true);
+        let permutations = [
+            [0, 1, 2],
+            [0, 2, 1],
+            [1, 0, 2],
+            [1, 2, 0],
+            [2, 0, 1],
+            [2, 1, 0],
+        ];
 
-        let mut output_and_prompt = frame_at(
-            size,
-            2,
-            vec![row(2, 2, &[80, 32, 32, 32]), row(1, 2, &[69, 32, 32, 32])],
-            cursor,
-        );
-        output_and_prompt.damage = DamageKind::Full;
-        let frame = m.apply_frame(&output_and_prompt, 2000, true);
+        for permutation in permutations {
+            let size = GridSize::new(4, 3);
+            let mut m = model(TextAnimation::Typewriter, 4, 3);
+            let cursor = CursorState::default();
+            let mut baseline = frame_at(
+                size,
+                1,
+                vec![
+                    row(0, 1, &[32, 32, 32, 32]),
+                    row(1, 1, &[32, 32, 32, 32]),
+                    row(2, 1, &[32, 32, 32, 32]),
+                ],
+                cursor,
+            );
+            baseline.damage = DamageKind::Full;
+            let _ = m.apply_frame(&baseline, 1000, true);
 
-        assert!(
-            frame
-                .revealing
-                .iter()
-                .any(|reveal| reveal.pos == CellPos::new(1, 0)),
-            "the earlier output row must reveal first"
-        );
-        assert!(
-            frame.pending.contains(&CellPos::new(2, 0)),
-            "the following prompt row must remain pending"
-        );
+            let rows = permutation
+                .map(|row_index| row(row_index, 2, &[65 + u32::from(row_index), 32, 32, 32]))
+                .into_iter()
+                .collect();
+            let mut output_and_prompt = frame_at(size, 2, rows, cursor);
+            output_and_prompt.damage = DamageKind::Full;
+            let frame = m.apply_frame(&output_and_prompt, 2000, true);
+            assert!(
+                frame
+                    .revealing
+                    .iter()
+                    .any(|reveal| reveal.pos == CellPos::new(0, 0)),
+                "top row must reveal first for delivery order {permutation:?}"
+            );
+            assert!(
+                frame.pending.contains(&CellPos::new(1, 0))
+                    && frame.pending.contains(&CellPos::new(2, 0)),
+                "later rows must remain pending for delivery order {permutation:?}"
+            );
+
+            let frame = m.apply_frame(&frame_at(size, 3, Vec::new(), cursor), 2030, true);
+            let timestamp = |row| {
+                frame
+                    .revealing
+                    .iter()
+                    .find(|reveal| reveal.pos == CellPos::new(row, 0))
+                    .expect("changed row remains in reveal window")
+                    .change_ms
+            };
+            assert!(
+                timestamp(0) < timestamp(1) && timestamp(1) < timestamp(2),
+                "timestamps must follow visual order for delivery order {permutation:?}"
+            );
+        }
     }
 
     #[test]
