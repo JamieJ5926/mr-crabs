@@ -10,7 +10,7 @@
       "src/renderer/shaders/typewriter-text.glsl:10-21 (typewriter semantics: staggered per-cell timestamps, one eighth of duration per character)",
       "src/renderer/shaders/typewriter-text.glsl:44-91 (typewriter math: future cells fully concealed, strike over first quarter, hold until window end)",
       "src/renderer/shaders/cursor-trail.glsl:11-27 (defaults: opacity 0.35, duration 0.25)",
-      "src/renderer/shaders/cursor-trail.glsl:53-88 (trail math: linear fade, exp(-d/radius) glow, segment between centers, focus/visibility guards)",
+      "src/renderer/shaders/cursor-trail.glsl:53-88 (trail math: linear fade, exp(-d/radius) glow, three shape-aware cursor echoes, focus/visibility guards)",
       "src/renderer/generic.zig:48-186 (TypewriterSchedule: burst continuation, fresh burst rules, max_ahead 1.0s)",
       "src/renderer/generic.zig:730-811 (TextAnimationState: per-cell snapshot keys and change times, never sentinel -1000, row 0 = top row)",
       "src/renderer/generic.zig:1396-1432 (textAnimationAnimating/cursorTrailAnimating: frames only while a reveal/fade is in progress; future timestamps keep frames alive)",
@@ -312,8 +312,36 @@
               "alpha": 0.0,
               "elapsed_ms": 0.0,
               "radius": 0.0,
-              "segment": null,
-              "glow": null
+              "glow": null,
+              "echoes": [
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                }
+              ]
             }
           }
         },
@@ -482,8 +510,36 @@
               "alpha": 0.0,
               "elapsed_ms": 0.0,
               "radius": 0.0,
-              "segment": null,
-              "glow": null
+              "glow": null,
+              "echoes": [
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                }
+              ]
             }
           }
         },
@@ -652,8 +708,36 @@
               "alpha": 0.0,
               "elapsed_ms": 0.0,
               "radius": 0.0,
-              "segment": null,
-              "glow": null
+              "glow": null,
+              "echoes": [
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                }
+              ]
             }
           }
         },
@@ -822,8 +906,36 @@
               "alpha": 0.0,
               "elapsed_ms": 0.0,
               "radius": 0.0,
-              "segment": null,
-              "glow": null
+              "glow": null,
+              "echoes": [
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                }
+              ]
             }
           }
         },
@@ -992,8 +1104,36 @@
               "alpha": 0.0,
               "elapsed_ms": 0.0,
               "radius": 0.0,
-              "segment": null,
-              "glow": null
+              "glow": null,
+              "echoes": [
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                }
+              ]
             }
           }
         },
@@ -1017,8 +1157,36 @@
               "alpha": 0.0,
               "elapsed_ms": 0.0,
               "radius": 0.0,
-              "segment": null,
-              "glow": null
+              "glow": null,
+              "echoes": [
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                }
+              ]
             }
           }
         },
@@ -1042,8 +1210,36 @@
               "alpha": 0.0,
               "elapsed_ms": 0.0,
               "radius": 0.0,
-              "segment": null,
-              "glow": null
+              "glow": null,
+              "echoes": [
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                }
+              ]
             }
           }
         }
@@ -1092,8 +1288,36 @@
               "alpha": 0.0,
               "elapsed_ms": 0.0,
               "radius": 0.0,
-              "segment": null,
-              "glow": null
+              "glow": null,
+              "echoes": [
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                }
+              ]
             }
           }
         },
@@ -1117,8 +1341,36 @@
               "alpha": 0.0,
               "elapsed_ms": 0.0,
               "radius": 0.0,
-              "segment": null,
-              "glow": null
+              "glow": null,
+              "echoes": [
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                }
+              ]
             }
           }
         },
@@ -1142,8 +1394,36 @@
               "alpha": 0.0,
               "elapsed_ms": 0.0,
               "radius": 0.0,
-              "segment": null,
-              "glow": null
+              "glow": null,
+              "echoes": [
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                }
+              ]
             }
           }
         }
@@ -1243,8 +1523,36 @@
               "alpha": 0.0,
               "elapsed_ms": 0.0,
               "radius": 0.0,
-              "segment": null,
-              "glow": null
+              "glow": null,
+              "echoes": [
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                }
+              ]
             }
           }
         },
@@ -1291,8 +1599,36 @@
               "alpha": 0.0,
               "elapsed_ms": 0.0,
               "radius": 0.0,
-              "segment": null,
-              "glow": null
+              "glow": null,
+              "echoes": [
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                }
+              ]
             }
           }
         },
@@ -1344,8 +1680,36 @@
               "alpha": 0.0,
               "elapsed_ms": 0.0,
               "radius": 0.0,
-              "segment": null,
-              "glow": null
+              "glow": null,
+              "echoes": [
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                }
+              ]
             }
           }
         },
@@ -1402,8 +1766,36 @@
               "alpha": 0.0,
               "elapsed_ms": 0.0,
               "radius": 0.0,
-              "segment": null,
-              "glow": null
+              "glow": null,
+              "echoes": [
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                }
+              ]
             }
           }
         },
@@ -1464,8 +1856,36 @@
               "alpha": 0.0,
               "elapsed_ms": 0.0,
               "radius": 0.0,
-              "segment": null,
-              "glow": null
+              "glow": null,
+              "echoes": [
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                }
+              ]
             }
           }
         },
@@ -1499,8 +1919,36 @@
               "alpha": 0.0,
               "elapsed_ms": 0.0,
               "radius": 0.0,
-              "segment": null,
-              "glow": null
+              "glow": null,
+              "echoes": [
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                }
+              ]
             }
           }
         }
@@ -1599,8 +2047,36 @@
               "alpha": 0.0,
               "elapsed_ms": 0.0,
               "radius": 0.0,
-              "segment": null,
-              "glow": null
+              "glow": null,
+              "echoes": [
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                }
+              ]
             }
           }
         },
@@ -1674,8 +2150,36 @@
               "alpha": 0.0,
               "elapsed_ms": 0.0,
               "radius": 0.0,
-              "segment": null,
-              "glow": null
+              "glow": null,
+              "echoes": [
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                }
+              ]
             }
           }
         },
@@ -1749,8 +2253,36 @@
               "alpha": 0.0,
               "elapsed_ms": 0.0,
               "radius": 0.0,
-              "segment": null,
-              "glow": null
+              "glow": null,
+              "echoes": [
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                }
+              ]
             }
           }
         },
@@ -1811,8 +2343,36 @@
               "alpha": 0.0,
               "elapsed_ms": 0.0,
               "radius": 0.0,
-              "segment": null,
-              "glow": null
+              "glow": null,
+              "echoes": [
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                }
+              ]
             }
           }
         }
@@ -2541,8 +3101,36 @@
               "alpha": 0.0,
               "elapsed_ms": 0.0,
               "radius": 0.0,
-              "segment": null,
-              "glow": null
+              "glow": null,
+              "echoes": [
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                }
+              ]
             }
           }
         },
@@ -3276,8 +3864,36 @@
               "alpha": 0.0,
               "elapsed_ms": 0.0,
               "radius": 0.0,
-              "segment": null,
-              "glow": null
+              "glow": null,
+              "echoes": [
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                }
+              ]
             }
           }
         }
@@ -3285,7 +3901,7 @@
     },
     {
       "id": "cursor-trail-fade",
-      "name": "cursor trail linear 250ms fade at 0.35 with segment between centers",
+      "name": "cursor trail linear 250ms fade with three shape-aware echoes",
       "kind": "sequence",
       "config": {
         "text_animation": "none",
@@ -3326,12 +3942,40 @@
               "alpha": 0.35,
               "elapsed_ms": 0.0,
               "radius": 10.0,
-              "segment": null,
               "glow": [
                 0.0,
                 0.0,
                 10.0,
                 20.0
+              ],
+              "echoes": [
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                }
               ]
             }
           }
@@ -3356,21 +4000,40 @@
               "alpha": 0.35,
               "elapsed_ms": 0.0,
               "radius": 10.0,
-              "segment": [
-                [
-                  5.0,
-                  10.0
-                ],
-                [
-                  55.0,
-                  10.0
-                ]
-              ],
               "glow": [
                 50.0,
                 0.0,
                 10.0,
                 20.0
+              ],
+              "echoes": [
+                {
+                  "rect": [
+                    7.5,
+                    0.0,
+                    10.0,
+                    20.0
+                  ],
+                  "alpha": 0.077
+                },
+                {
+                  "rect": [
+                    22.5,
+                    0.0,
+                    10.0,
+                    20.0
+                  ],
+                  "alpha": 0.1575
+                },
+                {
+                  "rect": [
+                    37.5,
+                    0.0,
+                    10.0,
+                    20.0
+                  ],
+                  "alpha": 0.252
+                }
               ]
             }
           }
@@ -3395,21 +4058,40 @@
               "alpha": 0.03499999999999999,
               "elapsed_ms": 225.0,
               "radius": 10.0,
-              "segment": [
-                [
-                  5.0,
-                  10.0
-                ],
-                [
-                  55.0,
-                  10.0
-                ]
-              ],
               "glow": [
                 50.0,
                 0.0,
                 10.0,
                 20.0
+              ],
+              "echoes": [
+                {
+                  "rect": [
+                    49.575,
+                    0.0,
+                    10.0,
+                    20.0
+                  ],
+                  "alpha": 0.007699999999999998
+                },
+                {
+                  "rect": [
+                    49.724999999999994,
+                    0.0,
+                    10.0,
+                    20.0
+                  ],
+                  "alpha": 0.015749999999999997
+                },
+                {
+                  "rect": [
+                    49.875,
+                    0.0,
+                    10.0,
+                    20.0
+                  ],
+                  "alpha": 0.02519999999999999
+                }
               ]
             }
           }
@@ -3434,8 +4116,36 @@
               "alpha": 0.0,
               "elapsed_ms": 0.0,
               "radius": 0.0,
-              "segment": null,
-              "glow": null
+              "glow": null,
+              "echoes": [
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                }
+              ]
             }
           }
         }
@@ -3484,12 +4194,40 @@
               "alpha": 0.35,
               "elapsed_ms": 0.0,
               "radius": 10.0,
-              "segment": null,
               "glow": [
                 0.0,
                 0.0,
                 10.0,
                 20.0
+              ],
+              "echoes": [
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                }
               ]
             }
           }
@@ -3514,8 +4252,36 @@
               "alpha": 0.0,
               "elapsed_ms": 0.0,
               "radius": 0.0,
-              "segment": null,
-              "glow": null
+              "glow": null,
+              "echoes": [
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                }
+              ]
             }
           }
         },
@@ -3539,21 +4305,40 @@
               "alpha": 0.315,
               "elapsed_ms": 25.0,
               "radius": 10.0,
-              "segment": [
-                [
-                  5.0,
-                  10.0
-                ],
-                [
-                  55.0,
-                  10.0
-                ]
-              ],
               "glow": [
                 50.0,
                 0.0,
                 10.0,
                 20.0
+              ],
+              "echoes": [
+                {
+                  "rect": [
+                    15.574999999999998,
+                    0.0,
+                    10.0,
+                    20.0
+                  ],
+                  "alpha": 0.0693
+                },
+                {
+                  "rect": [
+                    27.725,
+                    0.0,
+                    10.0,
+                    20.0
+                  ],
+                  "alpha": 0.14175000000000001
+                },
+                {
+                  "rect": [
+                    39.875,
+                    0.0,
+                    10.0,
+                    20.0
+                  ],
+                  "alpha": 0.2268
+                }
               ]
             }
           }
@@ -3578,8 +4363,36 @@
               "alpha": 0.0,
               "elapsed_ms": 0.0,
               "radius": 0.0,
-              "segment": null,
-              "glow": null
+              "glow": null,
+              "echoes": [
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                }
+              ]
             }
           }
         }
@@ -3675,8 +4488,36 @@
               "alpha": 0.0,
               "elapsed_ms": 0.0,
               "radius": 0.0,
-              "segment": null,
-              "glow": null
+              "glow": null,
+              "echoes": [
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                }
+              ]
             }
           }
         },
@@ -3700,8 +4541,36 @@
               "alpha": 0.0,
               "elapsed_ms": 0.0,
               "radius": 0.0,
-              "segment": null,
-              "glow": null
+              "glow": null,
+              "echoes": [
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                }
+              ]
             }
           }
         }
@@ -3841,8 +4710,36 @@
               "alpha": 0.0,
               "elapsed_ms": 0.0,
               "radius": 0.0,
-              "segment": null,
-              "glow": null
+              "glow": null,
+              "echoes": [
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                },
+                {
+                  "rect": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "alpha": 0.0
+                }
+              ]
             }
           }
         }

@@ -18,7 +18,7 @@
 //!   stay fully concealed and keep animation frames scheduled.
 //! * **Cursor trail** (`cursor-trail`, opt-in): a linear 250 ms
 //!   fade at opacity 0.35 with a soft glow around the current cursor rect
-//!   and a segment connecting the previous and current rect centers. The
+//!   and three shape-aware echoes. The
 //!   gradient resource descriptors come from a bounded cache.
 //! * **Disabled path**: with `text-animation=none` and `cursor-trail=false`
 //!   the model retains zero allocations and never schedules a frame.
@@ -45,7 +45,7 @@ pub use model::{EffectsFrame, EffectsModel};
 pub use reveal::{CellPos, CellReveal, RevealMath, RevealPhase};
 pub use schedule::TypewriterSchedule;
 pub use trail::{
-    CursorTrail, GradientCache, GradientId, LinePx, PointPx, RectPx, TrailConfig, TrailFrame,
+    CursorTrail, GradientCache, GradientId, RectPx, TrailConfig, TrailEcho, TrailFrame,
 };
 
 pub use mr_crabs_config::TextAnimation;
