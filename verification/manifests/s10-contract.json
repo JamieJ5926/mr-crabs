@@ -60,7 +60,7 @@
       "KeyBindingDef + KeymapResolver + default_keybindings; every shell action keyboard-dispatachable"
     ],
     "binary": [
-      "bin target ghostty: gpui_platform::application, one window, focus, keybindings, menus, accessibility roles, TerminalElement rendering"
+      "bin target mr-crabs: gpui_platform::application, one window, focus, keybindings, menus, accessibility roles, TerminalElement rendering"
     ]
   },
   "parity_map": [
@@ -86,7 +86,7 @@
   ],
   "acceptance": [
     "Every S10 callable-parity ID maps exactly once to production symbols and tests (see parity_map)",
-    "cargo build -p mr-crabs-app --bin ghostty compiles after parent formatting",
+    "cargo build -p mr-crabs-app --bin mr-crabs compiles after parent formatting",
     "Headless behavioral tests cover tab/split resize, close cascade, and restore round trips",
     "Keyboard-only operation verified through the default keymap end-to-end",
     "PTY ownership bounded (mr-crabs-pty queues) and shut down deterministically (close paths + Drop)",

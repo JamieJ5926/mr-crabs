@@ -20,7 +20,7 @@ fn sequence_and_damage_through_framedelta() {
     assert_eq!(f0.sequence, 0);
     assert_eq!(f0.damage, DamageKind::Full);
     assert_eq!(f0.rows.len(), size.rows as usize);
-    assert_eq!(f0.cursor.visible, true);
+    assert!(f0.cursor.visible);
     assert_eq!(f0.cursor.shape, CursorShape::Block);
     pool.release(f0);
 

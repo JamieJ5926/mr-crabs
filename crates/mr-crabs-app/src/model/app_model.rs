@@ -929,6 +929,42 @@ impl AppModel {
         Ok(())
     }
 
+    pub fn toggle_chat_presentation(&mut self) -> ActionResult {
+        let Some(pane_id) = self.focused_pane_id() else {
+            return ActionResult::ignored("no focused pane");
+        };
+        let Some((window_id, tab_id)) = self.locate_pane(pane_id) else {
+            return ActionResult::ignored("no focused pane");
+        };
+        let pane = match self
+            .windows
+            .get_mut(&window_id)
+            .and_then(|window| window.tabs.get_mut(&tab_id))
+            .and_then(|tab| tab.pane_mut(pane_id))
+        {
+            Some(pane) => pane,
+            None => return ActionResult::ignored("no focused pane"),
+        };
+        let eligible = pane.is_chat_eligible(self.palette.is_open(), false);
+        if !eligible {
+            return ActionResult::ignored("chat not eligible on this pane");
+        }
+        let next = match pane.preferred_mode {
+            crate::model::presentation::SurfaceMode::Terminal => {
+                crate::model::presentation::SurfaceMode::Chat
+            }
+            crate::model::presentation::SurfaceMode::Chat => {
+                crate::model::presentation::SurfaceMode::Terminal
+            }
+        };
+        pane.preferred_mode = next;
+        self.generation += 1;
+        ActionResult::performed(match next {
+            crate::model::presentation::SurfaceMode::Chat => "chat shown",
+            crate::model::presentation::SurfaceMode::Terminal => "chat hidden",
+        })
+    }
+
     // ── dispatch ──
 
     /// Dispatch one shell action with full cascade semantics.
@@ -1221,6 +1257,9 @@ impl AppModel {
                         ActionResult::ignored(format!("animation setting update failed: {error}"))
                     }
                 }
+            }
+            AppAction::ToggleChatPresentation => {
+                return self.toggle_chat_presentation();
             }
             AppAction::Quit => {
                 self.quit_requested = true;
@@ -1950,7 +1989,11 @@ mod tests {
             .feed_test_output(b"\x1b[?1049h");
         let _stats2 = model.pump(8);
         let snap2 = trace.snapshot();
-        let last_frame = snap2.iter().filter_map(|e| e.as_frame()).last().unwrap();
+        let last_frame = snap2
+            .iter()
+            .filter_map(|e| e.as_frame())
+            .next_back()
+            .unwrap();
         assert!(
             last_frame.alternate_screen,
             "alternate screen flag propagated"

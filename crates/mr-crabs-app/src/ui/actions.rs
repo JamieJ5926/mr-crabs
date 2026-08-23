@@ -40,6 +40,7 @@ gpui::actions!(
         SetTextAnimationStreaming,
         SetTextAnimationTypewriter,
         ToggleCursorTrail,
+        ToggleChatPresentation,
     ]
 );
 
@@ -73,6 +74,7 @@ pub fn gpui_action_name(action: AppAction) -> &'static str {
         AppAction::SetTextAnimationStreaming => "mr_crabs::SetTextAnimationStreaming",
         AppAction::SetTextAnimationTypewriter => "mr_crabs::SetTextAnimationTypewriter",
         AppAction::ToggleCursorTrail => "mr_crabs::ToggleCursorTrail",
+        AppAction::ToggleChatPresentation => "mr_crabs::ToggleChatPresentation",
     }
 }
 
@@ -120,6 +122,7 @@ pub fn action_struct(action: AppAction) -> Box<dyn Action> {
         AppAction::SetTextAnimationStreaming => Box::new(SetTextAnimationStreaming),
         AppAction::SetTextAnimationTypewriter => Box::new(SetTextAnimationTypewriter),
         AppAction::ToggleCursorTrail => Box::new(ToggleCursorTrail),
+        AppAction::ToggleChatPresentation => Box::new(ToggleChatPresentation),
     }
 }
 
@@ -177,6 +180,7 @@ fn binding_for(keys: &str, action: AppAction) -> KeyBinding {
             KeyBinding::new(keys, SetTextAnimationTypewriter, None)
         }
         AppAction::ToggleCursorTrail => KeyBinding::new(keys, ToggleCursorTrail, None),
+        AppAction::ToggleChatPresentation => KeyBinding::new(keys, ToggleChatPresentation, None),
     }
 }
 

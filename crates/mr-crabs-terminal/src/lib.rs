@@ -552,7 +552,12 @@ impl Terminal {
                     .into_iter()
                     .map(|r| {
                         crate::compact::row::CompactRow::from_parts(
-                            r.cells, r.cols, r.occupancy, r.first_occupied, r.wrapped, r.generation,
+                            r.cells,
+                            r.cols,
+                            r.occupancy,
+                            r.first_occupied,
+                            r.wrapped,
+                            r.generation,
                         )
                     })
                     .collect();

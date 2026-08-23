@@ -42,6 +42,7 @@ use crate::{
     selection::selection_rects,
 };
 
+type PaintCallback = Arc<dyn Fn(&mut App)>;
 /// A GPUI element that renders a terminal [`FrameDelta`].
 ///
 /// Construct with [`TerminalElement::new`] (owned frame) or
@@ -100,7 +101,7 @@ pub struct TerminalElement {
     element_id: Option<ElementId>,
     /// Optional main-thread hook invoked at the start of paint so the app
     /// can drain PTY output on frames that already run (cursor blink).
-    on_paint: Option<Arc<dyn Fn(&mut App)>>,
+    on_paint: Option<PaintCallback>,
     borrowed_focus: bool,
     /// Live text/trail effects. `None` keeps the disabled fast path.
     effects: Option<EffectsConfig>,
