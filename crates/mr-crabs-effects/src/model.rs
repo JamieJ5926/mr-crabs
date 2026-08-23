@@ -186,6 +186,8 @@ impl EffectsModel {
             let duration_ms = self.config.text_animation_duration_ms as f64;
             let is_full = frame.damage == DamageKind::Full;
             let is_alt = frame.viewport.alternate_screen;
+            let is_large = frame.rows.len() > 16;
+            let has_previous_frame = previous_history_rows.is_some();
             let history_consistent = previous_history_rows.is_some_and(|previous| {
                 frame.viewport.history_rows == previous
                     || previous.checked_add(1) == Some(frame.viewport.history_rows)
@@ -199,10 +201,12 @@ impl EffectsModel {
             if bottom_only {
                 tracker.translate_up_one();
             }
-            let frame_reveal_eligible = !is_alt && !size_changed;
+            let frame_reveal_eligible = !is_alt
+                && !size_changed
+                && ((is_full && has_previous_frame) || (!is_full && !is_large));
             out.text_reveal_allowed = frame_reveal_eligible;
 
-            if is_full && !can_translate && (is_alt || size_changed) {
+            if is_full && !can_translate && (is_alt || size_changed || !has_previous_frame) {
                 tracker.clear_changes();
                 tracker.adopt_rows(&frame.rows);
                 self.schedule = TypewriterSchedule::new(
@@ -252,13 +256,23 @@ impl EffectsModel {
                                     continue;
                                 }
                             }
-                            tracker.update_row(
-                                rd.row,
-                                rd.generation,
-                                &rd.cells,
-                                now,
-                                &mut self.schedule,
-                            );
+                            if is_full && !can_translate {
+                                tracker.reconcile_full_row(
+                                    rd.row,
+                                    rd.generation,
+                                    &rd.cells,
+                                    now,
+                                    &mut self.schedule,
+                                );
+                            } else {
+                                tracker.update_row(
+                                    rd.row,
+                                    rd.generation,
+                                    &rd.cells,
+                                    now,
+                                    &mut self.schedule,
+                                );
+                            }
                         }
                     }
                 } else if is_alt || size_changed {

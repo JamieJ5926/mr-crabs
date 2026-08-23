@@ -191,6 +191,29 @@ impl ChangeTracker {
         anim_ms: f64,
         schedule: &mut TypewriterSchedule,
     ) {
+        self.update_row_with_policy(row, generation, cells, anim_ms, schedule, true);
+    }
+
+    pub(crate) fn reconcile_full_row(
+        &mut self,
+        row: u16,
+        generation: u64,
+        cells: &[Cell],
+        anim_ms: f64,
+        schedule: &mut TypewriterSchedule,
+    ) {
+        self.update_row_with_policy(row, generation, cells, anim_ms, schedule, false);
+    }
+
+    fn update_row_with_policy(
+        &mut self,
+        row: u16,
+        generation: u64,
+        cells: &[Cell],
+        anim_ms: f64,
+        schedule: &mut TypewriterSchedule,
+        stamp_changed_blanks: bool,
+    ) {
         let row = usize::from(row);
         if row >= self.rows {
             return;
@@ -201,13 +224,12 @@ impl ChangeTracker {
         self.row_generations[row] = generation;
         let base = row * self.cols;
         if base >= self.cap {
-            // Beyond the tracked prefix: cells here are never stamped and
-            // pass through (their texels stay sentinel).
             return;
         }
         let len = cells.len().min(self.cols).min(self.cap - base);
         let mut last = self.last_change_ms;
-        let mut changed = false;
+        let mut key_changed = false;
+        let mut stamped = false;
         for (x, cell) in cells.iter().take(len).enumerate() {
             let i = base + x;
             let key = cell_render_key(*cell);
@@ -215,11 +237,18 @@ impl ChangeTracker {
                 continue;
             }
             self.snapshot[i] = key;
-            self.stamp_change(i, anim_ms, schedule, &mut last);
-            changed = true;
+            key_changed = true;
+            let is_glyph_span = cell_paints_glyph(*cell)
+                || (cell.flags & Cell::WIDE_SPACER != 0
+                    && x > 0
+                    && cells[x - 1].flags & Cell::WIDE != 0);
+            if stamp_changed_blanks || is_glyph_span {
+                self.stamp_change(i, anim_ms, schedule, &mut last);
+                stamped = true;
+            }
         }
 
-        if !changed {
+        if !key_changed {
             for (x, cell) in cells.iter().take(len).enumerate() {
                 if !cell_paints_glyph(*cell) {
                     continue;
@@ -231,11 +260,11 @@ impl ChangeTracker {
                 {
                     self.stamp_change(base + x + 1, anim_ms, schedule, &mut last);
                 }
-                changed = true;
+                stamped = true;
             }
         }
 
-        if changed {
+        if stamped {
             self.last_change_ms = last;
             self.upload_dirty = true;
             self.repack();
