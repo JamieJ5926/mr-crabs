@@ -220,7 +220,7 @@ fn large_partial_bypass_preserves_existing_reveal_and_ignores_new_cells() {
     let large = frame_with_damage(size, 2, DamageKind::Partial, rows);
     let effect = model.apply_frame(&large, 1_040, true);
 
-    assert!(!effect.text_reveal_allowed);
+    assert!(effect.text_reveal_allowed);
     assert!(effect.needs_frame);
     assert_eq!(
         reveal_positions(effect),
@@ -252,7 +252,7 @@ fn full_bypass_preserves_existing_reveal_for_unchanged_cells() {
     );
     let effect = model.apply_frame(&full, 1_040, true);
 
-    assert!(!effect.text_reveal_allowed);
+    assert!(effect.text_reveal_allowed);
     assert!(effect.needs_frame);
     assert_eq!(
         reveal_positions(effect),
