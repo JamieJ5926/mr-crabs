@@ -4,6 +4,10 @@
 //! `TerminalElement::with_shared` on a synthetic one-row frame. This module
 //! never calls `request_animation_frame`.
 
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::{SendError, Sender};
+
 use gpui::{
     Div, FocusHandle, Font, InteractiveElement as _, ParentElement as _, Pixels, Styled as _, div,
     px, rgb,
@@ -17,6 +21,32 @@ use crate::model::input_dock::{
     InputDockState, PAD_Y, PointF, layout_input_dock,
 };
 use crate::model::split::PaneId;
+
+#[derive(Clone)]
+pub(super) struct ModalImeSender {
+    tx: Sender<(PaneId, String)>,
+    modal_input_gate: Arc<AtomicBool>,
+}
+
+impl ModalImeSender {
+    pub(super) fn new(tx: Sender<(PaneId, String)>, modal_input_gate: Arc<AtomicBool>) -> Self {
+        Self {
+            tx,
+            modal_input_gate,
+        }
+    }
+
+    pub(super) fn send(
+        &self,
+        message: (PaneId, String),
+    ) -> Result<(), SendError<(PaneId, String)>> {
+        if self.modal_input_gate.load(Ordering::Acquire) {
+            Ok(())
+        } else {
+            self.tx.send(message)
+        }
+    }
+}
 
 /// Light/dark tokens. Do not reuse TerminalPalette::light canvas.
 #[derive(Clone, Copy, Debug)]
@@ -94,7 +124,7 @@ pub fn input_dock_separator(layout: InputDockLayout, tokens: InputDockTokens) ->
 }
 
 /// Paint inputs for the dock chrome + synthetic one-row element.
-pub struct InputDockOverlayView<'a> {
+pub(super) struct InputDockOverlayView<'a> {
     pub snap: &'a InputDockSnapshot,
     pub layout: InputDockLayout,
     pub tokens: InputDockTokens,
@@ -104,11 +134,11 @@ pub struct InputDockOverlayView<'a> {
     pub terminal_palette: TerminalPalette,
     pub focused: bool,
     pub focus: Option<FocusHandle>,
-    pub ime_tx: Option<std::sync::mpsc::Sender<(PaneId, String)>>,
+    pub ime_tx: Option<ModalImeSender>,
     pub pane_id: PaneId,
 }
 
-pub fn input_dock_overlay(view: InputDockOverlayView<'_>) -> Div {
+pub(super) fn input_dock_overlay(view: InputDockOverlayView<'_>) -> Div {
     let InputDockOverlayView {
         snap,
         layout,
@@ -215,4 +245,28 @@ fn mix_alpha(color: u32, alpha: f32) -> u32 {
     let g = ((color >> 8) & 0xff) as f32 * alpha;
     let b = (color & 0xff) as f32 * alpha;
     ((r as u32) << 16) | ((g as u32) << 8) | (b as u32)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn modal_ime_sender_gates_commits_at_enqueue_time() {
+        let gate = Arc::new(AtomicBool::new(false));
+        let (tx, rx) = std::sync::mpsc::channel();
+        let sender = ModalImeSender::new(tx, Arc::clone(&gate));
+        let pane_id = PaneId::new(1);
+
+        sender.send((pane_id, "active".to_owned())).unwrap();
+        assert_eq!(rx.try_recv(), Ok((pane_id, "active".to_owned())));
+
+        gate.store(true, Ordering::Release);
+        sender.send((pane_id, "blocked".to_owned())).unwrap();
+        assert!(rx.try_recv().is_err());
+
+        gate.store(false, Ordering::Release);
+        sender.send((pane_id, "resumed".to_owned())).unwrap();
+        assert_eq!(rx.try_recv(), Ok((pane_id, "resumed".to_owned())));
+    }
 }

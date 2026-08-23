@@ -22,7 +22,7 @@
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::mpsc::{self, Receiver};
 
 use gpui::{
     App, ClipboardItem, Context, ElementId, Entity, ExternalPaths, FocusHandle, Font,
@@ -59,8 +59,9 @@ use crate::model::split::{GridRect, PaneId};
 use crate::model::window::WindowId;
 use crate::palette::PaletteState;
 use crate::ui::input_dock::{
-    InputDockOverlayView, InputDockTokens, compose_input_dock_layout, dock_hit_consumes,
-    input_dock_footer, input_dock_mask, input_dock_overlay, input_dock_separator,
+    InputDockOverlayView, InputDockTokens, ModalImeSender, compose_input_dock_layout,
+    dock_hit_consumes, input_dock_footer, input_dock_mask, input_dock_overlay,
+    input_dock_separator,
 };
 use crate::ui::input_surface::{
     encode_ime, encode_live_focus, encode_live_key, encode_live_mouse, encode_live_paste,
@@ -94,29 +95,6 @@ struct MeasuredCellMetrics {
     settings_generation: u64,
     metrics: CellMetrics,
     font: Font,
-}
-
-#[derive(Clone)]
-struct ModalImeSender {
-    tx: Sender<(PaneId, String)>,
-    modal_input_gate: Arc<AtomicBool>,
-}
-
-impl ModalImeSender {
-    fn send(
-        &self,
-        message: (PaneId, String),
-    ) -> Result<(), std::sync::mpsc::SendError<(PaneId, String)>> {
-        if self.modal_input_gate.load(Ordering::Acquire) {
-            Ok(())
-        } else {
-            self.tx.send(message)
-        }
-    }
-
-    fn raw_sender(&self) -> Sender<(PaneId, String)> {
-        self.tx.clone()
-    }
 }
 
 /// Permanent native title prefix identifying the pure-Rust application.
@@ -164,10 +142,7 @@ impl WindowView {
 
         let modal_input_gate = Arc::new(AtomicBool::new(model.read(cx).palette.is_open()));
         let (ime_tx, ime_rx) = mpsc::channel();
-        let ime_tx = ModalImeSender {
-            tx: ime_tx,
-            modal_input_gate: Arc::clone(&modal_input_gate),
-        };
+        let ime_tx = ModalImeSender::new(ime_tx, Arc::clone(&modal_input_gate));
 
         let focused = cx.on_focus_in(&focus, window, |view, _, cx| {
             view.write_focus_report(true, cx);
@@ -215,9 +190,6 @@ impl WindowView {
 
     fn drain_ime_commits(&mut self, cx: &mut Context<Self>) {
         while let Ok((pane_id, text)) = self.ime_rx.try_recv() {
-            if self.model.read(cx).palette.is_open() {
-                continue;
-            }
             let bytes = encode_ime(&text, false);
             if !bytes.is_empty() {
                 self.model
@@ -777,7 +749,7 @@ impl Render for WindowView {
                     let overlay_pane = pane_id;
                     let overlay_geometry = pane_geometry;
                     let overlay_layout = layout;
-                    let ime_tx = self.ime_tx.raw_sender();
+                    let ime_tx = self.ime_tx.clone();
                     root = root.child(
                         input_dock_overlay(InputDockOverlayView {
                             snap: &snap,
@@ -2353,6 +2325,28 @@ mod tests {
             window.draw(cx).clear(cx);
         })
         .unwrap();
+    }
+
+    #[gpui::test]
+    fn pre_palette_ime_commit_survives_palette_open_before_draw(cx: &mut gpui::TestAppContext) {
+        let (model, shell, writer_rx, _reader_tx) = cx.update(attach_fake_writer);
+        let _keep_shell = shell;
+        let handle = cx.windows().into_iter().next().expect("one window");
+        draw_window(cx, handle);
+
+        let pane_id = cx.update(|cx| model.read(cx).focused_pane_id().expect("focused pane"));
+        let window = handle
+            .downcast::<WindowView>()
+            .expect("window root should be WindowView");
+        window
+            .update(cx, |view, _, _| {
+                view.ime_tx.send((pane_id, "hello".to_owned())).unwrap();
+            })
+            .unwrap();
+        cx.dispatch_keystroke(handle, Keystroke::parse("cmd-shift-p").unwrap());
+        draw_window(cx, handle);
+
+        assert_eq!(drain_writer(&writer_rx), b"hello");
     }
 
     #[gpui::test]
