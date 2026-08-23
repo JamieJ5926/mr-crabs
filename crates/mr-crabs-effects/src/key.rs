@@ -84,6 +84,12 @@ fn cell_paints_glyph(cell: Cell) -> bool {
 /// prefix; cells beyond the previous grid are marked changed at the resize
 /// time so they reveal like any other new content (oracle
 /// `textAnimationEnsureBuffers`).
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum RowStampPolicy {
+    EveryChangedCell,
+    DrawableGlyphsPerRow,
+}
+
 pub struct ChangeTracker {
     cols: usize,
     rows: usize,
@@ -191,7 +197,14 @@ impl ChangeTracker {
         anim_ms: f64,
         schedule: &mut TypewriterSchedule,
     ) {
-        self.update_row_with_policy(row, generation, cells, anim_ms, schedule, true);
+        self.update_row_with_policy(
+            row,
+            generation,
+            cells,
+            anim_ms,
+            schedule,
+            RowStampPolicy::EveryChangedCell,
+        );
     }
 
     pub(crate) fn reconcile_full_row(
@@ -202,7 +215,14 @@ impl ChangeTracker {
         anim_ms: f64,
         schedule: &mut TypewriterSchedule,
     ) {
-        self.update_row_with_policy(row, generation, cells, anim_ms, schedule, false);
+        self.update_row_with_policy(
+            row,
+            generation,
+            cells,
+            anim_ms,
+            schedule,
+            RowStampPolicy::DrawableGlyphsPerRow,
+        );
     }
 
     fn tracked_row_span(&self, row: usize, cell_count: usize) -> Option<(usize, usize)> {
@@ -220,22 +240,35 @@ impl ChangeTracker {
         cells: &[Cell],
         anim_ms: f64,
         schedule: &mut TypewriterSchedule,
-        stamp_changed_blanks: bool,
+        policy: RowStampPolicy,
     ) {
         let row = usize::from(row);
-        if row >= self.rows {
-            return;
-        }
-        if self.row_generations[row] == generation {
+        if row >= self.rows || self.row_generations[row] == generation {
             return;
         }
         self.row_generations[row] = generation;
         let Some((base, len)) = self.tracked_row_span(row, cells.len()) else {
             return;
         };
+        let shared_timestamp = (policy == RowStampPolicy::DrawableGlyphsPerRow
+            && cells.iter().take(len).enumerate().any(|(x, cell)| {
+                let key_changed = cell_render_key(*cell) != self.snapshot[base + x];
+                let drawable = cell_paints_glyph(*cell)
+                    || (cell.flags & Cell::WIDE_SPACER != 0
+                        && x > 0
+                        && cells[x - 1].flags & Cell::WIDE != 0);
+                key_changed && drawable
+            }))
+        .then(|| {
+            if schedule.is_active() {
+                schedule.next_timestamp()
+            } else {
+                anim_ms
+            }
+        });
         let mut last = self.last_change_ms;
         let mut key_changed = false;
-        let mut stamped = false;
+        let mut timestamp_changed = false;
         for (x, cell) in cells.iter().take(len).enumerate() {
             let i = base + x;
             let key = cell_render_key(*cell);
@@ -248,13 +281,30 @@ impl ChangeTracker {
                 || (cell.flags & Cell::WIDE_SPACER != 0
                     && x > 0
                     && cells[x - 1].flags & Cell::WIDE != 0);
-            if stamp_changed_blanks || is_glyph_span {
-                self.stamp_change(i, anim_ms, schedule, &mut last);
-                stamped = true;
+            match policy {
+                RowStampPolicy::EveryChangedCell => {
+                    self.stamp_change(i, anim_ms, schedule, &mut last);
+                    timestamp_changed = true;
+                }
+                RowStampPolicy::DrawableGlyphsPerRow if is_glyph_span => {
+                    self.stamp_change_at(
+                        i,
+                        shared_timestamp.expect("drawable row timestamp"),
+                        &mut last,
+                    );
+                    timestamp_changed = true;
+                }
+                RowStampPolicy::DrawableGlyphsPerRow => {
+                    if self.change_ms[i] != NEVER_MS {
+                        self.change_times[i] = NEVER_BITS;
+                        self.change_ms[i] = NEVER_MS;
+                        timestamp_changed = true;
+                    }
+                }
             }
         }
 
-        if !key_changed && stamp_changed_blanks {
+        if !key_changed && policy == RowStampPolicy::EveryChangedCell {
             for (x, cell) in cells.iter().take(len).enumerate() {
                 if !cell_paints_glyph(*cell) {
                     continue;
@@ -266,14 +316,22 @@ impl ChangeTracker {
                 {
                     self.stamp_change(base + x + 1, anim_ms, schedule, &mut last);
                 }
-                stamped = true;
+                timestamp_changed = true;
             }
         }
 
-        if stamped {
-            self.last_change_ms = last;
+        if timestamp_changed {
+            self.last_change_ms = self.change_ms.iter().copied().fold(NEVER_MS, f64::max);
             self.upload_dirty = true;
             self.repack();
+        }
+    }
+
+    fn stamp_change_at(&mut self, index: usize, timestamp: f64, last: &mut f64) {
+        self.change_times[index] = pack_time_ms(timestamp);
+        self.change_ms[index] = timestamp;
+        if timestamp > *last {
+            *last = timestamp;
         }
     }
 
@@ -606,6 +664,93 @@ mod tests {
         assert_eq!(t.change_ms_at(1), 1060.0);
         assert_eq!(t.change_ms_at(0), 1000.0); // unchanged cells keep stamps
         assert_eq!(t.last_change_ms(), 1060.0);
+    }
+
+    #[test]
+    fn full_reconcile_shares_one_timestamp_per_drawable_row() {
+        let mut tracker = ChangeTracker::new(4, 1, 16);
+        let mut schedule = TypewriterSchedule::new(15.0);
+        schedule.begin_build(1000.0, 120.0);
+        tracker.reconcile_full_row(
+            0,
+            1,
+            &[
+                cell(65, 0, 0),
+                cell(66, 0, 0),
+                cell(67, 0, 0),
+                cell(32, 0, 0),
+            ],
+            1000.0,
+            &mut schedule,
+        );
+        assert_eq!(tracker.change_ms_at(0), 1000.0);
+        assert_eq!(tracker.change_ms_at(1), 1000.0);
+        assert_eq!(tracker.change_ms_at(2), 1000.0);
+        assert_eq!(tracker.change_ms_at(3), NEVER_MS);
+        assert_eq!(tracker.last_change_ms(), 1000.0);
+    }
+
+    #[test]
+    fn full_reconcile_schedule_advances_only_for_changed_drawable_rows() {
+        let mut tracker = ChangeTracker::new(4, 3, 16);
+        let mut schedule = TypewriterSchedule::new(20.0);
+        schedule.begin_build(1000.0, 120.0);
+        let blank = [cell(32, 0, 0); 4];
+        tracker.reconcile_full_row(1, 1, &blank, 1000.0, &mut schedule);
+        tracker.reconcile_full_row(
+            0,
+            1,
+            &[
+                cell(65, 0, 0),
+                cell(66, 0, 0),
+                cell(32, 0, 0),
+                cell(32, 0, 0),
+            ],
+            1000.0,
+            &mut schedule,
+        );
+        tracker.reconcile_full_row(
+            2,
+            1,
+            &[
+                cell(67, 0, 0),
+                cell(68, 0, 0),
+                cell(32, 0, 0),
+                cell(32, 0, 0),
+            ],
+            1000.0,
+            &mut schedule,
+        );
+        assert_eq!(tracker.change_ms_at(0), 1000.0);
+        assert_eq!(tracker.change_ms_at(1), 1000.0);
+        assert_eq!(tracker.change_ms_at(4), NEVER_MS);
+        assert_eq!(tracker.change_ms_at(8), 1020.0);
+        assert_eq!(tracker.change_ms_at(9), 1020.0);
+        assert_eq!(tracker.last_change_ms(), 1020.0);
+    }
+
+    #[test]
+    fn full_reconcile_erasing_glyphs_clears_reveal_state() {
+        let mut tracker = ChangeTracker::new(4, 1, 16);
+        let mut schedule = TypewriterSchedule::new(0.0);
+        tracker.reconcile_full_row(
+            0,
+            1,
+            &[
+                cell(65, 0, 0),
+                cell(66, 0, 0),
+                cell(32, 0, 0),
+                cell(32, 0, 0),
+            ],
+            1000.0,
+            &mut schedule,
+        );
+        tracker.reconcile_full_row(0, 2, &[cell(32, 0, 0); 4], 1100.0, &mut schedule);
+        assert_eq!(tracker.change_ms_at(0), NEVER_MS);
+        assert_eq!(tracker.change_ms_at(1), NEVER_MS);
+        assert_eq!(tracker.bits_at(0), NEVER_BITS);
+        assert_eq!(tracker.bits_at(1), NEVER_BITS);
+        assert_eq!(tracker.last_change_ms(), NEVER_MS);
     }
 
     #[test]
