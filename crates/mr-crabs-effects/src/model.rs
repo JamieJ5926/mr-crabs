@@ -456,12 +456,17 @@ mod tests {
         let rows = vec![row(0, 2, &[65, 32, 32, 32])];
         let f = m.apply_frame(&frame_at(size, 2, rows, cursor), 1100, true);
         assert_eq!(f.revealing.len(), 4);
-        assert!(f.revealing.iter().any(|reveal| {
-            reveal.pos == CellPos::new(0, 0) && reveal.change_ms == 1100.0
-        }));
-        assert!(f.revealing.iter().filter(|reveal| {
-            reveal.pos != CellPos::new(0, 0)
-        }).all(|reveal| reveal.change_ms == 1000.0));
+        assert!(
+            f.revealing
+                .iter()
+                .any(|reveal| { reveal.pos == CellPos::new(0, 0) && reveal.change_ms == 1100.0 })
+        );
+        assert!(
+            f.revealing
+                .iter()
+                .filter(|reveal| { reveal.pos != CellPos::new(0, 0) })
+                .all(|reveal| reveal.change_ms == 1000.0)
+        );
     }
 
     #[test]

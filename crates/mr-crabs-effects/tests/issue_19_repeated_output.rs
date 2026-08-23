@@ -36,7 +36,12 @@ fn repeated_identical_partial_frame_starts_a_fresh_typewriter_reveal() {
     let size = GridSize::new(4, 1);
     let config = EffectsConfig::new(TextAnimation::Typewriter, 120, 1.0, false, 0.35, 250, 16);
     let mut model = EffectsModel::new(config, size, CellPx::new(10.0, 20.0));
-    let contents = [u32::from('A'), u32::from('B'), u32::from(' '), u32::from(' ')];
+    let contents = [
+        u32::from('A'),
+        u32::from('B'),
+        u32::from(' '),
+        u32::from(' '),
+    ];
 
     let first = frame(size, 1, vec![row(1, &contents)]);
     assert!(model.apply_frame(&first, 1_000, true).needs_frame);
@@ -49,7 +54,11 @@ fn repeated_identical_partial_frame_starts_a_fresh_typewriter_reveal() {
     assert!(effect.text_reveal_allowed);
     assert!(effect.needs_frame);
     assert_eq!(
-        effect.revealing.iter().map(|cell| cell.pos).collect::<Vec<_>>(),
+        effect
+            .revealing
+            .iter()
+            .map(|cell| cell.pos)
+            .collect::<Vec<_>>(),
         vec![CellPos::new(0, 0)]
     );
     assert_eq!(effect.pending, vec![CellPos::new(0, 1)]);
@@ -59,5 +68,9 @@ fn repeated_identical_partial_frame_starts_a_fresh_typewriter_reveal() {
     assert!(model.apply_frame(&repeated_expired, 2_135, true).is_idle());
 
     let duplicate_generation = frame(size, 5, vec![row(2, &contents)]);
-    assert!(model.apply_frame(&duplicate_generation, 3_000, true).is_idle());
+    assert!(
+        model
+            .apply_frame(&duplicate_generation, 3_000, true)
+            .is_idle()
+    );
 }
