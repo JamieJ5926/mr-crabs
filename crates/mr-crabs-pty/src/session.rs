@@ -47,11 +47,6 @@ pub type OutputWake = Arc<dyn Fn() + Send + Sync + 'static>;
 /// `poll(2)` below, so normal I/O wakes immediately rather than sleeping.
 const BACKPRESSURE_SLEEP: Duration = Duration::from_millis(1);
 const IO_POLL_TIMEOUT_MS: libc::c_int = 100;
-/// Backstop for `abort_child` spawn-failure cleanup only (the lifetime exit
-/// waiter now blocks in the kernel via `waitpid_block`).
-#[allow(dead_code)]
-const EXIT_POLL_SLEEP: Duration = Duration::from_millis(5);
-///
 /// Exactly one of [`ExitStatus::code`] and [`ExitStatus::signal`] is `Some`:
 /// `code` is set when the process terminated normally (the `WEXITSTATUS`
 /// value), `signal` when it was killed by a signal (the `WTERMSIG` value).
