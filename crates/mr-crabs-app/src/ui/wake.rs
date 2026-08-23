@@ -8,6 +8,7 @@ use std::cell::RefCell;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use super::shell::AppShell;
 use gpui::{App, AsyncApp, Entity, WeakEntity};
 
 use super::workspace::PUMP_CAP_PER_PANE;
@@ -15,6 +16,7 @@ use super::workspace::PUMP_CAP_PER_PANE;
 struct WakeState {
     cx: AsyncApp,
     model: WeakEntity<crate::model::app_model::AppModel>,
+    shell: WeakEntity<AppShell>,
     dirty: Arc<AtomicBool>,
 }
 
@@ -43,6 +45,7 @@ pub fn new_output_wake() -> (mr_crabs_pty::OutputWake, Arc<AtomicBool>) {
 pub fn install_wake(
     cx: &mut App,
     model: Entity<crate::model::app_model::AppModel>,
+    shell: Entity<AppShell>,
     dirty: Arc<AtomicBool>,
 ) {
     let async_cx = cx.to_async();
@@ -50,6 +53,7 @@ pub fn install_wake(
         *slot.borrow_mut() = Some(WakeState {
             cx: async_cx,
             model: model.downgrade(),
+            shell: shell.downgrade(),
             dirty,
         });
     });
@@ -59,9 +63,10 @@ pub fn install_wake(
 pub fn spawn_wake_task(
     cx: &mut App,
     model: Entity<crate::model::app_model::AppModel>,
+    shell: Entity<AppShell>,
 ) -> mr_crabs_pty::OutputWake {
     let (wake, dirty) = new_output_wake();
-    install_wake(cx, model, dirty);
+    install_wake(cx, model, shell, dirty);
     wake
 }
 
@@ -100,11 +105,15 @@ fn pump_now(cx: &mut App) -> bool {
 
 fn pump_now_inner(cx: &mut App) -> bool {
     let state = WAKE.with(|slot| {
-        slot.borrow()
-            .as_ref()
-            .map(|state| (state.model.clone(), Arc::clone(&state.dirty)))
+        slot.borrow().as_ref().map(|state| {
+            (
+                state.model.clone(),
+                state.shell.clone(),
+                Arc::clone(&state.dirty),
+            )
+        })
     });
-    let Some((model, dirty)) = state else {
+    let Some((model, shell, dirty)) = state else {
         return false;
     };
     dirty.store(false, Ordering::Release);
@@ -120,8 +129,10 @@ fn pump_now_inner(cx: &mut App) -> bool {
             model.should_quit(),
         )
     });
-    if changed {
-        cx.refresh_windows();
+    if changed && let Some(shell) = shell.upgrade() {
+        cx.defer(move |cx| {
+            shell.update(cx, |shell, cx| shell.refresh_windows(cx));
+        });
     }
     if should_quit {
         cx.quit();
@@ -226,7 +237,7 @@ mod tests {
                 pane.lifecycle = PtyLifecycle::Live;
             });
             let shell = cx.new(|_| AppShell::new(model.clone()));
-            let wake = spawn_wake_task(cx, model.clone());
+            let wake = spawn_wake_task(cx, model.clone(), shell.clone());
             (wake, model, shell, window_id, reader_tx)
         });
 

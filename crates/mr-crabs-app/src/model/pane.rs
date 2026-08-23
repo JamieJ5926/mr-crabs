@@ -855,6 +855,10 @@ pub struct PaneModel {
     pub viewport: Viewport,
     /// User selection anchors in absolute history-space coordinates.
     pub selection: Option<Selection>,
+    /// Trusted OSC 133 latch: true after the first non-None semantic content.
+    ever_seen_osc133: bool,
+    /// Last derived dock snapshot; layout-independent, retained across Clean frames.
+    latest_dock: Option<Arc<super::input_dock::InputDockSnapshot>>,
     apc_scanner: apc::Scanner,
     apc_handler: apc::Handler,
     osc_tap: Osc1337Tap,
@@ -912,6 +916,8 @@ impl PaneModel {
             search: PaneSearchState::default(),
             viewport: Viewport::new(),
             selection: None,
+            ever_seen_osc133: false,
+            latest_dock: None,
             apc_scanner: apc::Scanner::new(),
             apc_handler: apc::Handler::new(),
             osc_tap: Osc1337Tap::new(),
@@ -1024,6 +1030,9 @@ impl PaneModel {
                 self.search_frame_matches(&mut frame.search_matches);
                 self.frame_hyperlinks(&mut frame.hyperlinks);
                 self.latest_frame = Some(Arc::new(frame));
+                self.latch_osc133();
+                self.latest_dock =
+                    Some(Arc::new(super::input_dock::derive_input_dock(self, false)));
             }
             Err(err) => {
                 self.core.release_frame(frame);
@@ -1646,6 +1655,24 @@ impl PaneModel {
         self.latest_frame.clone()
     }
 
+    /// Last derived input-dock snapshot, if any.
+    pub fn input_dock(&self) -> Option<Arc<super::input_dock::InputDockSnapshot>> {
+        self.latest_dock.clone()
+    }
+
+    /// True after the first OSC 133 semantic content on this pane.
+    pub fn ever_seen_osc133(&self) -> bool {
+        self.ever_seen_osc133
+    }
+
+    fn latch_osc133(&mut self) {
+        if !self.ever_seen_osc133
+            && self.core.semantic_state().content
+                != mr_crabs_protocols::shell::SemanticContent::None
+        {
+            self.ever_seen_osc133 = true;
+        }
+    }
     /// The pane-owned protocol sink (shared with the terminal engine).
     pub fn protocol_sink(&self) -> &PaneProtocolSink {
         &self.protocol_sink

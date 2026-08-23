@@ -49,9 +49,16 @@ use mr_crabs_terminal::FrameDelta;
 
 use crate::model::app_model::AppModel;
 use crate::model::geometry::{PaddingPx, SurfaceGeometry};
+use crate::model::input_dock::{
+    InputDockLayout, InputDockSnapshot, InputDockState, PointF, hit_test_dock, remap_pointer,
+};
 use crate::model::split::{GridRect, PaneId};
 use crate::model::window::WindowId;
 use crate::palette::PaletteState;
+use crate::ui::input_dock::{
+    InputDockOverlayView, InputDockTokens, compose_input_dock_layout, dock_hit_consumes,
+    input_dock_footer, input_dock_mask, input_dock_overlay, input_dock_separator,
+};
 use crate::ui::input_surface::{
     encode_ime, encode_live_focus, encode_live_key, encode_live_mouse, encode_live_paste,
 };
@@ -243,6 +250,28 @@ struct PaneRender {
     pane_geometry: SurfaceGeometry,
     frame: Arc<FrameDelta>,
     graphics: Arc<Mutex<GraphicsOverlay>>,
+    dock: Option<Arc<InputDockSnapshot>>,
+    focused: bool,
+}
+
+struct FocusedDockRender {
+    pane_id: PaneId,
+    geometry: SurfaceGeometry,
+    rect: GridRect,
+    pane_geometry: SurfaceGeometry,
+    snap: Arc<InputDockSnapshot>,
+}
+
+struct DockMouseRoute {
+    pane_id: PaneId,
+    geometry: SurfaceGeometry,
+    layout: InputDockLayout,
+    window_x: f32,
+    window_y: f32,
+    button: Option<InputMouseButton>,
+    action: InputMouseAction,
+    modifiers: GpuiModifiers,
+    click_count: usize,
 }
 
 /// Static namespace for pane terminal element IDs (see
@@ -332,13 +361,6 @@ impl Render for WindowView {
             });
         }
 
-        // 2. Drain PTY output on every view rebuild. Cursor-blink frames
-        //    notify this view via request_animation_frame.
-        if super::wake::pump_output(cx) {
-            window.refresh();
-        }
-        window.request_animation_frame();
-
         // 3. Keep the native title in sync with the shell model.
         let title = self
             .model
@@ -372,6 +394,8 @@ impl Render for WindowView {
                                     pane_geometry: geometry.for_rect(rect),
                                     frame: pane.frame()?,
                                     graphics: Arc::clone(&pane.graphics),
+                                    dock: pane.input_dock(),
+                                    focused: tab.focused_pane_id() == Some(pane_id),
                                 })
                             })
                             .collect::<Vec<_>>(),
@@ -384,6 +408,22 @@ impl Render for WindowView {
         let palette = self.model.read(cx).palette.clone();
         let secure_input = self.model.read(cx).secure_input.is_enabled();
         let trace_for_paint = self.model.read(cx).diagnostic_trace();
+        let focused_dock = bundles.iter().find_map(|bundle| {
+            if !bundle.focused {
+                return None;
+            }
+            let snap = bundle.dock.clone()?;
+            if snap.state != InputDockState::ShellInputActive {
+                return None;
+            }
+            Some(FocusedDockRender {
+                pane_id: bundle.pane_id,
+                geometry: bundle.geometry,
+                rect: bundle.rect,
+                pane_geometry: bundle.pane_geometry,
+                snap,
+            })
+        });
 
         let key_model = self.model.clone();
         let key_shell = self.shell.clone();
@@ -422,9 +462,6 @@ impl Render for WindowView {
                     .with_palette(terminal_palette)
                     .with_effects(EffectsConfig::from(settings.animation_defaults()))
                     .with_graphics(bundle.graphics)
-                    .with_on_paint(|cx| {
-                        let _ = super::wake::pump_output(cx);
-                    })
                     .with_input_sink(move |text| {
                         let _ = ime_tx.send((ime_pane_id, text.to_owned()));
                     });
@@ -549,6 +586,102 @@ impl Render for WindowView {
             });
             root = root.child(surface.child(element));
         }
+
+        // Focused-pane semantic dock: mask + 1px separator + 55px dock + 31px
+        // footer. Palette stays last so it paints above the dock. Hidden when
+        // the palette is open so keys stay on the existing path.
+        if !palette.is_open() {
+            if let Some(focused) = focused_dock {
+                let FocusedDockRender {
+                    pane_id,
+                    geometry,
+                    rect,
+                    pane_geometry,
+                    snap,
+                } = focused;
+                let left = f32::from(geometry.padding.left)
+                    + f32::from(rect.x) * pane_geometry.metrics.width;
+                let top = f32::from(geometry.padding.top)
+                    + f32::from(rect.y) * pane_geometry.metrics.height;
+                let tokens = InputDockTokens::for_palette(terminal_palette);
+                if let Some(layout) = compose_input_dock_layout(
+                    PixelExtent {
+                        width: f32::from(viewport.width),
+                        height: f32::from(viewport.height),
+                    },
+                    PointF { x: left, y: top },
+                    pane_geometry,
+                    &snap,
+                    true,
+                ) {
+                    let dock_model = self.model.clone();
+                    let dock_pane = pane_id;
+                    let dock_geometry = pane_geometry;
+                    let dock_layout = layout;
+                    root = root.child(input_dock_mask(layout, tokens).on_any_mouse_down(
+                        move |event, _, cx| {
+                            route_dock_mouse(
+                                &dock_model,
+                                DockMouseRoute {
+                                    pane_id: dock_pane,
+                                    geometry: dock_geometry,
+                                    layout: dock_layout,
+                                    window_x: f32::from(event.position.x),
+                                    window_y: f32::from(event.position.y),
+                                    button: Some(input_mouse_button(event.button)),
+                                    action: InputMouseAction::Press,
+                                    modifiers: event.modifiers,
+                                    click_count: event.click_count,
+                                },
+                                cx,
+                            );
+                        },
+                    ));
+                    root = root.child(input_dock_separator(layout, tokens));
+                    let overlay_model = self.model.clone();
+                    let overlay_pane = pane_id;
+                    let overlay_geometry = pane_geometry;
+                    let overlay_layout = layout;
+                    let ime_tx = self.ime_tx.clone();
+                    root = root.child(
+                        input_dock_overlay(InputDockOverlayView {
+                            snap: &snap,
+                            layout,
+                            tokens,
+                            font: terminal_font
+                                .as_ref()
+                                .expect("measured font accompanies geometry")
+                                .clone(),
+                            font_size: px(settings.font_size),
+                            metrics: pane_geometry.metrics,
+                            focused: true,
+                            focus: Some(self.focus.clone()),
+                            ime_tx: Some(ime_tx),
+                            pane_id,
+                        })
+                        .on_any_mouse_down(move |event, _, cx| {
+                            route_dock_mouse(
+                                &overlay_model,
+                                DockMouseRoute {
+                                    pane_id: overlay_pane,
+                                    geometry: overlay_geometry,
+                                    layout: overlay_layout,
+                                    window_x: f32::from(event.position.x),
+                                    window_y: f32::from(event.position.y),
+                                    button: Some(input_mouse_button(event.button)),
+                                    action: InputMouseAction::Press,
+                                    modifiers: event.modifiers,
+                                    click_count: event.click_count,
+                                },
+                                cx,
+                            );
+                        }),
+                    );
+                    root = root.child(input_dock_footer(&snap, layout, tokens));
+                }
+            }
+        }
+
         if palette.is_open() {
             root = root.child(palette_overlay(&palette, terminal_palette));
         }
@@ -746,6 +879,35 @@ fn route_mouse(model: &Entity<AppModel>, route: MouseRoute, cx: &mut App) {
     });
 }
 
+fn route_dock_mouse(model: &Entity<AppModel>, route: DockMouseRoute, cx: &mut App) {
+    let hit = hit_test_dock(
+        &route.layout,
+        PointF {
+            x: route.window_x,
+            y: route.window_y,
+        },
+    );
+    if dock_hit_consumes(hit) {
+        return;
+    }
+    let Some((local_x, local_y)) = remap_pointer(&route.layout.map, hit) else {
+        return;
+    };
+    route_mouse(
+        model,
+        MouseRoute {
+            pane_id: route.pane_id,
+            geometry: route.geometry,
+            local_x,
+            local_y,
+            button: route.button,
+            action: route.action,
+            modifiers: route.modifiers,
+            click_count: route.click_count,
+        },
+        cx,
+    );
+}
 fn route_mouse_down(
     model: &Entity<AppModel>,
     pane_id: PaneId,

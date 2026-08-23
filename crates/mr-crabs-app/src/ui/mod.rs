@@ -2,6 +2,7 @@
 //! and the window view that renders `TerminalElement`s.
 
 pub mod actions;
+pub mod input_dock;
 pub mod input_surface;
 pub mod menus;
 pub mod shell;

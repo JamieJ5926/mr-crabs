@@ -1010,15 +1010,21 @@ impl TerminalProtocol {
                 self.sink.hyperlink(None, "");
             }
             Command::SemanticPrompt(cmd) => {
-                let actions = self.semantic.apply(&cmd);
+                let cursor = self.engine.cursor();
+                let actions = self.semantic.apply(&cmd, cursor.col, cursor.row);
                 self.apply_semantic_actions(&actions);
                 self.sink.semantic_prompt(&cmd);
             }
             Command::MarkPromptStart => {
-                let actions = self.semantic.apply(&SemanticPrompt {
-                    action: Action::FreshLineNewPrompt,
-                    options_unvalidated: String::new(),
-                });
+                let cursor = self.engine.cursor();
+                let actions = self.semantic.apply(
+                    &SemanticPrompt {
+                        action: Action::FreshLineNewPrompt,
+                        options_unvalidated: String::new(),
+                    },
+                    cursor.col,
+                    cursor.row,
+                );
                 self.apply_semantic_actions(&actions);
             }
             Command::ShowDesktopNotification { title, body } => {

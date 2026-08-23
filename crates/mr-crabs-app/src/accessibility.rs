@@ -144,6 +144,25 @@ impl AccessibilitySnapshot {
                             continue;
                         };
                         let grid = format!("{}x{}", pane.last_size.cols, pane.last_size.rows);
+                        let dock_value = pane.input_dock().and_then(|snap| {
+                            if snap.state
+                                != crate::model::input_dock::InputDockState::ShellInputActive
+                            {
+                                return None;
+                            }
+                            let mut text = String::new();
+                            for cell in snap.cells.iter() {
+                                if let Some(ch) = char::from_u32(cell.content) {
+                                    text.push(ch);
+                                }
+                            }
+                            let trimmed = text.trim_end();
+                            if trimmed.is_empty() {
+                                None
+                            } else {
+                                Some(trimmed.to_string())
+                            }
+                        });
                         let mut pane_node = AccessibilityNode::new(
                             next_id,
                             AccessibilityRole::Pane,
@@ -162,7 +181,7 @@ impl AccessibilitySnapshot {
                             AccessibilityRole::TerminalGrid,
                             "Terminal",
                         )
-                        .with_value(grid)
+                        .with_value(dock_value.unwrap_or(grid))
                         .with_actions(vec![
                             AccessibleAction::Focus,
                             AccessibleAction::ScrollUp,

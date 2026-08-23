@@ -118,6 +118,11 @@ impl AppCore {
     pub fn pwd(&self) -> Option<&str> {
         self.terminal.pwd()
     }
+
+    /// Live OSC 133 semantic-prompt state. Additive; terminal stays private.
+    pub fn semantic_state(&self) -> &mr_crabs_protocols::shell::SemanticPromptState {
+        self.terminal.semantic_state()
+    }
     /// Live terminal modes used by keyboard/mouse input.
     pub fn modes(&self) -> Vec<TerminalMode> {
         self.terminal.modes()
