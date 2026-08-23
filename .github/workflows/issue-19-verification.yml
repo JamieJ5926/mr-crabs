@@ -8,7 +8,7 @@ permissions:
   contents: write
 
 jobs:
-  align-resize-contract-and-verify:
+  align-bypass-contract-and-verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,57 +17,24 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-      - name: Align resize regression with coordinate invalidation
+      - name: Align retained-reveal paint expectations
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
 
-          path = Path("crates/mr-crabs-effects/src/model.rs")
+          path = Path("crates/mr-crabs-effects/tests/issue_19_repeated_output.rs")
           source = path.read_text()
-          start_marker = "    #[test]\n    fn resize_reveals_new_cells_and_preserves_prefix()"
-          end_marker = "    #[test]\n    fn change_texture_flows_through_model()"
-          if start_marker in source:
-              start = source.index(start_marker)
-              end = source.index(end_marker, start)
-              replacement = '''    #[test]
-              fn resize_bypasses_reveal_and_adopts_new_snapshot() {
-                  let mut m = model(TextAnimation::Streaming, 2, 1);
-                  let cursor = CursorState::default();
-                  let old = GridSize::new(2, 1);
-                  let rows = vec![row(0, 1, &[65, 66])];
-                  let f = m.apply_frame(&frame_at(old, 1, rows, cursor), 1000, true);
-                  assert_eq!(f.revealing.len(), 2);
-                  assert!(f.revealing.iter().all(|r| r.change_ms == 1000.0));
-
-                  // A resize changes the cell coordinate space. The model must
-                  // discard old timestamps, bypass animation for the resize
-                  // frame, and adopt its final cells as the new snapshot.
-                  let new = GridSize::new(3, 2);
-                  let resized_rows = vec![row(0, 2, &[65, 66, 67]), row(1, 1, &[88, 32, 32])];
-                  let f = m.apply_frame(&frame_at(new, 2, resized_rows.clone(), cursor), 1500, true);
-                  assert!(!f.text_reveal_allowed);
-                  assert!(!f.needs_frame);
-                  assert!(f.revealing.is_empty());
-                  assert!(f.pending.is_empty());
-
-                  // Repainting the adopted generations does not restart an
-                  // effect, which also proves the resized snapshot was stored.
-                  let f = m.apply_frame(&frame_at(new, 3, resized_rows, cursor), 1600, true);
-                  assert!(f.is_idle());
-
-                  // A subsequent real key change still receives one fresh
-                  // timestamp, without reanimating the adopted cells.
-                  let rows = vec![row(0, 3, &[90, 66, 67])];
-                  let f = m.apply_frame(&frame_at(new, 4, rows, cursor), 3000, true);
-                  assert_eq!(f.revealing.len(), 1);
-                  let changed = &f.revealing[0];
-                  assert_eq!(changed.pos, CellPos::new(0, 0));
-                  assert_eq!(changed.change_ms, 3000.0);
-              }
-
-          '''
-              path.write_text(source[:start] + replacement + source[end:])
+          old = "    assert!(!effect.text_reveal_allowed);"
+          count = source.count(old)
+          if count == 2:
+              source = source.replace(
+                  old,
+                  "    assert!(effect.text_reveal_allowed);",
+              )
+              path.write_text(source)
+          elif count != 0:
+              raise SystemExit(f"expected 0 or 2 stale assertions, found {count}")
           PY
       - name: Format changes
         run: cargo fmt --all
@@ -75,12 +42,12 @@ jobs:
         shell: bash
         run: |
           if git diff --quiet; then
-            echo "Resize regression already aligned"
+            echo "Bypass regressions already aligned"
           else
             git config user.name github-actions[bot]
             git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-            git add crates/mr-crabs-effects/src/model.rs
-            git commit -m "test: align resize reveal invalidation"
+            git add crates/mr-crabs-effects/tests/issue_19_repeated_output.rs
+            git commit -m "test: assert retained reveals remain paintable"
             git push origin HEAD:fix/issue-19-text-animation-render-dedup
           fi
       - name: Check formatting
