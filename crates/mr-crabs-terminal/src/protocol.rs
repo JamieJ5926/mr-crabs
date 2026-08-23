@@ -327,6 +327,8 @@ pub struct TerminalProtocol {
     pwd: Option<String>,
     /// Number of BELs received.
     bell_count: u64,
+    /// Latched when CSI 3 J clears the compact engine's saved lines.
+    saved_history_cleared: bool,
     /// Bounded reply scratch buffer (reused; capacity never exceeds the
     /// largest reply).
     reply: Vec<u8>,
@@ -495,6 +497,7 @@ impl TerminalProtocol {
             title: None,
             pwd: None,
             bell_count: 0,
+            saved_history_cleared: false,
             reply: Vec::new(),
             scroll_region_start: 0,
             scroll_region_end: usize::from(size.rows),
@@ -509,6 +512,10 @@ impl TerminalProtocol {
 
     pub fn engine(&self) -> &CompactEngine {
         &self.engine
+    }
+
+    pub fn take_saved_history_cleared(&mut self) -> bool {
+        std::mem::take(&mut self.saved_history_cleared)
     }
 
     pub fn engine_mut(&mut self) -> &mut CompactEngine {
@@ -1479,6 +1486,9 @@ impl Handler for TerminalProtocol {
     }
 
     fn clear_screen(&mut self, mode: ClearMode) {
+        if matches!(mode, ClearMode::Saved) {
+            self.saved_history_cleared = true;
+        }
         self.engine.clear_screen(mode);
     }
 

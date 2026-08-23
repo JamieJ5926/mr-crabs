@@ -510,6 +510,7 @@ impl Terminal {
                 let _g = crate::phase::Guard::new("protocol_feed");
                 self.protocol.feed(bytes);
             }
+            self.sync_saved_history_clear();
             {
                 #[cfg(feature = "phase-timing")]
                 let _g = crate::phase::Guard::new("scrolled_ingest");
@@ -538,6 +539,7 @@ impl Terminal {
                 let _g = crate::phase::Guard::new("protocol_feed");
                 self.protocol.feed(chunk);
             }
+            self.sync_saved_history_clear();
             {
                 #[cfg(feature = "phase-timing")]
                 let _g = crate::phase::Guard::new("scrolled_ingest");
@@ -621,6 +623,12 @@ impl Terminal {
                 self.storage.resume_style_transaction();
                 Err(err)
             }
+        }
+    }
+
+    fn sync_saved_history_clear(&mut self) {
+        if self.protocol.take_saved_history_cleared() {
+            self.storage.clear();
         }
     }
 

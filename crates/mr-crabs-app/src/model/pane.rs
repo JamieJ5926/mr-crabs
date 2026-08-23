@@ -2522,6 +2522,52 @@ mod tests {
     }
 
     #[test]
+    fn clear_screen_replaces_retained_terminal_rows() {
+        let mut pane = PaneModel::detached(PaneId::new(1), GridSize::new(12, 4)).expect("pane");
+        let mut cache = mr_crabs_element::RenderCache::new();
+        pane.feed_test_output(
+            b"OLD_ONE\r\nOLD_TWO\r\nOLD_THREE\r\nOLD_FOUR\r\nOLD_FIVE\r\nOLD_SIX",
+        )
+        .expect("pane fixture feed should succeed");
+        cache.apply_frame(&pane.frame().expect("frame before clear"));
+
+        pane.feed_test_output(b"\x1b[H\x1b[2J\x1b[3Jprompt> ")
+            .expect("clear sequence should succeed");
+        let clear_frame = pane.frame().expect("frame after clear");
+        cache.apply_frame(&clear_frame);
+        let painted: String = cache
+            .batches()
+            .iter()
+            .flat_map(|batch| batch.runs.iter())
+            .map(|run| run.text.as_str())
+            .collect();
+
+        assert_eq!(
+            pane.core.terminal.history_len(),
+            0,
+            "CSI 3 J must clear scrollback"
+        );
+        assert!(
+            !painted.contains("OLD_ONE"),
+            "first stale row survived clear"
+        );
+        assert!(
+            !painted.contains("OLD_SIX"),
+            "last stale row survived clear"
+        );
+        assert!(
+            painted.contains("prompt>"),
+            "new prompt was not painted: damage={:?}, rows={:?}, painted={painted:?}",
+            clear_frame.damage,
+            clear_frame
+                .rows
+                .iter()
+                .map(|row| row.row)
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
     fn pane_pump_drains_receiver_chunks() {
         let (tx, rx) = sync_channel::<Vec<u8>>(8);
         tx.send(b"abc".to_vec()).expect("send");
