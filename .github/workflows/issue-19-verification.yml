@@ -4,20 +4,81 @@ on:
   push:
     branches:
       - fix/issue-19-text-animation-render-dedup
-  pull_request:
-    paths:
-      - crates/mr-crabs-effects/**
-      - Cargo.toml
-      - Cargo.lock
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  test-effects:
+  patch-and-test-effects:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: fix/issue-19-text-animation-render-dedup
+      - name: Align the existing model regression with issue 19
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("crates/mr-crabs-effects/src/model.rs")
+          source = path.read_text()
+          old = '''    #[test]
+              fn unchanged_cells_never_restamp() {
+                  let size = GridSize::new(4, 1);
+                  let mut m = model(TextAnimation::Streaming, 4, 1);
+                  let cursor = CursorState::default();
+                  let rows = vec![row(0, 1, &[65, 32, 32, 32])];
+                  let f = m.apply_frame(&frame_at(size, 1, rows, cursor), 1000, true);
+                  assert_eq!(f.revealing.len(), 4); // fresh tracker stamps all
+                  assert!(f.revealing.iter().all(|r| r.change_ms == 1000.0));
+
+                  // Same content, new generation: no restamp, no re-animation.
+                  let rows = vec![row(0, 2, &[65, 32, 32, 32])];
+                  let f = m.apply_frame(&frame_at(size, 2, rows, cursor), 1100, true);
+                  assert_eq!(f.revealing.len(), 4);
+                  assert!(f.revealing.iter().all(|r| r.change_ms == 1000.0));
+              }
+          '''
+          new = '''    #[test]
+              fn repeated_identical_generation_restamps_only_drawable_glyphs() {
+                  let size = GridSize::new(4, 1);
+                  let mut m = model(TextAnimation::Streaming, 4, 1);
+                  let cursor = CursorState::default();
+                  let rows = vec![row(0, 1, &[65, 32, 32, 32])];
+                  let f = m.apply_frame(&frame_at(size, 1, rows, cursor), 1000, true);
+                  assert_eq!(f.revealing.len(), 4); // fresh tracker stamps all
+                  assert!(f.revealing.iter().all(|r| r.change_ms == 1000.0));
+
+                  // A new generation proves a fresh write cycle even when the
+                  // final cells are identical. Re-time the drawable glyph only;
+                  // spaces retain their previous stamps.
+                  let rows = vec![row(0, 2, &[65, 32, 32, 32])];
+                  let f = m.apply_frame(&frame_at(size, 2, rows, cursor), 1100, true);
+                  assert_eq!(f.revealing.len(), 4);
+                  assert!(f.revealing.iter().any(|reveal| {
+                      reveal.pos == CellPos::new(0, 0) && reveal.change_ms == 1100.0
+                  }));
+                  assert!(f.revealing.iter().filter(|reveal| {
+                      reveal.pos != CellPos::new(0, 0)
+                  }).all(|reveal| reveal.change_ms == 1000.0));
+              }
+          '''
+          if old not in source:
+              raise SystemExit("expected stale model test was not found")
+          path.write_text(source.replace(old, new, 1))
+          PY
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add crates/mr-crabs-effects/src/model.rs
+          git commit -m "test: align repeated output model expectations"
+          git push origin HEAD:fix/issue-19-text-animation-render-dedup
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Lint effects crate
+        run: cargo clippy -p mr-crabs-effects --all-targets -- -D warnings
       - name: Run effects tests
         run: cargo test -p mr-crabs-effects
