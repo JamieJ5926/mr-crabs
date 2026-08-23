@@ -2195,4 +2195,524 @@ mod tests {
             "each press must increment generation exactly once"
         );
     }
+
+    fn attach_fake_writer(
+        cx: &mut gpui::App,
+    ) -> (
+        gpui::Entity<AppModel>,
+        gpui::Entity<AppShell>,
+        std::sync::mpsc::Receiver<Vec<u8>>,
+        std::sync::mpsc::SyncSender<Vec<u8>>,
+    ) {
+        use crate::model::app_model::AppModel;
+        use crate::model::pane::PaneSession;
+        use crate::ui::shell::AppShell;
+        use std::sync::mpsc::sync_channel;
+
+        let model = cx.new(|_| AppModel::headless());
+        let window_id = model.read(cx).active_window.expect("active window");
+        let pane_id = model.read(cx).focused_pane_id().expect("focused pane");
+        let size = model.read(cx).windows[&window_id]
+            .active_tab()
+            .expect("active tab")
+            .panes[&pane_id]
+            .last_size;
+        let (reader_tx, reader_rx) = sync_channel::<Vec<u8>>(8);
+        let (writer_tx, writer_rx) = sync_channel::<Vec<u8>>(8);
+        model.update(cx, |model, _| {
+            let pane = model
+                .windows
+                .get_mut(&window_id)
+                .unwrap()
+                .active_tab_mut()
+                .unwrap()
+                .panes
+                .get_mut(&pane_id)
+                .unwrap();
+            pane.session = PaneSession::from_receivers_with_writer(
+                size,
+                Some(reader_rx),
+                None,
+                Some(writer_tx),
+            );
+        });
+        let shell = cx.new(|_| AppShell::new(model.clone()));
+        cx.bind_keys(crate::ui::actions::key_bindings(
+            &crate::keymap::default_keybindings(),
+        ));
+        AppShell::register_actions(&shell, cx);
+        shell.update(cx, |shell, cx| shell.sync_windows(cx));
+        (model, shell, writer_rx, reader_tx)
+    }
+
+    fn drain_writer(rx: &std::sync::mpsc::Receiver<Vec<u8>>) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        while let Ok(chunk) = rx.try_recv() {
+            bytes.extend_from_slice(&chunk);
+        }
+        bytes
+    }
+
+    fn draw_window(cx: &mut gpui::TestAppContext, handle: gpui::AnyWindowHandle) {
+        cx.update_window(handle, |_, window, cx| {
+            window.draw(cx).clear(cx);
+        })
+        .unwrap();
+    }
+
+    #[gpui::test]
+    fn ctrl_c_writes_etx_and_never_printable_c_after_ime_drain(cx: &mut gpui::TestAppContext) {
+        let (model, shell, writer_rx, _reader_tx) = cx.update(attach_fake_writer);
+        let _keep_shell = shell;
+        let handle = cx.windows().into_iter().next().expect("one window");
+        cx.dispatch_keystroke(handle, Keystroke::parse("ctrl-c->c").unwrap());
+
+        draw_window(cx, handle);
+        draw_window(cx, handle);
+
+        let bytes = drain_writer(&writer_rx);
+        assert_eq!(
+            bytes,
+            vec![0x03],
+            "Ctrl-C must write exactly ETX after InputHandler commit/drain, got {bytes:?}"
+        );
+        assert!(
+            !bytes.contains(&b'c') && !bytes.contains(&b'C'),
+            "Ctrl-C must never leak printable c, got {bytes:?}"
+        );
+        let _ = model;
+    }
+
+    #[gpui::test]
+    fn cmd_backspace_writes_exactly_ctrl_u_through_window_view(cx: &mut gpui::TestAppContext) {
+        let (_model, shell, writer_rx, _reader_tx) = cx.update(attach_fake_writer);
+        let _keep_shell = shell;
+        let handle = cx.windows().into_iter().next().expect("one window");
+        draw_window(cx, handle);
+
+        cx.dispatch_keystroke(handle, Keystroke::parse("cmd-backspace").unwrap());
+        draw_window(cx, handle);
+        draw_window(cx, handle);
+
+        let bytes = drain_writer(&writer_rx);
+        assert_eq!(
+            bytes,
+            vec![0x15],
+            "Cmd+Backspace must write exactly Ctrl-U, got {bytes:?}"
+        );
+    }
+
+    #[gpui::test]
+    fn cmd_v_writes_one_bracketed_paste_and_no_second_ime_payload(cx: &mut gpui::TestAppContext) {
+        let (model, shell, writer_rx, _reader_tx) = cx.update(attach_fake_writer);
+        let _keep_shell = shell;
+        let handle = cx.windows().into_iter().next().expect("one window");
+        draw_window(cx, handle);
+
+        cx.update(|cx| {
+            model.update(cx, |model, _| {
+                model
+                    .focused_pane_mut()
+                    .expect("pane")
+                    .feed_test_output(b"\x1b[?2004h")
+                    .expect("enable bracketed paste");
+            });
+        });
+        let paste = "echo hi\nsecond line";
+        cx.write_to_clipboard(ClipboardItem::new_string(paste.to_string()));
+
+        cx.dispatch_keystroke(handle, Keystroke::parse("cmd-v->v").unwrap());
+
+        draw_window(cx, handle);
+        draw_window(cx, handle);
+
+        let bytes = drain_writer(&writer_rx);
+        let expected = cx.update(|cx| {
+            encode_live_paste(&model.read(cx).focused_pane().expect("pane").core, paste)
+        });
+
+        assert_eq!(
+            bytes,
+            expected,
+            "Cmd+V must write exactly one bracketed payload and no second IME copy, got {bytes:?}"
+        );
+        assert_eq!(
+            bytes
+                .windows(b"\x1b[200~".len())
+                .filter(|w| *w == b"\x1b[200~")
+                .count(),
+            1,
+            "only one bracketed paste start is allowed"
+        );
+    }
+
+    #[gpui::test]
+    fn terminal_and_dock_wheel_move_viewport_hide_dock_and_write_nothing(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (model, shell, writer_rx, _reader_tx) = cx.update(attach_fake_writer);
+        let _keep_shell = shell;
+        let handle = cx.windows().into_iter().next().expect("one window");
+        draw_window(cx, handle);
+
+        cx.update(|cx| {
+            model.update(cx, |model, _| {
+                let pane = model.focused_pane_mut().expect("pane");
+                pane.feed_test_output(b"\x1b]133;A\x07$ \x1b]133;B\x07")
+                    .expect("prompt");
+                for i in 0..40 {
+                    pane.feed_test_output(format!("line-{i:02}\r\n").as_bytes())
+                        .expect("history");
+                }
+                pane.feed_test_output(b"\x1b]133;A\x07$ \x1b]133;B\x07")
+                    .expect("live prompt");
+            });
+        });
+        draw_window(cx, handle);
+
+        let (offset_before, dock_before) = cx.update(|cx| {
+            let pane = model.read(cx).focused_pane().expect("pane");
+            (
+                pane.viewport_offset(),
+                pane.input_dock()
+                    .map(|snap| snap.state)
+                    .unwrap_or(InputDockState::Hidden),
+            )
+        });
+        assert_eq!(offset_before, 0);
+        assert_eq!(dock_before, InputDockState::ShellInputActive);
+
+        let mut visual = gpui::VisualTestContext::from_window(handle, cx);
+        visual.simulate_event(ScrollWheelEvent {
+            position: gpui::point(gpui::px(40.0), gpui::px(40.0)),
+            delta: ScrollDelta::Lines(gpui::point(0.0, 3.0)),
+            modifiers: GpuiModifiers::default(),
+            touch_phase: gpui::TouchPhase::Moved,
+        });
+        drop(visual);
+        draw_window(cx, handle);
+
+        let (offset_after, dock_after, painted_offset) = cx.update(|cx| {
+            let pane = model.read(cx).focused_pane().expect("pane");
+            let frame = pane.frame().expect("painted frame");
+            (
+                pane.viewport_offset(),
+                pane.input_dock()
+                    .map(|snap| snap.state)
+                    .unwrap_or(InputDockState::Hidden),
+                frame.viewport.scroll_offset,
+            )
+        });
+        assert!(
+            offset_after > offset_before,
+            "terminal-body wheel must move viewport offset, before={offset_before} after={offset_after}"
+        );
+        assert_eq!(
+            painted_offset,
+            u32::try_from(offset_after).expect("offset"),
+            "painted frame must move with the viewport"
+        );
+        assert_eq!(
+            dock_after,
+            InputDockState::Hidden,
+            "scrolled dock must hide"
+        );
+        assert!(
+            writer_rx.try_recv().is_err(),
+            "wheel must not write PTY bytes"
+        );
+
+        cx.update(|cx| {
+            model.update(cx, |model, _| {
+                let pane = model.focused_pane_mut().expect("pane");
+                pane.scroll_viewport_down(usize::MAX);
+                pane.feed_test_output(b"\x1b]133;A\x07$ \x1b]133;B\x07live")
+                    .expect("restore prompt");
+            });
+        });
+        draw_window(cx, handle);
+
+        let mut visual = gpui::VisualTestContext::from_window(handle, cx);
+        visual.simulate_event(ScrollWheelEvent {
+            position: gpui::point(gpui::px(40.0), gpui::px(520.0)),
+            delta: ScrollDelta::Lines(gpui::point(0.0, 3.0)),
+            modifiers: GpuiModifiers::default(),
+            touch_phase: gpui::TouchPhase::Moved,
+        });
+        drop(visual);
+        draw_window(cx, handle);
+
+        let (dock_wheel_offset, dock_wheel_state) = cx.update(|cx| {
+            let pane = model.read(cx).focused_pane().expect("pane");
+            (
+                pane.viewport_offset(),
+                pane.input_dock()
+                    .map(|snap| snap.state)
+                    .unwrap_or(InputDockState::Hidden),
+            )
+        });
+        assert!(
+            dock_wheel_offset > 0,
+            "dock wheel must move viewport offset"
+        );
+        assert_eq!(
+            dock_wheel_state,
+            InputDockState::Hidden,
+            "dock wheel must hide the dock"
+        );
+        assert!(
+            writer_rx.try_recv().is_err(),
+            "dock wheel must not write PTY bytes"
+        );
+    }
+
+    #[gpui::test]
+    fn shifted_pageup_and_shift_up_fn_alias_scroll_without_pty_csi(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (model, shell, writer_rx, _reader_tx) = cx.update(attach_fake_writer);
+        let _keep_shell = shell;
+        let handle = cx.windows().into_iter().next().expect("one window");
+        draw_window(cx, handle);
+
+        cx.update(|cx| {
+            model.update(cx, |model, _| {
+                let pane = model.focused_pane_mut().expect("pane");
+                for i in 0..40 {
+                    pane.feed_test_output(format!("hist-{i:02}\r\n").as_bytes())
+                        .expect("history");
+                }
+            });
+        });
+        draw_window(cx, handle);
+
+        cx.dispatch_keystroke(handle, Keystroke::parse("shift-pageup").unwrap());
+        draw_window(cx, handle);
+        let page_offset =
+            cx.update(|cx| model.read(cx).focused_pane().expect("pane").viewport_offset());
+        assert!(
+            page_offset > 0,
+            "Shift+PageUp must scroll the viewport, offset={page_offset}"
+        );
+        let page_bytes = drain_writer(&writer_rx);
+        assert!(
+            page_bytes.is_empty(),
+            "Shift+PageUp must not write PTY bytes, got {page_bytes:?}"
+        );
+
+        cx.update(|cx| {
+            model.update(cx, |model, _| {
+                model
+                    .focused_pane_mut()
+                    .expect("pane")
+                    .scroll_viewport_down(usize::MAX);
+            });
+        });
+
+        cx.dispatch_keystroke(handle, Keystroke::parse("shift-up").unwrap());
+        draw_window(cx, handle);
+        let up_offset =
+            cx.update(|cx| model.read(cx).focused_pane().expect("pane").viewport_offset());
+        let up_bytes = drain_writer(&writer_rx);
+        assert!(
+            up_offset > 0,
+            "Shift+Up must scroll the viewport instead of inserting CSI, offset={up_offset}"
+        );
+        assert!(
+            !up_bytes
+                .windows(b"\x1b[1;2A".len())
+                .any(|w| w == b"\x1b[1;2A")
+                && !up_bytes
+                    .windows(b"\x1b[1;2B".len())
+                    .any(|w| w == b"\x1b[1;2B"),
+            "Shift+Up must not write ;2A/;2B PTY bytes, got {up_bytes:?}"
+        );
+        assert!(
+            up_bytes.is_empty(),
+            "Shift+Up must write no PTY bytes, got {up_bytes:?}"
+        );
+
+        cx.update(|cx| {
+            model.update(cx, |model, _| {
+                model
+                    .focused_pane_mut()
+                    .expect("pane")
+                    .scroll_viewport_down(usize::MAX);
+            });
+        });
+        cx.dispatch_keystroke(handle, Keystroke::parse("shift-fn-up").unwrap());
+        draw_window(cx, handle);
+        let fn_offset =
+            cx.update(|cx| model.read(cx).focused_pane().expect("pane").viewport_offset());
+        let fn_bytes = drain_writer(&writer_rx);
+        assert!(
+            fn_offset > 0,
+            "Shift+Fn+Up alias must scroll the viewport, offset={fn_offset}"
+        );
+        assert!(
+            fn_bytes.is_empty(),
+            "Shift+Fn+Up must not write PTY bytes, got {fn_bytes:?}"
+        );
+    }
+
+    #[gpui::test]
+    fn alternate_screen_wheel_is_fail_closed(cx: &mut gpui::TestAppContext) {
+        let (model, shell, writer_rx, _reader_tx) = cx.update(attach_fake_writer);
+        let _keep_shell = shell;
+        let handle = cx.windows().into_iter().next().expect("one window");
+        draw_window(cx, handle);
+
+        cx.update(|cx| {
+            model.update(cx, |model, _| {
+                let pane = model.focused_pane_mut().expect("pane");
+                for i in 0..20 {
+                    pane.feed_test_output(format!("pri-{i:02}\r\n").as_bytes())
+                        .expect("primary");
+                }
+                pane.feed_test_output(b"\x1b[?1049hALT")
+                    .expect("alternate");
+            });
+        });
+        draw_window(cx, handle);
+
+        let mut visual = gpui::VisualTestContext::from_window(handle, cx);
+        visual.simulate_event(ScrollWheelEvent {
+            position: gpui::point(gpui::px(40.0), gpui::px(40.0)),
+            delta: ScrollDelta::Lines(gpui::point(0.0, 5.0)),
+            modifiers: GpuiModifiers::default(),
+            touch_phase: gpui::TouchPhase::Moved,
+        });
+        drop(visual);
+        draw_window(cx, handle);
+
+        let (offset, alternate, dock) = cx.update(|cx| {
+            let pane = model.read(cx).focused_pane().expect("pane");
+            let frame = pane.frame().expect("frame");
+            (
+                pane.viewport_offset(),
+                frame.viewport.alternate_screen,
+                pane.input_dock()
+                    .map(|snap| snap.state)
+                    .unwrap_or(InputDockState::Hidden),
+            )
+        });
+        assert!(alternate, "fixture must be on the alternate screen");
+        assert_eq!(
+            offset, 0,
+            "alternate-screen wheel must fail closed and keep offset 0"
+        );
+        assert_eq!(dock, InputDockState::Hidden);
+        assert!(
+            writer_rx.try_recv().is_err(),
+            "alternate-screen wheel must not write PTY bytes"
+        );
+    }
+
+    #[gpui::test]
+    fn seq_countdown_chat_has_no_synthetic_prefix_and_second_toggle_hides_later_echo(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (model, shell, writer_rx, _reader_tx) = cx.update(attach_fake_writer);
+        let _keep_shell = shell;
+        let handle = cx.windows().into_iter().next().expect("one window");
+        draw_window(cx, handle);
+
+        let mut seq = Vec::from(&b"\x1b]133;A\x07"[..]);
+        for n in 1..=200 {
+            seq.extend_from_slice(format!("{n}\r\n").as_bytes());
+        }
+        cx.update(|cx| {
+            model.update(cx, |model, _| {
+                model
+                    .focused_pane_mut()
+                    .expect("pane")
+                    .feed_test_output(&seq)
+                    .expect("seq fixture");
+            });
+        });
+
+        cx.dispatch_keystroke(handle, Keystroke::parse("cmd-shift-j").unwrap());
+        draw_window(cx, handle);
+        assert!(writer_rx.try_recv().is_err(), "toggle must not write PTY");
+
+        let (effective, events, chat_a11y) = cx.update(|cx| {
+            let model = model.read(cx);
+            let pane = model.focused_pane().expect("pane");
+            let events = pane.conversation_events(false, false);
+            let chat_a11y = model
+                .accessibility_snapshot()
+                .root
+                .children
+                .iter()
+                .any(|node| node.label == "Chat");
+            (pane.effective_mode(false, false), events, chat_a11y)
+        });
+        assert_eq!(effective, SurfaceMode::Chat);
+        assert!(chat_a11y, "Chat overlay must be present after first toggle");
+        assert!(
+            !events.is_empty(),
+            "seq 1 200 fixture must project countdown rows"
+        );
+        let joined = events
+            .iter()
+            .map(|event| event.text.as_str())
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(
+            joined.contains("1") && joined.contains("200"),
+            "seq fixture must keep countdown 1 and 200, got {joined:?}"
+        );
+        assert!(
+            !joined.contains("j 200")
+                && !joined.contains("Chat:")
+                && !joined.contains("[chat]")
+                && !joined.contains("assistant:"),
+            "countdown rows must have no synthetic prefix, got {joined:?}"
+        );
+
+        cx.dispatch_keystroke(handle, Keystroke::parse("cmd-shift-j").unwrap());
+        draw_window(cx, handle);
+        let effective_off = cx.update(|cx| {
+            model
+                .read(cx)
+                .focused_pane()
+                .expect("pane")
+                .effective_mode(false, false)
+        });
+        assert_eq!(effective_off, SurfaceMode::Terminal);
+
+        cx.update(|cx| {
+            model.update(cx, |model, _| {
+                model
+                    .focused_pane_mut()
+                    .expect("pane")
+                    .feed_test_output(b"\r\necho later-shell\r\n")
+                    .expect("later echo");
+            });
+        });
+        draw_window(cx, handle);
+
+        let (effective_later, events_later, chat_a11y_later) = cx.update(|cx| {
+            let model = model.read(cx);
+            let pane = model.focused_pane().expect("pane");
+            let events = pane.conversation_events(false, false);
+            let chat_a11y = model
+                .accessibility_snapshot()
+                .root
+                .children
+                .iter()
+                .any(|node| node.label == "Chat");
+            (pane.effective_mode(false, false), events, chat_a11y)
+        });
+        assert_eq!(effective_later, SurfaceMode::Terminal);
+        assert!(
+            events_later.is_empty(),
+            "later shell echo must not appear in Chat after overlay is removed, got {events_later:?}"
+        );
+        assert!(
+            !chat_a11y_later,
+            "second Cmd+Shift+J must remove the Chat overlay exactly once"
+        );
+    }
+
 }

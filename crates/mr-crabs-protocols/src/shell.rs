@@ -437,4 +437,31 @@ mod tests {
         assert_eq!(s.content, SemanticContent::Output);
         assert!(!s.cursor_is_at_prompt());
     }
+
+    #[test]
+    fn prompt_start_redraw_clears_stale_input_start_coordinates() {
+        let mut s = SemanticPromptState::new();
+        s.apply(&sp(Action::FreshLineNewPrompt, "k=i"), 2, 0);
+        s.apply(&sp(Action::EndPromptStartInput, ""), 4, 0);
+        assert_eq!(s.input_start_col, Some(4));
+        assert_eq!(s.input_start_row, Some(0));
+
+        s.apply(&sp(Action::PromptStart, "k=i"), 0, 5);
+        assert_eq!(s.content, SemanticContent::Prompt);
+        assert_eq!(s.row, RowSemantic::Prompt);
+        assert_eq!(
+            s.input_start_row, None,
+            "PromptStart redraw must drop stale input_start_row so a later B can record the current prompt"
+        );
+        assert_eq!(
+            s.input_start_col, None,
+            "PromptStart redraw must drop stale input_start_col"
+        );
+
+        s.apply(&sp(Action::EndPromptStartInput, ""), 22, 5);
+        assert_eq!(s.input_start_col, Some(22));
+        assert_eq!(s.input_start_row, Some(5));
+        assert!(s.cursor_is_at_prompt());
+    }
+
 }

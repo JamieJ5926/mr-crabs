@@ -710,6 +710,69 @@ mod tests {
     }
 
     #[test]
+    fn text_right_of_moved_cursor_stays_in_snapshot_and_synthetic_frame() {
+        let mut pane = PaneModel::detached(PaneId::new(1), GridSize::new(80, 24)).expect("pane");
+        pane.feed_test_output(b"\x1b]133;A\x07$ \x1b]133;B\x07hello")
+            .expect("feed");
+        pane.feed_test_output(b"\x1b[3D")
+            .expect("move cursor left into hello");
+
+        let snap = derive_input_dock(&pane, false);
+        assert_eq!(snap.state, InputDockState::ShellInputActive);
+        let text: String = snap
+            .cells
+            .iter()
+            .filter_map(|cell| char::from_u32(cell.content).filter(|ch| *ch != '\0'))
+            .collect();
+        assert!(
+            text.contains("hello"),
+            "text to the right of the moved cursor must remain in InputDockSnapshot, got {text:?} span={:?} cursor={:?}",
+            snap.source,
+            snap.cursor
+        );
+        assert!(
+            snap.source.end_col > snap.cursor.source_col,
+            "span must extend past the moved cursor so trailing text remains, span={:?} cursor={:?}",
+            snap.source,
+            snap.cursor
+        );
+
+        let frame = synthetic_dock_frame(&snap);
+        let frame_text: String = frame.rows[0]
+            .cells
+            .iter()
+            .filter_map(|cell| char::from_u32(cell.content).filter(|ch| *ch != '\0'))
+            .collect();
+        assert!(
+            frame_text.contains("hello"),
+            "synthetic frame must keep text to the right of the moved cursor, got {frame_text:?}"
+        );
+    }
+
+    #[test]
+    fn osc133_prompt_redraw_does_not_hide_current_prompt_on_stale_input_start() {
+        let mut pane = PaneModel::detached(PaneId::new(1), GridSize::new(80, 24)).expect("pane");
+        pane.feed_test_output(b"\x1b]133;A\x07$ \x1b]133;B\x07old")
+            .expect("first prompt");
+        pane.feed_test_output(b"\r\n\x1b]133;P;k=i\x07(reverse-i-search)`': \x1b]133;B\x07")
+            .expect("ctrl-r shaped redraw");
+
+        let semantic = pane.core.semantic_state();
+        let snapshot = pane.core.terminal_snapshot();
+        let snap = derive_input_dock(&pane, false);
+        assert_eq!(
+            snap.state,
+            InputDockState::ShellInputActive,
+            "stale input_start coordinates must not hide the current prompt dock; input_start_row={:?} cursor_row={} content={:?} row={:?}",
+            semantic.input_start_row,
+            snapshot.cursor.row,
+            semantic.content,
+            semantic.row
+        );
+    }
+
+
+    #[test]
     fn extract_span_never_splits_wide_pair() {
         let mut snapshot = empty_snapshot(8, 1, 3, 0);
         snapshot.cells[2].flags |= Cell::WIDE;
