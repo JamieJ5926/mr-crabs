@@ -21,6 +21,7 @@
 //! everything.
 
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
 
 use gpui::{
@@ -95,6 +96,29 @@ struct MeasuredCellMetrics {
     font: Font,
 }
 
+#[derive(Clone)]
+struct ModalImeSender {
+    tx: Sender<(PaneId, String)>,
+    modal_input_gate: Arc<AtomicBool>,
+}
+
+impl ModalImeSender {
+    fn send(
+        &self,
+        message: (PaneId, String),
+    ) -> Result<(), std::sync::mpsc::SendError<(PaneId, String)>> {
+        if self.modal_input_gate.load(Ordering::Acquire) {
+            Ok(())
+        } else {
+            self.tx.send(message)
+        }
+    }
+
+    fn raw_sender(&self) -> Sender<(PaneId, String)> {
+        self.tx.clone()
+    }
+}
+
 /// Permanent native title prefix identifying the pure-Rust application.
 pub const WINDOW_TITLE_PREFIX: &str = "Mr Crabs";
 
@@ -118,8 +142,9 @@ pub struct WindowView {
     /// Shared with each pane's text-input sink. Drained on the main thread
     /// during render; never parked on a `cx.spawn` future.
     pub focus: FocusHandle,
-    ime_tx: Sender<(PaneId, String)>,
+    ime_tx: ModalImeSender,
     ime_rx: Receiver<(PaneId, String)>,
+    modal_input_gate: Arc<AtomicBool>,
     /// Focus subscriptions must remain alive for the lifetime of the view.
     _focus_subscriptions: Vec<Subscription>,
 }
@@ -137,7 +162,12 @@ impl WindowView {
         let initial_focus = focus.clone();
         window.defer(cx, move |window, cx| window.focus(&initial_focus, cx));
 
+        let modal_input_gate = Arc::new(AtomicBool::new(model.read(cx).palette.is_open()));
         let (ime_tx, ime_rx) = mpsc::channel();
+        let ime_tx = ModalImeSender {
+            tx: ime_tx,
+            modal_input_gate: Arc::clone(&modal_input_gate),
+        };
 
         let focused = cx.on_focus_in(&focus, window, |view, _, cx| {
             view.write_focus_report(true, cx);
@@ -154,6 +184,7 @@ impl WindowView {
             focus,
             ime_tx,
             ime_rx,
+            modal_input_gate,
             _focus_subscriptions: vec![focused, blurred],
         }
     }
@@ -301,6 +332,8 @@ impl Render for WindowView {
         if !self.focus.is_focused(window) {
             window.focus(&self.focus, cx);
         }
+        self.modal_input_gate
+            .store(self.model.read(cx).palette.is_open(), Ordering::Release);
         self.process_clipboard_requests(cx);
         self.drain_ime_commits(cx);
 
@@ -448,6 +481,7 @@ impl Render for WindowView {
 
         let key_model = self.model.clone();
         let key_shell = self.shell.clone();
+        let key_modal_input_gate = Arc::clone(&self.modal_input_gate);
         let key_up_model = self.model.clone();
         let mut root = div()
             .relative()
@@ -458,6 +492,7 @@ impl Render for WindowView {
             .track_focus(&self.focus)
             .on_key_down(move |event, window, cx| {
                 handle_key_event(&key_model, &key_shell, event, window, cx);
+                key_modal_input_gate.store(key_model.read(cx).palette.is_open(), Ordering::Release);
             })
             .on_key_up(move |event, _, cx| {
                 handle_key_release(&key_up_model, event, cx);
@@ -742,7 +777,7 @@ impl Render for WindowView {
                     let overlay_pane = pane_id;
                     let overlay_geometry = pane_geometry;
                     let overlay_layout = layout;
-                    let ime_tx = self.ime_tx.clone();
+                    let ime_tx = self.ime_tx.raw_sender();
                     root = root.child(
                         input_dock_overlay(InputDockOverlayView {
                             snap: &snap,
@@ -2321,9 +2356,7 @@ mod tests {
     }
 
     #[gpui::test]
-    fn palette_ime_commit_before_escape_never_reaches_pty(
-        cx: &mut gpui::TestAppContext,
-    ) {
+    fn palette_ime_commit_before_escape_never_reaches_pty(cx: &mut gpui::TestAppContext) {
         let (model, shell, writer_rx, _reader_tx) = cx.update(attach_fake_writer);
         let _keep_shell = shell;
         let handle = cx.windows().into_iter().next().expect("one window");
