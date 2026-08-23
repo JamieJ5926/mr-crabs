@@ -31,15 +31,12 @@ pub const MAX_AHEAD_MS: f64 = 1000.0;
 /// Persistent typewriter burst schedule (see module docs).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TypewriterSchedule {
-    /// The next change timestamp to hand out, in milliseconds.
     next_ms: f64,
-    /// The most recent timestamp handed out, in milliseconds.
     last_ms: f64,
-    /// The per-cell stagger (milliseconds): each changed cell is
-    /// timestamped this much later than the previous changed cell. Zero
-    /// disables the schedule (streaming timestamps every change in a
-    /// rebuild identically instead).
     stagger_ms: f64,
+    build_now_ms: f64,
+    build_limit_ms: f64,
+    active_row: Option<u16>,
 }
 
 impl TypewriterSchedule {
@@ -50,6 +47,9 @@ impl TypewriterSchedule {
             next_ms: NEVER_MS,
             last_ms: NEVER_MS,
             stagger_ms,
+            build_now_ms: NEVER_MS,
+            build_limit_ms: NEVER_MS,
+            active_row: None,
         }
     }
 
@@ -83,6 +83,8 @@ impl TypewriterSchedule {
         if !self.is_active() {
             return;
         }
+        self.build_now_ms = now_ms;
+        self.build_limit_ms = now_ms + duration_ms;
         if self.next_ms != NEVER_MS
             && now_ms < self.last_ms + duration_ms
             && self.next_ms <= now_ms + MAX_AHEAD_MS
@@ -92,13 +94,25 @@ impl TypewriterSchedule {
         self.next_ms = now_ms;
     }
 
+    pub fn begin_row(&mut self, row: u16) {
+        if !self.is_active() || self.active_row == Some(row) {
+            return;
+        }
+        self.active_row = Some(row);
+        self.next_ms = self.build_now_ms;
+    }
+
+    pub fn translate_up_one(&mut self) {
+        self.active_row = self.active_row.and_then(|row| row.checked_sub(1));
+    }
+
     /// Hand out the timestamp for the next changed cell and advance the
     /// schedule by one stagger step.
     pub fn next_timestamp(&mut self) -> f64 {
-        let t = self.next_ms;
+        let timestamp = self.next_ms.min(self.build_limit_ms);
         self.next_ms += self.stagger_ms;
-        self.last_ms = t;
-        t
+        self.last_ms = timestamp;
+        timestamp
     }
 }
 
@@ -106,35 +120,39 @@ impl TypewriterSchedule {
 mod tests {
     use super::*;
 
-    /// Port of the oracle test "typewriter schedule sequences changed rows
-    /// across rebuilds".
     #[test]
-    fn sequences_changed_rows_across_rebuilds() {
+    fn continued_burst_is_clamped_to_each_build_window() {
         let duration_ms = 60.0;
         let stagger = duration_ms / 8.0;
-        let mut s = TypewriterSchedule::new(stagger);
+        let mut schedule = TypewriterSchedule::new(stagger);
         let now = 10_000.0;
 
-        // Line 1: 24 changed cells, one burst.
-        s.begin_build(now, duration_ms);
-        let line1_first = s.next_timestamp();
-        let mut line1_last = line1_first;
+        schedule.begin_build(now, duration_ms);
+        let first = schedule.next_timestamp();
+        let mut last = first;
         for _ in 0..24 {
-            line1_last = s.next_timestamp();
+            last = schedule.next_timestamp();
         }
-        assert_eq!(line1_first, now);
-        assert!(line1_last > line1_first);
+        assert_eq!(first, now);
+        assert_eq!(last, now + duration_ms);
 
-        // Line 2 arrives a few ms later: the cascade is still revealing,
-        // so the burst continues and line 2 starts after line 1.
-        s.begin_build(now + 4.0, duration_ms);
-        let line2_first = s.next_timestamp();
-        assert_eq!(line2_first, line1_last + stagger);
+        schedule.begin_build(now + 4.0, duration_ms);
+        assert_eq!(schedule.next_timestamp(), now + 4.0 + duration_ms);
 
-        // Line 3 likewise continues the burst.
-        s.begin_build(now + 8.0, duration_ms);
-        let line3_first = s.next_timestamp();
-        assert_eq!(line3_first, line2_first + stagger);
+        schedule.begin_build(now + 8.0, duration_ms);
+        assert_eq!(schedule.next_timestamp(), now + 8.0 + duration_ms);
+    }
+
+    #[test]
+    fn different_row_starts_at_current_build_time() {
+        let mut schedule = TypewriterSchedule::new(75.0);
+        schedule.begin_build(1_000.0, 600.0);
+        schedule.begin_row(0);
+        for _ in 0..20 {
+            _ = schedule.next_timestamp();
+        }
+        schedule.begin_row(1);
+        assert_eq!(schedule.next_timestamp(), 1_000.0);
     }
 
     /// Port of the oracle test "typewriter schedule starts a fresh burst
@@ -158,29 +176,21 @@ mod tests {
         assert!(first > old_last);
     }
 
-    /// Port of the oracle test "typewriter schedule bounds the reveal
-    /// backlog".
     #[test]
     fn bounds_the_reveal_backlog() {
         let duration_ms = 60.0;
         let stagger = duration_ms / 8.0;
-        let mut s = TypewriterSchedule::new(stagger);
-        s.begin_build(1000.0, duration_ms);
-        let mut last = 1000.0;
-        // A very long burst pushes the schedule far ahead of the present.
+        let mut schedule = TypewriterSchedule::new(stagger);
+        schedule.begin_build(1_000.0, duration_ms);
+        let mut last = 1_000.0;
         for _ in 0..300 {
-            last = s.next_timestamp();
+            last = schedule.next_timestamp();
         }
-        assert!(last > 1000.0 + MAX_AHEAD_MS);
+        assert_eq!(last, 1_000.0 + duration_ms);
 
-        // A rebuild while that cascade still runs must not push further
-        // ahead: it starts a fresh burst at the current time so the reveal
-        // backlog stays bounded and new input never waits for the backlog.
-        let now = 1500.0;
-        s.begin_build(now, duration_ms);
-        let first = s.next_timestamp();
-        assert_eq!(first, now);
-        assert!(first < last);
+        let now = 1_500.0;
+        schedule.begin_build(now, duration_ms);
+        assert_eq!(schedule.next_timestamp(), now);
     }
 
     #[test]

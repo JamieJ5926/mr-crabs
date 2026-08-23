@@ -200,6 +200,7 @@ impl EffectsModel {
             let mut bottom_only = false;
             if is_full && can_translate {
                 tracker.translate_up_one();
+                self.schedule.translate_up_one();
                 translated = true;
                 bottom_only = true;
             }
@@ -228,6 +229,7 @@ impl EffectsModel {
                         let target = self.size.rows.saturating_sub(1);
                         for rd in &frame.rows {
                             if rd.row == target {
+                                self.schedule.begin_row(rd.row);
                                 tracker.update_row(
                                     rd.row,
                                     rd.generation,
@@ -240,6 +242,7 @@ impl EffectsModel {
                         }
                     } else {
                         for rd in &frame.rows {
+                            self.schedule.begin_row(rd.row);
                             tracker.update_row(
                                 rd.row,
                                 rd.generation,
