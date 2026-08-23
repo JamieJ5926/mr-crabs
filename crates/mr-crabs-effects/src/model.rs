@@ -351,6 +351,7 @@ fn collect_reveals(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::TrailEcho;
     use mr_crabs_terminal::{Cell, CursorState, DamageKind, RowDelta};
 
     fn cell(content: u32) -> Cell {
@@ -559,21 +560,19 @@ mod tests {
         let mut cursor = CursorState::default();
         let size = GridSize::new(8, 1);
 
-        // First appearance at t=2000: glow, no segment.
         let f = m.apply_frame(&frame_at(size, 1, Vec::new(), cursor), 2000, true);
         assert!(f.trail.active);
         assert_eq!(f.trail.alpha, 0.35);
-        assert_eq!(f.trail.segment, None);
+        assert_eq!(f.trail.echoes, [TrailEcho::default(); 3]);
         assert!(f.needs_frame);
 
-        // Move to col 5 at t=2016: segment from old to new center.
         cursor.col = 5;
         let f = m.apply_frame(&frame_at(size, 2, Vec::new(), cursor), 2016, true);
         assert!(f.trail.active);
         assert_eq!(f.trail.alpha, 0.35);
-        assert!(f.trail.segment.is_some());
+        assert_eq!(f.trail.echoes.len(), 3);
+        assert!(f.trail.echoes[0].alpha > 0.0);
         assert_eq!(f.trail.glow_rect.x, 50.0);
-
         // Linear fade at t=2241: (1 - 225/250) * 0.35.
         let f = m.apply_frame(&frame_at(size, 3, Vec::new(), cursor), 2241, true);
         assert!((f.trail.alpha - 0.035).abs() < f64::EPSILON);

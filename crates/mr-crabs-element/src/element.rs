@@ -9,13 +9,11 @@
 use gpui::{
     App, BorderStyle, Bounds, BoxShadow, Corners, Element, ElementId, FocusHandle, Font,
     FontFeatures, FontStyle, FontWeight, GlobalElementId, Hsla, InspectorElementId, IntoElement,
-    LayoutId, PathBuilder, Pixels, Point, RenderImage, ShapedLine, SharedString,
-    StrikethroughStyle, Style as GpuiStyle, TextRun, UnderlineStyle, Window, fill, font, outline,
-    point, px, size, white,
+    LayoutId, Pixels, Point, RenderImage, ShapedLine, SharedString, StrikethroughStyle,
+    Style as GpuiStyle, TextRun, UnderlineStyle, Window, fill, font, outline, point, px, size,
+    white,
 };
-use mr_crabs_effects::{
-    CellPx, EffectsConfig, EffectsModel, LinePx, RectPx, RevealMath, TextAnimation,
-};
+use mr_crabs_effects::{CellPx, EffectsConfig, EffectsModel, RectPx, RevealMath, TextAnimation};
 use mr_crabs_graphics::{
     image::{Image, ImageData, ImageFormat},
     iterm::{self, ItermUploads},
@@ -213,23 +211,17 @@ pub(crate) fn trail_glow_bounds(
     })
 }
 
-pub(crate) fn trail_segment_points(
-    segment: LinePx,
-    origin: Point<Pixels>,
-) -> (Point<Pixels>, Point<Pixels>) {
-    let from = point(
-        origin.x + px(segment.from.x as f32),
-        origin.y + px(segment.from.y as f32),
-    );
-    let to = point(
-        origin.x + px(segment.to.x as f32),
-        origin.y + px(segment.to.y as f32),
-    );
-    (from, to)
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum TrailEchoPaintStyle {
+    Fill,
+    Outline,
 }
 
-pub(crate) fn trail_stroke_width(radius_px: f64) -> Pixels {
-    px((radius_px * 0.5).max(1.0) as f32)
+const fn trail_echo_paint_style(shape: CursorShape) -> TrailEchoPaintStyle {
+    match shape {
+        CursorShape::HollowBlock => TrailEchoPaintStyle::Outline,
+        CursorShape::Block | CursorShape::Bar | CursorShape::Underline => TrailEchoPaintStyle::Fill,
+    }
 }
 
 impl TerminalElement {
@@ -706,6 +698,26 @@ impl TerminalElement {
             }
         }
         if fx.trail.active && fx.trail.alpha > 0.0 {
+            let cursor_shape = frame.cursor.shape;
+            for echo in &fx.trail.echoes {
+                if echo.alpha <= 0.0 {
+                    continue;
+                }
+                let Some(bounds) = trail_glow_bounds(echo.rect, origin) else {
+                    continue;
+                };
+                let mut color = self.palette.cursor_color();
+                color.a = echo.alpha as f32;
+                if color.a <= 0.0 {
+                    continue;
+                }
+                match trail_echo_paint_style(cursor_shape) {
+                    TrailEchoPaintStyle::Outline => {
+                        window.paint_quad(outline(bounds, color, BorderStyle::default()));
+                    }
+                    TrailEchoPaintStyle::Fill => window.paint_quad(fill(bounds, color)),
+                }
+            }
             if let Some(rect) = trail_glow_bounds(fx.trail.glow_rect, origin) {
                 let mut glow = self.palette.cursor_color();
                 glow.a = fx.trail.alpha as f32;
@@ -716,16 +728,6 @@ impl TerminalElement {
                         &[BoxShadow::new(px(0.0), px(0.0), glow)
                             .blur_radius(px(fx.trail.radius_px as f32))],
                     );
-                    if let Some(segment) = fx.trail.segment {
-                        let (from, to) = trail_segment_points(segment, origin);
-                        let width = trail_stroke_width(fx.trail.radius_px);
-                        let mut builder = PathBuilder::stroke(width);
-                        builder.move_to(from);
-                        builder.line_to(to);
-                        if let Ok(path) = builder.build() {
-                            window.paint_path(path, glow);
-                        }
-                    }
                 }
             }
         }
@@ -1633,7 +1635,6 @@ fn build_render_image(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mr_crabs_effects::PointPx;
     use mr_crabs_terminal::{
         CursorShape, CursorState, DamageKind, FramePool, GridSize, RowDelta, Run, SelectionState,
         Style as TermStyle,
@@ -2174,33 +2175,34 @@ mod tests {
     }
 
     #[test]
-    fn trail_segment_points_translate_by_origin() {
-        let origin = point(px(3.0), px(4.0));
-        let seg = LinePx::new(PointPx::new(1.0, 2.0), PointPx::new(10.0, 12.0));
-        let (from, to) = trail_segment_points(seg, origin);
-        assert_eq!(from, point(px(4.0), px(6.0)));
-        assert_eq!(to, point(px(13.0), px(16.0)));
+    fn trail_echo_bounds_translate_by_origin() {
+        let echo_rect = RectPx::new(7.5, 0.0, 10.0, 20.0);
+        let origin = point(px(10.0), px(15.0));
+        let bounds = trail_glow_bounds(echo_rect, origin).expect("bounds");
+        assert_eq!(bounds.origin.x, px(17.5));
+        assert_eq!(bounds.origin.y, px(15.0));
+        assert_eq!(bounds.size.width, px(10.0));
+        assert_eq!(bounds.size.height, px(20.0));
     }
 
     #[test]
-    fn trail_stroke_width_clamps_at_one() {
-        assert_eq!(trail_stroke_width(10.0), px(5.0));
-        assert_eq!(trail_stroke_width(0.2), px(1.0));
-        assert_eq!(trail_stroke_width(1.0), px(1.0));
-    }
-
-    #[test]
-    fn trail_segment_stroke_builds_nonempty_path() {
-        let origin = point(px(0.0), px(0.0));
-        let seg = LinePx::new(PointPx::new(0.0, 0.0), PointPx::new(20.0, 0.0));
-        let (from, to) = trail_segment_points(seg, origin);
-        let mut builder = PathBuilder::stroke(px(4.0));
-        builder.move_to(from);
-        builder.line_to(to);
-        let path = builder.build().expect("path");
-        assert_ne!(
-            format!("{path:?}"),
-            format!("{:?}", PathBuilder::stroke(px(1.0)).build().unwrap())
+    fn trail_echo_degenerate_rect_is_none() {
+        assert!(
+            trail_glow_bounds(RectPx::new(5.0, 5.0, 0.0, 20.0), point(px(0.0), px(0.0))).is_none()
         );
+        assert!(
+            trail_glow_bounds(RectPx::new(5.0, 5.0, 10.0, -1.0), point(px(0.0), px(0.0))).is_none()
+        );
+    }
+
+    #[test]
+    fn trail_echo_shape_styles_cover_fill_and_outline() {
+        assert_eq!(
+            trail_echo_paint_style(CursorShape::HollowBlock),
+            TrailEchoPaintStyle::Outline
+        );
+        for shape in [CursorShape::Block, CursorShape::Bar, CursorShape::Underline] {
+            assert_eq!(trail_echo_paint_style(shape), TrailEchoPaintStyle::Fill);
+        }
     }
 }
