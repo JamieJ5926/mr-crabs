@@ -2246,7 +2246,7 @@ mod tests {
         cx.dispatch_keystroke(handle, Keystroke::parse("enter").unwrap());
         assert_eq!(
             writer_rx.try_recv().expect("launch command"),
-            b"'omp' 'hi '\r"
+            b"\x15'omp' 'hi '\r"
         );
         assert!(cx.update(|cx| matches!(
             model.read(cx).focused_pane().expect("pane").chat_state(),

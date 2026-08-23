@@ -8,6 +8,7 @@ use super::presentation::{ConversationEvent, ConversationKind, ConversationSourc
 
 const INPUT_CAP: usize = 200;
 const DRAFT_CAP_BYTES: usize = 64 * 1024;
+const SHELL_KILL_LINE: char = '\u{15}';
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AgentLaunchSpec {
@@ -35,15 +36,18 @@ impl AgentLaunchSpec {
         }
 
         let mut command = String::new();
+        command.push(SHELL_KILL_LINE);
+        let mut first = true;
         for part in self
             .argv
             .iter()
             .map(String::as_str)
             .chain(std::iter::once(prompt))
         {
-            if !command.is_empty() {
+            if !first {
                 command.push(' ');
             }
+            first = false;
             quote_posix(part, &mut command);
         }
         command.push('\r');
@@ -242,7 +246,7 @@ mod tests {
         };
         assert_eq!(
             spec.command_line("say 'hello'").unwrap(),
-            b"'omp' '--profile' 'work space' 'say '\\''hello'\\'''\r"
+            b"\x15'omp' '--profile' 'work space' 'say '\\''hello'\\'''\r"
         );
     }
 

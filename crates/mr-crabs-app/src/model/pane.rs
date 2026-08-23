@@ -3198,7 +3198,7 @@ mod tests {
         pane.insert_chat_text("hello");
         pane.submit_chat(&AgentLaunchSpec::default())
             .expect("submit");
-        assert_eq!(writer_rx.try_recv().unwrap(), b"'omp' 'hello'\r");
+        assert_eq!(writer_rx.try_recv().unwrap(), b"\x15'omp' 'hello'\r");
 
         pane.feed_test_output(b"\x1b]133;C\x07\x1b[?1049h\x1b[?2004h")
             .expect("feed");
@@ -3229,7 +3229,7 @@ mod tests {
         pane.insert_chat_text("restart");
         pane.submit_chat(&AgentLaunchSpec::default())
             .expect("restart");
-        assert_eq!(writer_rx.try_recv().unwrap(), b"'omp' 'restart'\r");
+        assert_eq!(writer_rx.try_recv().unwrap(), b"\x15'omp' 'restart'\r");
     }
     #[test]
     fn real_pty_chat_launch_and_view_switch_keep_one_child() {
@@ -3299,6 +3299,51 @@ mod tests {
             AgentSessionState::Exited { code: Some(0) }
         );
         assert_eq!(pane.session.child_pid(), Some(child_pid));
+        pane.session
+            .shutdown(Duration::from_millis(200))
+            .expect("shutdown");
+    }
+
+    #[test]
+    fn chat_launch_clears_existing_shell_input_before_command() {
+        let config = PtySpawnConfig::new(GridSize::new(80, 24)).with_shell("/bin/sh");
+        let mut pane = PaneModel::pending(PaneId::new(3), config).expect("pending");
+        let geometry = SurfaceGeometry::from_viewport(
+            mr_crabs_element::PixelExtent {
+                width: 800.0,
+                height: 480.0,
+            },
+            mr_crabs_element::CellMetrics::new(10.0, 20.0).expect("metrics"),
+            crate::model::geometry::PaddingPx::default(),
+        )
+        .expect("geometry");
+        assert!(pane.commit_geometry(geometry, None).expect("spawn"));
+        pane.session.write(b"\"").expect("prefill");
+        pane.insert_chat_text("sad");
+        pane.submit_chat(&AgentLaunchSpec {
+            argv: vec!["/bin/echo".into(), "LAUNCH_OK".into()],
+        })
+        .expect("launch");
+
+        let deadline = std::time::Instant::now() + Duration::from_secs(3);
+        let text = loop {
+            pane.pump(8);
+            let snapshot = pane.core.terminal_snapshot();
+            let text: String = snapshot
+                .cells
+                .iter()
+                .filter_map(|cell| char::from_u32(cell.content))
+                .filter(|ch| *ch != '\0')
+                .collect();
+            if text.contains("LAUNCH_OK sad") || std::time::Instant::now() >= deadline {
+                break text;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        };
+        assert!(
+            text.contains("LAUNCH_OK sad"),
+            "launch stayed in quote continuation: {text:?}"
+        );
         pane.session
             .shutdown(Duration::from_millis(200))
             .expect("shutdown");
