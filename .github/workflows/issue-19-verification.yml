@@ -8,28 +8,12 @@ permissions:
   contents: write
 
 jobs:
-  format-and-run-red-tests:
+  run-red-tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: fix/issue-19-text-animation-render-dedup
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt
-      - name: Format regression tests
-        run: cargo fmt --all
-      - name: Commit formatting
-        shell: bash
-        run: |
-          if git diff --quiet; then
-            echo "Formatting already clean"
-          else
-            git config user.name github-actions[bot]
-            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-            git add crates/mr-crabs-effects/tests/issue_19_repeated_output.rs
-            git commit -m "style: format burst bypass regressions"
-            git push origin HEAD:fix/issue-19-text-animation-render-dedup
-          fi
-      - name: Run burst bypass regressions
-        run: cargo test -p mr-crabs-effects --test issue_19_repeated_output large_partial_bypass_preserves_existing_reveal_and_ignores_new_cells full_bypass_preserves_existing_reveal_for_unchanged_cells
+      - name: Run issue 19 regressions
+        run: cargo test -p mr-crabs-effects --test issue_19_repeated_output
