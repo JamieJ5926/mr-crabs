@@ -522,7 +522,7 @@ mod tests {
         let defaults = mr_crabs_config::EffectiveConfig::defaults();
         assert_eq!(
             defaults.startup_fetch_command,
-            "\"$MR_CRABS_BIN\" +animated-fetch"
+            "sleep 0.5; \"$MR_CRABS_BIN\" +animated-fetch"
         );
         assert!(defaults.startup_fetch);
     }
