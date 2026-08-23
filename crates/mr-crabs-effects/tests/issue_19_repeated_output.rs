@@ -1,9 +1,9 @@
 use mr_crabs_effects::{CellPos, CellPx, EffectsConfig, EffectsModel, TextAnimation};
 use mr_crabs_terminal::{Cell, CursorState, DamageKind, FrameDelta, GridSize, RowDelta};
 
-fn row(generation: u64, contents: &[u32]) -> RowDelta {
+fn row_at(row: u16, generation: u64, contents: &[u32]) -> RowDelta {
     RowDelta {
-        row: 0,
+        row,
         generation,
         cells: contents
             .iter()
@@ -18,21 +18,34 @@ fn row(generation: u64, contents: &[u32]) -> RowDelta {
     }
 }
 
-fn frame(size: GridSize, sequence: u64, rows: Vec<RowDelta>) -> FrameDelta {
+fn row(generation: u64, contents: &[u32]) -> RowDelta {
+    row_at(0, generation, contents)
+}
+
+fn frame_with_damage(
+    size: GridSize,
+    sequence: u64,
+    damage: DamageKind,
+    rows: Vec<RowDelta>,
+) -> FrameDelta {
     let mut frame = FrameDelta::empty(size);
     frame.sequence = sequence;
-    frame.damage = if rows.is_empty() {
-        DamageKind::Clean
-    } else {
-        DamageKind::Partial
-    };
+    frame.damage = damage;
     frame.rows = rows;
     frame.cursor = CursorState::default();
     frame
 }
 
-fn typewriter_model(duration_ms: u64) -> (GridSize, EffectsModel) {
-    let size = GridSize::new(4, 1);
+fn frame(size: GridSize, sequence: u64, rows: Vec<RowDelta>) -> FrameDelta {
+    let damage = if rows.is_empty() {
+        DamageKind::Clean
+    } else {
+        DamageKind::Partial
+    };
+    frame_with_damage(size, sequence, damage, rows)
+}
+
+fn typewriter_model_for(size: GridSize, duration_ms: u64) -> EffectsModel {
     let config = EffectsConfig::new(
         TextAnimation::Typewriter,
         duration_ms,
@@ -40,10 +53,14 @@ fn typewriter_model(duration_ms: u64) -> (GridSize, EffectsModel) {
         false,
         0.35,
         250,
-        16,
+        usize::from(size.cols) * usize::from(size.rows),
     );
-    let model = EffectsModel::new(config, size, CellPx::new(10.0, 20.0));
-    (size, model)
+    EffectsModel::new(config, size, CellPx::new(10.0, 20.0))
+}
+
+fn typewriter_model(duration_ms: u64) -> (GridSize, EffectsModel) {
+    let size = GridSize::new(4, 1);
+    (size, typewriter_model_for(size, duration_ms))
 }
 
 fn contents() -> [u32; 4] {
@@ -53,6 +70,15 @@ fn contents() -> [u32; 4] {
         u32::from(' '),
         u32::from(' '),
     ]
+}
+
+fn reveal_positions(effect: &mr_crabs_effects::EffectsFrame) -> Vec<CellPos> {
+    effect
+        .revealing
+        .iter()
+        .map(|reveal| reveal.pos)
+        .chain(effect.pending.iter().copied())
+        .collect()
 }
 
 #[test]
@@ -167,4 +193,70 @@ fn third_overlapping_identical_execution_preserves_active_and_pending_reveals() 
 
     let expired = frame(size, 5, Vec::new());
     assert!(model.apply_frame(&expired, 2_125, true).is_idle());
+}
+
+#[test]
+fn large_partial_bypass_preserves_existing_reveal_and_ignores_new_cells() {
+    let size = GridSize::new(4, 17);
+    let mut model = typewriter_model_for(size, 600);
+    let contents = contents();
+
+    let initial = frame(size, 1, vec![row_at(0, 1, &contents)]);
+    assert!(model.apply_frame(&initial, 1_000, true).needs_frame);
+
+    let mut rows = vec![row_at(0, 2, &contents)];
+    for row_index in 1..size.rows {
+        rows.push(row_at(
+            row_index,
+            1,
+            &[u32::from('X'), u32::from(' '), u32::from(' '), u32::from(' ')],
+        ));
+    }
+    let large = frame_with_damage(size, 2, DamageKind::Partial, rows);
+    let effect = model.apply_frame(&large, 1_040, true);
+
+    assert!(!effect.text_reveal_allowed);
+    assert!(effect.needs_frame);
+    assert_eq!(
+        reveal_positions(effect),
+        vec![
+            CellPos::new(0, 0),
+            CellPos::new(0, 1),
+            CellPos::new(0, 2),
+            CellPos::new(0, 3),
+        ]
+    );
+    assert_eq!(model.last_change_ms(), Some(1_225.0));
+}
+
+#[test]
+fn full_bypass_preserves_existing_reveal_for_unchanged_cells() {
+    let size = GridSize::new(4, 2);
+    let mut model = typewriter_model_for(size, 600);
+    let contents = contents();
+    let blank = [u32::from(' '); 4];
+
+    let initial = frame(size, 1, vec![row_at(0, 1, &contents)]);
+    assert!(model.apply_frame(&initial, 1_000, true).needs_frame);
+
+    let full = frame_with_damage(
+        size,
+        2,
+        DamageKind::Full,
+        vec![row_at(0, 2, &contents), row_at(1, 1, &blank)],
+    );
+    let effect = model.apply_frame(&full, 1_040, true);
+
+    assert!(!effect.text_reveal_allowed);
+    assert!(effect.needs_frame);
+    assert_eq!(
+        reveal_positions(effect),
+        vec![
+            CellPos::new(0, 0),
+            CellPos::new(0, 1),
+            CellPos::new(0, 2),
+            CellPos::new(0, 3),
+        ]
+    );
+    assert_eq!(model.last_change_ms(), Some(1_225.0));
 }
