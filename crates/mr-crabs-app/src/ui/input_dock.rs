@@ -101,6 +101,7 @@ pub struct InputDockOverlayView<'a> {
     pub font: Font,
     pub font_size: Pixels,
     pub metrics: CellMetrics,
+    pub terminal_palette: TerminalPalette,
     pub focused: bool,
     pub focus: Option<FocusHandle>,
     pub ime_tx: Option<std::sync::mpsc::Sender<(PaneId, String)>>,
@@ -115,6 +116,7 @@ pub fn input_dock_overlay(view: InputDockOverlayView<'_>) -> Div {
         font,
         font_size,
         metrics,
+        terminal_palette,
         focused,
         focus,
         ime_tx,
@@ -123,7 +125,8 @@ pub fn input_dock_overlay(view: InputDockOverlayView<'_>) -> Div {
     let frame = crate::model::input_dock::synthetic_dock_frame(snap);
     let mut element = TerminalElement::new(frame, metrics)
         .with_font(font)
-        .with_font_size(font_size);
+        .with_font_size(font_size)
+        .with_palette(terminal_palette);
     if let Some(focus) = focus {
         element = element.with_focus(focus);
     }
@@ -184,17 +187,10 @@ pub fn input_dock_footer(
     layout: InputDockLayout,
     tokens: InputDockTokens,
 ) -> Div {
+    let _ = snap;
     bounds_div(layout.footer)
         .bg(rgb(tokens.footer_bg))
         .occlude()
-        .child(
-            div()
-                .absolute()
-                .left(px(24.0))
-                .top(px((31.0 - 11.0) * 0.5))
-                .text_color(rgb(tokens.footer_fg))
-                .child(snap.footer.label.to_string()),
-        )
 }
 
 pub fn dock_is_active(snap: &InputDockSnapshot) -> bool {

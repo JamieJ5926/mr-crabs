@@ -938,6 +938,42 @@ impl AppModel {
         Ok(())
     }
 
+    pub fn toggle_chat_presentation(&mut self) -> ActionResult {
+        let Some(pane_id) = self.focused_pane_id() else {
+            return ActionResult::ignored("no focused pane");
+        };
+        let Some((window_id, tab_id)) = self.locate_pane(pane_id) else {
+            return ActionResult::ignored("no focused pane");
+        };
+        let pane = match self
+            .windows
+            .get_mut(&window_id)
+            .and_then(|window| window.tabs.get_mut(&tab_id))
+            .and_then(|tab| tab.pane_mut(pane_id))
+        {
+            Some(pane) => pane,
+            None => return ActionResult::ignored("no focused pane"),
+        };
+        let eligible = pane.is_chat_eligible(self.palette.is_open(), false);
+        if !eligible {
+            return ActionResult::ignored("chat not eligible on this pane");
+        }
+        let next = match pane.preferred_mode {
+            crate::model::presentation::SurfaceMode::Terminal => {
+                crate::model::presentation::SurfaceMode::Chat
+            }
+            crate::model::presentation::SurfaceMode::Chat => {
+                crate::model::presentation::SurfaceMode::Terminal
+            }
+        };
+        pane.preferred_mode = next;
+        self.generation += 1;
+        ActionResult::performed(match next {
+            crate::model::presentation::SurfaceMode::Chat => "chat shown",
+            crate::model::presentation::SurfaceMode::Terminal => "chat hidden",
+        })
+    }
+
     // ── dispatch ──
 
     /// Dispatch one shell action with full cascade semantics.
@@ -1231,6 +1267,7 @@ impl AppModel {
                     }
                 }
             }
+            AppAction::ToggleChatPresentation => self.toggle_chat_presentation(),
             AppAction::Quit => {
                 self.quit_requested = true;
                 self.shutdown_all();
@@ -1711,6 +1748,33 @@ mod tests {
             .expect("pane")
             .session = session;
         (reader_tx, writer_rx)
+    }
+
+    #[test]
+    fn chat_toggle_preserves_live_writer_and_scrollback() {
+        let mut model = headless();
+        let window_id = model.active_window.expect("window");
+        let pane_id = model.focused_pane_id().expect("focused pane");
+        let (reader_tx, writer_rx) = install_fake_session(&mut model);
+        reader_tx
+            .send(b"\x1b]133;A\x07existing output".to_vec())
+            .expect("feed semantic output");
+        assert!(model.pump(64).changed());
+        let sequence_before = model
+            .focused_frame(window_id)
+            .expect("focused frame")
+            .sequence;
+
+        assert!(model.dispatch(AppAction::ToggleChatPresentation).performed);
+        assert!(model.write_to_pane(pane_id, b"after-toggle"));
+        assert_eq!(writer_rx.try_recv(), Ok(b"after-toggle".to_vec()));
+        assert_eq!(
+            model
+                .focused_frame(window_id)
+                .expect("focused frame")
+                .sequence,
+            sequence_before
+        );
     }
 
     #[test]

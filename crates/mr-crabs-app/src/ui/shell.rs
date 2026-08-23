@@ -211,6 +211,7 @@ impl AppShell {
             SetTextAnimationStreaming => SetTextAnimationStreaming,
             SetTextAnimationTypewriter => SetTextAnimationTypewriter,
             ToggleCursorTrail => ToggleCursorTrail,
+            ToggleChatPresentation => ToggleChatPresentation,
         );
     }
 

@@ -207,6 +207,13 @@ pub fn derive_input_dock(pane: &PaneModel, palette_open: bool) -> InputDockSnaps
     if !semantic.cursor_is_at_prompt() {
         return hidden(fallback_span, fallback_cursor, semantic.prompt_kind);
     }
+    if semantic
+        .input_start_row
+        .is_some_and(|start_row| start_row != cursor.row)
+        || cursor.wrap_pending
+    {
+        return hidden(fallback_span, fallback_cursor, semantic.prompt_kind);
+    }
 
     let source = project_source_span(semantic, cursor.col, cursor.row, cursor.wrap_pending);
     let projection = extract_span_cells(&snapshot, source);

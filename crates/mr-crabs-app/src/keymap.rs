@@ -135,6 +135,7 @@ pub fn default_keybindings() -> Vec<KeyBindingDef> {
         KeyBindingDef::new("ctrl+cmd+left", AppAction::GotoSplitLeft),
         KeyBindingDef::new("ctrl+cmd+right", AppAction::GotoSplitRight),
         KeyBindingDef::new("cmd+shift+p", AppAction::TogglePalette),
+        KeyBindingDef::new("cmd+shift+j", AppAction::ToggleChatPresentation),
         KeyBindingDef::new("ctrl+`", AppAction::ToggleQuickTerminal),
         KeyBindingDef::new("ctrl+cmd+o", AppAction::ToggleSecureInput),
         KeyBindingDef::new("cmd+shift+r", AppAction::ReloadConfig),
@@ -240,7 +241,7 @@ mod tests {
     #[test]
     fn defaults_cover_the_shell_action_surface() {
         let bindings = default_keybindings();
-        assert_eq!(bindings.len(), 19);
+        assert_eq!(bindings.len(), 20);
         let resolver = KeymapResolver::new(bindings);
         assert!(resolver.invalid.is_empty());
         assert_eq!(resolver.resolve("cmd+t", ""), Some(AppAction::NewTab));

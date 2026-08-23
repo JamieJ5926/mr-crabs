@@ -16,6 +16,7 @@
 //! | `updates`              | `CheckForUpdates`                               |
 //! | `keyboard-only-operation` | every action is keyboard-dispatachable     |
 //! | `menus` / `dock-behavior` / `app-intents` / `accessibility` | consumed by their modules |
+//! | `presentation`         | `ToggleChatPresentation`                        |
 //!
 //! `AppAction` is deliberately payload-free so it can be serialized into
 //! keymaps, menus, palette entries, and restore state. Payload actions
@@ -81,11 +82,13 @@ pub enum AppAction {
     SetTextAnimationTypewriter,
     /// Toggle the cursor trail for this process.
     ToggleCursorTrail,
+    /// Toggle the Chat presentation overlay for the focused pane.
+    ToggleChatPresentation,
 }
 
 impl AppAction {
     /// Every shell action in declaration order.
-    pub const ALL: [AppAction; 27] = [
+    pub const ALL: [AppAction; 28] = [
         AppAction::NewWindow,
         AppAction::CloseWindow,
         AppAction::NewTab,
@@ -113,6 +116,7 @@ impl AppAction {
         AppAction::SetTextAnimationStreaming,
         AppAction::SetTextAnimationTypewriter,
         AppAction::ToggleCursorTrail,
+        AppAction::ToggleChatPresentation,
     ];
 
     /// Stable machine name (used for palette command ids and serialization).
@@ -145,6 +149,7 @@ impl AppAction {
             AppAction::SetTextAnimationStreaming => "set_text_animation_streaming",
             AppAction::SetTextAnimationTypewriter => "set_text_animation_typewriter",
             AppAction::ToggleCursorTrail => "toggle_cursor_trail",
+            AppAction::ToggleChatPresentation => "toggle_chat_presentation",
         }
     }
 
@@ -178,6 +183,7 @@ impl AppAction {
             AppAction::SetTextAnimationStreaming => "Text Animation: Streaming",
             AppAction::SetTextAnimationTypewriter => "Text Animation: Typewriter",
             AppAction::ToggleCursorTrail => "Toggle Cursor Trail",
+            AppAction::ToggleChatPresentation => "Chat Presentation",
         }
     }
 
@@ -205,7 +211,8 @@ impl AppAction {
             | AppAction::SetTextAnimationNone
             | AppAction::SetTextAnimationStreaming
             | AppAction::SetTextAnimationTypewriter
-            | AppAction::ToggleCursorTrail => "View",
+            | AppAction::ToggleCursorTrail
+            | AppAction::ToggleChatPresentation => "View",
             AppAction::CheckForUpdates | AppAction::Quit => "App",
         }
     }
@@ -223,7 +230,7 @@ mod tests {
     #[test]
     fn all_covers_every_parity_id_exactly_once() {
         // One entry per variant, no duplicates, and every variant is in ALL.
-        assert_eq!(AppAction::ALL.len(), 27);
+        assert_eq!(AppAction::ALL.len(), 28);
         let mut names: Vec<&str> = AppAction::ALL.iter().map(|a| a.name()).collect();
         names.sort_unstable();
         let mut dedup = names.clone();

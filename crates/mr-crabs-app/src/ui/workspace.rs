@@ -50,8 +50,10 @@ use mr_crabs_terminal::FrameDelta;
 use crate::model::app_model::AppModel;
 use crate::model::geometry::{PaddingPx, SurfaceGeometry};
 use crate::model::input_dock::{
-    InputDockLayout, InputDockSnapshot, InputDockState, PointF, hit_test_dock, remap_pointer,
+    CHROME_TOTAL, InputDockLayout, InputDockSnapshot, InputDockState, PointF, hit_test_dock,
+    remap_pointer,
 };
+use crate::model::presentation::{ConversationEvent, SurfaceMode};
 use crate::model::split::{GridRect, PaneId};
 use crate::model::window::WindowId;
 use crate::palette::PaletteState;
@@ -424,6 +426,17 @@ impl Render for WindowView {
                 snap,
             })
         });
+        let focused_pane_bounds = bundles.iter().find(|bundle| bundle.focused).map(|bundle| {
+            (
+                f32::from(bundle.geometry.padding.left)
+                    + f32::from(bundle.rect.x) * bundle.pane_geometry.metrics.width,
+                f32::from(bundle.geometry.padding.top)
+                    + f32::from(bundle.rect.y) * bundle.pane_geometry.metrics.height,
+                bundle.pane_geometry.content.width,
+                bundle.pane_geometry.content.height,
+            )
+        });
+        let dock_chrome_active = focused_dock.is_some();
 
         let key_model = self.model.clone();
         let key_shell = self.shell.clone();
@@ -618,26 +631,76 @@ impl Render for WindowView {
                     let dock_pane = pane_id;
                     let dock_geometry = pane_geometry;
                     let dock_layout = layout;
-                    root = root.child(input_dock_mask(layout, tokens).on_any_mouse_down(
-                        move |event, _, cx| {
-                            route_dock_mouse(
-                                &dock_model,
-                                DockMouseRoute {
-                                    pane_id: dock_pane,
-                                    geometry: dock_geometry,
-                                    layout: dock_layout,
-                                    window_x: f32::from(event.position.x),
-                                    window_y: f32::from(event.position.y),
-                                    button: Some(input_mouse_button(event.button)),
-                                    action: InputMouseAction::Press,
-                                    modifiers: event.modifiers,
-                                    click_count: event.click_count,
-                                },
-                                cx,
-                            );
-                        },
-                    ));
+                    let mask_move_model = self.model.clone();
+                    let mask_up_model = self.model.clone();
+                    root = root.child(
+                        input_dock_mask(layout, tokens)
+                            .on_any_mouse_down(move |event, _, cx| {
+                                route_dock_mouse(
+                                    &dock_model,
+                                    DockMouseRoute {
+                                        pane_id: dock_pane,
+                                        geometry: dock_geometry,
+                                        layout: dock_layout,
+                                        window_x: f32::from(event.position.x),
+                                        window_y: f32::from(event.position.y),
+                                        button: Some(input_mouse_button(event.button)),
+                                        action: InputMouseAction::Press,
+                                        modifiers: event.modifiers,
+                                        click_count: event.click_count,
+                                    },
+                                    cx,
+                                );
+                            })
+                            .on_mouse_move(move |event, _, cx| {
+                                route_dock_mouse(
+                                    &mask_move_model,
+                                    DockMouseRoute {
+                                        pane_id: dock_pane,
+                                        geometry: dock_geometry,
+                                        layout: dock_layout,
+                                        window_x: f32::from(event.position.x),
+                                        window_y: f32::from(event.position.y),
+                                        button: event.pressed_button.map(input_mouse_button),
+                                        action: InputMouseAction::Motion,
+                                        modifiers: event.modifiers,
+                                        click_count: 0,
+                                    },
+                                    cx,
+                                );
+                            })
+                            .on_mouse_up(gpui::MouseButton::Left, move |event, _, cx| {
+                                route_dock_mouse(
+                                    &mask_up_model,
+                                    DockMouseRoute {
+                                        pane_id: dock_pane,
+                                        geometry: dock_geometry,
+                                        layout: dock_layout,
+                                        window_x: f32::from(event.position.x),
+                                        window_y: f32::from(event.position.y),
+                                        button: Some(input_mouse_button(event.button)),
+                                        action: InputMouseAction::Release,
+                                        modifiers: event.modifiers,
+                                        click_count: 0,
+                                    },
+                                    cx,
+                                );
+                            }),
+                    );
                     root = root.child(input_dock_separator(layout, tokens));
+                    let overlay_move_model = self.model.clone();
+                    let overlay_move_pane = pane_id;
+                    let overlay_move_geometry = pane_geometry;
+                    let overlay_move_layout = layout;
+                    let overlay_up_model = self.model.clone();
+                    let overlay_up_pane = pane_id;
+                    let overlay_up_geometry = pane_geometry;
+                    let overlay_up_layout = layout;
+                    let overlay_scroll_model = self.model.clone();
+                    let overlay_scroll_pane = pane_id;
+                    let overlay_scroll_geometry = pane_geometry;
+                    let overlay_scroll_left = left;
+                    let overlay_scroll_top = top;
                     let overlay_model = self.model.clone();
                     let overlay_pane = pane_id;
                     let overlay_geometry = pane_geometry;
@@ -654,6 +717,7 @@ impl Render for WindowView {
                                 .clone(),
                             font_size: px(settings.font_size),
                             metrics: pane_geometry.metrics,
+                            terminal_palette,
                             focused: true,
                             focus: Some(self.focus.clone()),
                             ime_tx: Some(ime_tx),
@@ -675,12 +739,94 @@ impl Render for WindowView {
                                 },
                                 cx,
                             );
+                        })
+                        .on_mouse_move(move |event, _, cx| {
+                            route_dock_mouse(
+                                &overlay_move_model,
+                                DockMouseRoute {
+                                    pane_id: overlay_move_pane,
+                                    geometry: overlay_move_geometry,
+                                    layout: overlay_move_layout,
+                                    window_x: f32::from(event.position.x),
+                                    window_y: f32::from(event.position.y),
+                                    button: event.pressed_button.map(input_mouse_button),
+                                    action: InputMouseAction::Motion,
+                                    modifiers: event.modifiers,
+                                    click_count: 0,
+                                },
+                                cx,
+                            );
+                        })
+                        .on_mouse_up(gpui::MouseButton::Left, move |event, _, cx| {
+                            route_dock_mouse(
+                                &overlay_up_model,
+                                DockMouseRoute {
+                                    pane_id: overlay_up_pane,
+                                    geometry: overlay_up_geometry,
+                                    layout: overlay_up_layout,
+                                    window_x: f32::from(event.position.x),
+                                    window_y: f32::from(event.position.y),
+                                    button: Some(input_mouse_button(event.button)),
+                                    action: InputMouseAction::Release,
+                                    modifiers: event.modifiers,
+                                    click_count: 0,
+                                },
+                                cx,
+                            );
+                        })
+                        .on_scroll_wheel(move |event, _, cx| {
+                            route_scroll(
+                                &overlay_scroll_model,
+                                overlay_scroll_pane,
+                                overlay_scroll_geometry,
+                                overlay_scroll_left,
+                                overlay_scroll_top,
+                                event,
+                                cx,
+                            );
                         }),
                     );
                     root = root.child(input_dock_footer(&snap, layout, tokens));
                 }
             }
         }
+
+        // Chat presentation: per-pane preference, effective mode fails closed.
+        // TerminalElement remains mounted underneath; chat is a read-only overlay
+        // clipped to the pane geometry, not a replacement.
+        let chat_info = {
+            let model = self.model.read(cx);
+            let focused_pane_id = model.focused_pane_id();
+            focused_pane_id.and_then(|pid| {
+                model
+                    .active_tab()
+                    .and_then(|tab| tab.panes.get(&pid))
+                    .map(|pane| {
+                        let effective = pane.effective_mode(palette.is_open(), false);
+                        let events = pane.conversation_events(palette.is_open(), false);
+                        (effective, events, pid)
+                    })
+            })
+        };
+        let chat_active = chat_info
+            .as_ref()
+            .is_some_and(|(mode, _, _)| *mode == SurfaceMode::Chat);
+        if chat_active {
+            if let (Some((_, events, _)), Some((left, top, width, height))) =
+                (chat_info, focused_pane_bounds)
+            {
+                root = root.child(chat_overlay(
+                    &events,
+                    terminal_palette,
+                    left,
+                    top,
+                    width,
+                    chat_overlay_height(height, dock_chrome_active),
+                ));
+            }
+        }
+
+        // Chat is toggled only by cmd+shift+j (ToggleChatPresentation).
 
         if palette.is_open() {
             root = root.child(palette_overlay(&palette, terminal_palette));
@@ -1079,6 +1225,75 @@ fn route_drop_paths(
     });
 }
 
+fn chat_overlay_height(pane_height: f32, dock_chrome_active: bool) -> f32 {
+    let reserved = if dock_chrome_active {
+        CHROME_TOTAL
+    } else {
+        0.0
+    };
+    (pane_height - reserved).max(0.0)
+}
+
+fn chat_overlay(
+    events: &[ConversationEvent],
+    terminal_palette: TerminalPalette,
+    pane_left: f32,
+    pane_top: f32,
+    pane_width: f32,
+    pane_height: f32,
+) -> impl gpui::IntoElement {
+    let is_light = terminal_palette.background[0] > 0x80;
+    let panel: gpui::Hsla = if is_light {
+        gpui::rgba(0xfafa_faff).into()
+    } else {
+        gpui::rgba(0x2424_24ff).into()
+    };
+    let foreground: gpui::Hsla = if is_light {
+        gpui::rgb(0x202020).into()
+    } else {
+        gpui::rgb(0xe5e5e5).into()
+    };
+    let border: gpui::Hsla = if is_light {
+        gpui::rgba(0x2020_2033).into()
+    } else {
+        gpui::rgba(0xe5e5_e533).into()
+    };
+    let mut list = gpui::div()
+        .absolute()
+        .left(gpui::px(pane_left + 8.0))
+        .top(gpui::px(pane_top + 8.0))
+        .w(gpui::px((pane_width - 16.0).max(0.0)))
+        .h(gpui::px((pane_height - 16.0).max(0.0)))
+        .flex()
+        .flex_col()
+        .gap(gpui::px(6.0))
+        .p(gpui::px(10.0))
+        .rounded(gpui::px(8.0))
+        .border_1()
+        .border_color(border)
+        .bg(panel)
+        .text_color(foreground)
+        .id(gpui::ElementId::Name(gpui::SharedString::from(
+            "chat-overlay",
+        )))
+        .role(gpui::Role::Region);
+    for ev in events {
+        list = list.child(
+            gpui::div()
+                .id(gpui::ElementId::Name(gpui::SharedString::from(format!(
+                    "chat-event-{}",
+                    ev.id
+                ))))
+                .w_full()
+                .p(gpui::px(4.0))
+                .rounded(gpui::px(4.0))
+                .role(gpui::Role::ListItem)
+                .child(ev.text.clone()),
+        );
+    }
+    list
+}
+
 /// The command-palette overlay: a popover listing the current search
 /// results. Navigation is keyboard-driven (`palette_key`), matching the
 /// keyboard-only-operation contract.
@@ -1232,6 +1447,7 @@ fn handle_key_event(
         if let Some(action) = shell_model.keymap_resolver().resolve(&keystroke, "") {
             shell_model.dispatch(action);
             refresh_immediately = true;
+            model_cx.stop_propagation();
             return;
         }
         let action = if event.is_held {
@@ -1629,6 +1845,18 @@ mod tests {
             None
         );
     }
+
+    #[test]
+    fn chat_overlay_reserves_dock_chrome_below_transcript() {
+        let pane_height = 480.0;
+        let reserved = chat_overlay_height(pane_height, true);
+        let unreserved = chat_overlay_height(pane_height, false);
+        assert_eq!(unreserved, pane_height);
+        assert_eq!(reserved, pane_height - CHROME_TOTAL);
+        assert!(reserved + CHROME_TOTAL <= pane_height);
+        assert_eq!(chat_overlay_height(50.0, true), 0.0);
+    }
+
     #[gpui::test]
     fn palette_printable_keys_do_not_leak_to_pty_writer(cx: &mut gpui::TestAppContext) {
         use crate::model::app_model::AppModel;
@@ -1822,6 +2050,150 @@ mod tests {
         assert!(
             !release_bytes.is_empty(),
             "release bytes must be non-empty, got {release_bytes:?}"
+        );
+    }
+
+    #[gpui::test]
+    fn cmd_shift_j_toggles_chat_once_without_pty_leak(cx: &mut gpui::TestAppContext) {
+        use crate::model::app_model::AppModel;
+        use crate::model::pane::PaneSession;
+        use crate::model::presentation::SurfaceMode;
+        use crate::ui::shell::AppShell;
+        use gpui::Keystroke;
+        use std::sync::mpsc::sync_channel;
+
+        let (model, shell, writer_rx, _reader_tx) = cx.update(|cx| {
+            let model = cx.new(|_| AppModel::headless());
+            let window_id = model.read(cx).active_window.expect("active window");
+            let pane_id = model.read(cx).focused_pane_id().expect("focused pane");
+            let size = model.read(cx).windows[&window_id]
+                .active_tab()
+                .expect("active tab")
+                .panes[&pane_id]
+                .last_size;
+            let (reader_tx, reader_rx) = sync_channel::<Vec<u8>>(8);
+            let (writer_tx, writer_rx) = sync_channel::<Vec<u8>>(8);
+            model.update(cx, |model, _| {
+                let pane = model
+                    .windows
+                    .get_mut(&window_id)
+                    .unwrap()
+                    .active_tab_mut()
+                    .unwrap()
+                    .panes
+                    .get_mut(&pane_id)
+                    .unwrap();
+                pane.session = PaneSession::from_receivers_with_writer(
+                    size,
+                    Some(reader_rx),
+                    None,
+                    Some(writer_tx),
+                );
+            });
+            let shell = cx.new(|_| AppShell::new(model.clone()));
+            cx.bind_keys(crate::ui::actions::key_bindings(
+                &crate::keymap::default_keybindings(),
+            ));
+            AppShell::register_actions(&shell, cx);
+            shell.update(cx, |shell, cx| shell.sync_windows(cx));
+            (model, shell, writer_rx, reader_tx)
+        });
+        let _keep_shell = shell;
+
+        let handle = cx.windows().into_iter().next().expect("one window");
+        cx.update_window(handle, |_, window, cx| {
+            window.draw(cx).clear(cx);
+        })
+        .unwrap();
+
+        cx.update(|cx| {
+            model.update(cx, |model, _| {
+                model
+                    .focused_pane_mut()
+                    .expect("pane")
+                    .feed_test_output(b"\x1b]133;A\x07hello")
+                    .expect("feed OSC133");
+            });
+        });
+
+        let (generation_before, preferred_before) = cx.update(|cx| {
+            let model = model.read(cx);
+            let pane = model.focused_pane().expect("pane");
+            (model.generation, pane.preferred_mode)
+        });
+        assert_eq!(
+            preferred_before,
+            SurfaceMode::Terminal,
+            "idle eligible pane stays terminal until shortcut"
+        );
+
+        cx.dispatch_keystroke(handle, Keystroke::parse("cmd-shift-j").unwrap());
+        cx.update_window(handle, |_, window, cx| {
+            window.draw(cx).clear(cx);
+        })
+        .unwrap();
+        assert!(
+            writer_rx.try_recv().is_err(),
+            "cmd-shift-j must not write PTY bytes"
+        );
+        let (generation_after_open, preferred_after_open, effective_after_open) = cx.update(|cx| {
+            let model = model.read(cx);
+            let pane = model.focused_pane().expect("pane");
+            (
+                model.generation,
+                pane.preferred_mode,
+                pane.effective_mode(false, false),
+            )
+        });
+        assert_eq!(
+            preferred_after_open,
+            SurfaceMode::Chat,
+            "first cmd-shift-j must prefer chat"
+        );
+        assert_eq!(
+            effective_after_open,
+            SurfaceMode::Chat,
+            "first cmd-shift-j must toggle chat on"
+        );
+        assert_eq!(
+            generation_after_open,
+            generation_before + 1,
+            "double dispatch would restore Terminal and bump generation by 2"
+        );
+
+        cx.dispatch_keystroke(handle, Keystroke::parse("cmd-shift-j").unwrap());
+        cx.update_window(handle, |_, window, cx| {
+            window.draw(cx).clear(cx);
+        })
+        .unwrap();
+        assert!(
+            writer_rx.try_recv().is_err(),
+            "second cmd-shift-j must not write PTY bytes"
+        );
+        let (generation_after_close, preferred_after_close, effective_after_close) =
+            cx.update(|cx| {
+                let model = model.read(cx);
+                let pane = model.focused_pane().expect("pane");
+                (
+                    model.generation,
+                    pane.preferred_mode,
+                    pane.effective_mode(false, false),
+                )
+            });
+        assert_eq!(
+            preferred_after_close,
+            SurfaceMode::Terminal,
+            "second cmd-shift-j must restore terminal preference"
+        );
+        assert_eq!(
+            effective_after_close,
+            SurfaceMode::Terminal,
+            "second cmd-shift-j must restore terminal"
+        );
+        assert_eq!(
+            generation_after_close,
+            generation_before + 2,
+            "each press must increment generation exactly once"
         );
     }
 }
