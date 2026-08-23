@@ -222,15 +222,21 @@ impl ChangeTracker {
         // A terminal row generation advances when the engine observes a new
         // write cycle. If that cycle produced the same final cell keys (for
         // example, running the same printf twice), the key diff alone cannot
-        // see it. Re-time only drawable glyph cells in that otherwise
-        // identical row; spaces and wide spacers remain untouched, and the
-        // same generation still returns through the fast path above.
+        // see it. Re-time drawable glyph cells and the spacer that carries
+        // the trailing half of a wide glyph. Ordinary spaces remain untouched,
+        // and the same generation still returns through the fast path above.
         if !changed {
             for (x, cell) in cells.iter().take(len).enumerate() {
                 if !cell_paints_glyph(*cell) {
                     continue;
                 }
                 self.stamp_change(base + x, anim_ms, schedule, &mut last);
+                if cell.flags & Cell::WIDE != 0
+                    && x + 1 < len
+                    && cells[x + 1].flags & Cell::WIDE_SPACER != 0
+                {
+                    self.stamp_change(base + x + 1, anim_ms, schedule, &mut last);
+                }
                 changed = true;
             }
         }
