@@ -32,6 +32,7 @@ use mr_crabs_terminal::{
 use parking_lot::Mutex;
 
 use crate::AppCore;
+use super::fetch_animation::FetchDriver;
 
 use super::geometry::SurfaceGeometry;
 use super::pane_sink::{PaneProtocolSink, PaneSinkEvent};
@@ -865,6 +866,8 @@ pub struct PaneModel {
     /// is failed-closed: pump returns this error without consuming more
     /// reader data and never rebuilds a success frame.
     terminal_error: Option<TerminalError>,
+    fetch_driver: Option<FetchDriver>,
+    fetch_gif_path: Option<std::path::PathBuf>,
 }
 fn drain_graphics_responses(
     queue: &mut std::collections::VecDeque<Vec<u8>>,
@@ -919,6 +922,8 @@ impl PaneModel {
             protocol_sink,
             pending_graphics_responses: std::collections::VecDeque::new(),
             terminal_error: None,
+            fetch_driver: None,
+            fetch_gif_path: None,
         }
     }
 
@@ -1023,6 +1028,11 @@ impl PaneModel {
                 }
                 self.search_frame_matches(&mut frame.search_matches);
                 self.frame_hyperlinks(&mut frame.hyperlinks);
+                if let Some(driver) = &self.fetch_driver {
+                    if let Some((row, col, size)) = driver.animation_region() {
+                        frame.animation_region = Some(mr_crabs_terminal::AnimationRegion { row, col, size });
+                    }
+                }
                 self.latest_frame = Some(Arc::new(frame));
             }
             Err(err) => {
@@ -1461,6 +1471,17 @@ impl PaneModel {
             self.core.resize(geometry.grid)?;
             self.invalidate_stale_history_views();
             self.selection = None;
+            if let Some(path) = self.fetch_gif_path.clone() {
+                if let Some(driver) = self.fetch_driver.as_mut() {
+                    driver.on_resize(geometry.grid, &path);
+                } else if !path.as_os_str().is_empty() {
+                    let d = FetchDriver::from_path(&path, geometry.grid);
+                    if d.size().is_some() {
+                        self.fetch_driver = Some(d);
+                    }
+                }
+                self.rebuild_frame();
+            }
         }
 
         if pending {
@@ -1601,6 +1622,16 @@ impl PaneModel {
         // Retain ordering: if graphics responses backpressured, pending stays
         // true and old-front responses will be retried before newer ones.
         stats.pending |= !self.pending_graphics_responses.is_empty();
+        if stats.chunks > 0 && self.fetch_driver.is_some() {
+            if let Some(driver) = self.fetch_driver.as_mut() {
+                if driver.animation_region().is_some() {
+                    driver.invalidate();
+                }
+            }
+        }
+        let fetch_pending = self.needs_fetch_frame();
+        stats.pending |= fetch_pending;
+        if fetch_pending { stats.frames = stats.frames.max(1); }
         if self.lifecycle == PtyLifecycle::Live
             && !stats.pending
             && self.session.output_drained()
@@ -1618,6 +1649,48 @@ impl PaneModel {
 
     /// Refresh the overlay's terminal context from the latest frame, the
     /// engine history, and the pane's scroll state.
+    pub fn set_fetch_gif_path(&mut self, path: Option<std::path::PathBuf>) {
+        self.fetch_gif_path = path.clone();
+        if let Some(p) = path {
+            if p.as_os_str().is_empty() {
+                self.fetch_driver = None;
+                return;
+            }
+            let d = FetchDriver::from_path(&p, self.last_size);
+            if d.size().is_some() {
+                self.fetch_driver = Some(d);
+                self.rebuild_frame();
+            } else {
+                self.fetch_driver = None;
+            }
+        } else {
+            self.fetch_driver = None;
+        }
+    }
+
+    pub fn tick_fetch_animation(&mut self, now_ms: u64) -> bool {
+        let Some(driver) = self.fetch_driver.as_mut() else { return false; };
+        if !driver.needs_frame() { return false; }
+        let Some((size, cells)) = driver.tick(now_ms) else { return false; };
+        let styles = driver.styles().unwrap_or_default();
+        let (row, col) = driver.origin();
+        let hist = self.core.terminal.history_len();
+        if self.core.blit_region(row, col, size, &cells, &styles).is_err() {
+            driver.invalidate();
+            return false;
+        }
+        if self.core.terminal.history_len() != hist {
+            driver.invalidate();
+            return false;
+        }
+        self.rebuild_frame();
+        true
+    }
+
+    pub fn needs_fetch_frame(&self) -> bool {
+        self.fetch_driver.as_ref().is_some_and(|d| d.needs_frame())
+    }
+
     fn refresh_graphics_context(&mut self) {
         let Some(frame) = self.latest_frame.as_ref() else {
             return;

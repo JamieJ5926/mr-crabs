@@ -111,6 +111,9 @@ fn default_startup_fetch() -> bool {
 fn default_startup_fetch_command() -> String {
     mr_crabs_config::DEFAULT_STARTUP_FETCH_COMMAND.to_string()
 }
+fn default_fetch_gif_path() -> String {
+    mr_crabs_config::DEFAULT_FETCH_GIF_PATH.to_string()
+}
 
 /// Typed shell settings. Unknown JSON fields are ignored; every field
 /// defaults to the Ghostty-compatible value shown in the field docs.
@@ -185,6 +188,9 @@ pub struct AppSettings {
     /// POSIX command run on the PTY before the interactive shell starts.
     #[serde(default = "default_startup_fetch_command")]
     pub startup_fetch_command: String,
+    /// Path to a GIF for animated fetch; empty disables animation.
+    #[serde(default = "default_fetch_gif_path")]
+    pub fetch_gif_path: String,
     /// Shell keybindings (keyboard-only operation).
     #[serde(default)]
     pub keybindings: Vec<KeyBindingDef>,
@@ -232,6 +238,7 @@ impl AppSettings {
             allow_osc52_read: effective.allow_osc52_read,
             startup_fetch: effective.startup_fetch,
             startup_fetch_command: effective.startup_fetch_command.clone(),
+            fetch_gif_path: effective.fetch_gif_path.clone(),
             keybindings,
         }
     }
@@ -271,6 +278,7 @@ impl AppSettings {
             allow_osc52_read: self.allow_osc52_read,
             startup_fetch: self.startup_fetch,
             startup_fetch_command: self.startup_fetch_command.clone(),
+            fetch_gif_path: self.fetch_gif_path.clone(),
         }
     }
 
@@ -494,6 +502,7 @@ struct PartialAppSettings {
     allow_osc52_read: Option<bool>,
     startup_fetch: Option<bool>,
     startup_fetch_command: Option<String>,
+    fetch_gif_path: Option<String>,
     keybindings: Option<Vec<KeyBindingDef>>,
 }
 
@@ -523,6 +532,7 @@ impl PartialAppSettings {
             allow_osc52_read: self.allow_osc52_read,
             startup_fetch: self.startup_fetch,
             startup_fetch_command: self.startup_fetch_command,
+            fetch_gif_path: self.fetch_gif_path,
         };
         (overlay, self.keybindings)
     }

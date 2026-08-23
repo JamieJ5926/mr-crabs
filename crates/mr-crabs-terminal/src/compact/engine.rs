@@ -968,6 +968,51 @@ impl CompactEngine {
         self.mark_row(row);
     }
 
+    pub fn blit_region(&mut self, row: u16, col: u16, size: GridSize, cells: &[Cell], styles: &[Style]) -> Result<(), TerminalError> {
+        if self.alt_active {
+            return Err(TerminalError::InvalidRegion);
+        }
+        if size.cols == 0 || size.rows == 0 {
+            return Err(TerminalError::InvalidRegion);
+        }
+        let end_row = row.checked_add(size.rows).ok_or(TerminalError::InvalidRegion)?;
+        let end_col = col.checked_add(size.cols).ok_or(TerminalError::InvalidRegion)?;
+        if end_row > self.size.rows || end_col > self.size.cols {
+            return Err(TerminalError::InvalidRegion);
+        }
+        if cells.len() != usize::from(size.cols) * usize::from(size.rows) {
+            return Err(TerminalError::InvalidRegion);
+        }
+        let mut style_remap: std::collections::HashMap<u16, u16> = std::collections::HashMap::new();
+        for (idx, style) in styles.iter().enumerate() {
+            let old_id = idx as u16;
+            let new_id = self.styles.intern(style.clone());
+            style_remap.insert(old_id, new_id);
+        }
+        let rows = self.size.rows;
+        let cols = self.size.cols;
+        let start_row = row;
+        for r in 0..size.rows {
+            let dst_row = start_row + r;
+            let row_cells = &cells[usize::from(r) * usize::from(size.cols)..usize::from(r + 1) * usize::from(size.cols)];
+            let screen_row = &mut self.primary.active[usize::from(dst_row)];
+            let all = screen_row.cells_mut();
+            for c in 0..size.cols {
+                let dst_col = col + c;
+                let src = row_cells[usize::from(c)];
+                let mapped_style = style_remap.get(&src.style).copied().unwrap_or(src.style);
+                let mut cell = src;
+                cell.style = mapped_style;
+                all[usize::from(dst_col)] = cell;
+            }
+            screen_row.occupancy = cols;
+            screen_row.first_occupied = 0;
+            screen_row.generation = screen_row.generation.wrapping_add(1);
+            self.mark_row(dst_row);
+        }
+        Ok(())
+    }
+
     fn last_col(&self) -> u16 {
         self.size.cols.saturating_sub(1)
     }

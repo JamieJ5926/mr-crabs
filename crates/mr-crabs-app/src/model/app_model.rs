@@ -386,6 +386,9 @@ impl AppModel {
         if settings.startup_fetch && !settings.startup_fetch_command.is_empty() {
             pane.set_startup_command(Some(settings.startup_fetch_command.clone()));
         }
+        if !settings.fetch_gif_path.is_empty() {
+            pane.set_fetch_gif_path(Some(std::path::PathBuf::from(settings.fetch_gif_path.clone())));
+        }
         let pane_id = pane.id;
         let mut window = WindowModel::new(window_id, tab_id, pane_id, size).ok()?;
         window
@@ -411,6 +414,9 @@ impl AppModel {
         let settings = self.settings.current();
         if settings.startup_fetch && !settings.startup_fetch_command.is_empty() {
             pane.set_startup_command(Some(settings.startup_fetch_command.clone()));
+        }
+        if !settings.fetch_gif_path.is_empty() {
+            pane.set_fetch_gif_path(Some(std::path::PathBuf::from(settings.fetch_gif_path.clone())));
         }
         let pane_id = pane.id;
         let mut window = WindowModel::new(window_id, tab_id, pane_id, size).ok()?;
@@ -727,6 +733,7 @@ impl AppModel {
             for tab in window.tabs.values_mut() {
                 for pane in tab.panes.values_mut() {
                     pane.set_startup_command(None);
+                    pane.set_fetch_gif_path(None);
                 }
             }
             window.is_quick_terminal = true;
