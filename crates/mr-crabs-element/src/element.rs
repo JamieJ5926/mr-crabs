@@ -232,6 +232,61 @@ pub(crate) fn trail_stroke_width(radius_px: f64) -> Pixels {
     px((radius_px * 0.5).max(1.0) as f32)
 }
 
+struct VeilSlice {
+    x_px: f64,
+    width_px: f64,
+    alpha: f64,
+}
+
+fn reveal_veil_slices(math: &RevealMath, elapsed_ms: f64) -> [Option<VeilSlice>; 3] {
+    let cell_w = math.cell_width_px();
+    if cell_w <= 0.0 {
+        return [None, None, None];
+    }
+    let boundary_px = math.boundary_fraction(elapsed_ms) * cell_w;
+    let mut out: [Option<VeilSlice>; 3] = [None, None, None];
+    let mut idx = 0;
+    for offset in [0.0, 1.0] {
+        let x = boundary_px + offset;
+        if x >= cell_w {
+            continue;
+        }
+        let w = 1.0_f64.min(cell_w - x);
+        if w <= 0.0 {
+            continue;
+        }
+        let sample = x + w * 0.5;
+        let alpha = math.hidden_fraction_at(elapsed_ms, sample);
+        if alpha <= 0.0 {
+            continue;
+        }
+        if idx < 3 {
+            out[idx] = Some(VeilSlice {
+                x_px: x,
+                width_px: w,
+                alpha,
+            });
+            idx += 1;
+        }
+    }
+    let x = boundary_px + 2.0;
+    if x < cell_w && idx < 3 {
+        let w = cell_w - x;
+        if w > 0.0 {
+            let sample = x + w * 0.5;
+            let alpha = math.hidden_fraction_at(elapsed_ms, sample);
+            if alpha > 0.0 {
+                out[idx] = Some(VeilSlice {
+                    x_px: x,
+                    width_px: w,
+                    alpha,
+                });
+            }
+        }
+    }
+    out
+}
+
 impl TerminalElement {
     /// Create an element owning `frame`.
     pub fn new(frame: FrameDelta, metrics: CellMetrics) -> Self {
@@ -673,6 +728,11 @@ impl TerminalElement {
             let cw = px(self.metrics.width);
             let ch = px(self.metrics.height);
             for pending in &fx.pending {
+                let mut pending_bg = bg;
+                pending_bg.a *= config.text_animation_intensity as f32;
+                if pending_bg.a <= 0.0 {
+                    continue;
+                }
                 let rect = gpui::Bounds {
                     origin: point(
                         origin.x + px(f32::from(pending.col) * self.metrics.width),
@@ -680,29 +740,28 @@ impl TerminalElement {
                     ),
                     size: size(cw, ch),
                 };
-                window.paint_quad(fill(rect, bg));
+                window.paint_quad(fill(rect, pending_bg));
             }
             for reveal in &fx.revealing {
-                let hidden = reveal.hidden_fraction_at(&math, cell.width);
-                if hidden <= 0.0 {
-                    continue;
+                for slice in reveal_veil_slices(&math, reveal.elapsed_ms) {
+                    let Some(slice) = slice else {
+                        continue;
+                    };
+                    let mut color = bg;
+                    color.a *= slice.alpha as f32;
+                    if color.a <= 0.0 {
+                        continue;
+                    }
+                    let rect = gpui::Bounds {
+                        origin: point(
+                            origin.x + px(f32::from(reveal.pos.col) * self.metrics.width)
+                                + px(slice.x_px as f32),
+                            origin.y + px(f32::from(reveal.pos.row) * self.metrics.height),
+                        ),
+                        size: size(px(slice.width_px as f32), ch),
+                    };
+                    window.paint_quad(fill(rect, color));
                 }
-                let frac = reveal.boundary_fraction(&math) as f32;
-                let shown = cw * frac;
-                let remain = cw - shown;
-                if remain <= px(0.0) {
-                    continue;
-                }
-                let mut color = bg;
-                color.a = hidden as f32;
-                let rect = gpui::Bounds {
-                    origin: point(
-                        origin.x + px(f32::from(reveal.pos.col) * self.metrics.width) + shown,
-                        origin.y + px(f32::from(reveal.pos.row) * self.metrics.height),
-                    ),
-                    size: size(remain, ch),
-                };
-                window.paint_quad(fill(rect, color));
             }
         }
         if fx.trail.active && fx.trail.alpha > 0.0 {
