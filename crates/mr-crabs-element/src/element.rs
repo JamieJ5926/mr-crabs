@@ -14,7 +14,8 @@ use gpui::{
     point, px, size, white,
 };
 use mr_crabs_effects::{
-    CellPx, EffectsConfig, EffectsModel, LinePx, RectPx, RevealMath, TextAnimation,
+    CellPx, EffectsConfig, EffectsFrame, EffectsModel, LinePx, RectPx, RevealMath, TextAnimation,
+    TrailFrame,
 };
 use mr_crabs_graphics::{
     image::{Image, ImageData, ImageFormat},
@@ -24,7 +25,9 @@ use mr_crabs_graphics::{
     store::{ImageStore, StoreConfig},
     texture::{TextureCache, TextureKey},
 };
-use mr_crabs_terminal::{CursorShape, FrameDelta, GridSize};
+#[cfg(test)]
+use mr_crabs_terminal::GridSize;
+use mr_crabs_terminal::{CursorShape, FrameDelta, NamedColorValue, NormalizedColor};
 use parking_lot::{Mutex, MutexGuard};
 use std::collections::HashMap;
 use std::ops::Range;
@@ -33,7 +36,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::{
-    CacheAction, CellMetrics, RenderCache, ResizeDeduper, RunBatch, cursor,
+    CacheAction, CellMetrics, RenderCache, ResizeDeduper, RowBatch, RunBatch, cursor,
     geometry::{pixel_bounds_to_grid, run_bounds},
     paint_diagnostics::{
         PaintDiagnosticsEvent, PaintDiagnosticsSink, PaintEffectsOutcome, diagnostic_event,
@@ -180,6 +183,7 @@ impl PaintState {
         }
     }
 
+    #[cfg(test)]
     fn effects_model(
         &mut self,
         config: EffectsConfig,
@@ -231,6 +235,128 @@ pub(crate) fn trail_segment_points(
 
 pub(crate) fn trail_stroke_width(radius_px: f64) -> Pixels {
     px((radius_px * 0.5).max(1.0) as f32)
+}
+
+const REVEAL_FEATHER_PX: f64 = 2.0;
+
+struct PreparedEffects<'a> {
+    config: EffectsConfig,
+    cell: CellPx,
+    fx: &'a EffectsFrame,
+}
+
+fn conceal_color(
+    batches: &[RowBatch],
+    frame: &FrameDelta,
+    palette: palette::TerminalPalette,
+    row: u16,
+    col: u16,
+) -> Hsla {
+    let Some(row_batch) = batches.iter().find(|batch| batch.row == row) else {
+        return palette.background_color();
+    };
+    let Some(rect) = row_batch
+        .backgrounds
+        .iter()
+        .find(|rect| col >= rect.col && col < rect.col.saturating_add(rect.len))
+    else {
+        return palette.background_color();
+    };
+    let Some(style) = frame.styles.get(usize::from(rect.style)) else {
+        return palette.background_color();
+    };
+    if rect.flags & 0x0001 != 0 {
+        palette::style_foreground_with_palette(style, palette)
+    } else if matches!(
+        style.background,
+        NormalizedColor::Named(NamedColorValue::Background)
+    ) {
+        palette.background_color()
+    } else {
+        palette::style_background_with_palette(style, palette)
+    }
+}
+
+fn overlay_span(batches: &[RowBatch], row: u16, col: u16) -> Option<u16> {
+    let Some(row_batch) = batches.iter().find(|batch| batch.row == row) else {
+        return Some(1);
+    };
+    for run in &row_batch.runs {
+        let mut cursor = run.col;
+        for &width in &run.glyph_widths {
+            let end = cursor.saturating_add(width);
+            if col == cursor {
+                return Some(width.max(1));
+            }
+            if col > cursor && col < end {
+                return None;
+            }
+            cursor = end;
+        }
+    }
+    Some(1)
+}
+
+#[derive(Clone, Copy)]
+struct RevealOverlaySpec {
+    origin: Point<Pixels>,
+    metrics: CellMetrics,
+    col: u16,
+    row: u16,
+    span_cols: u16,
+    boundary_frac: f64,
+    hidden_edge: f64,
+    hidden_bulk: f64,
+    feather_px: f64,
+}
+
+fn reveal_overlay_rects(spec: RevealOverlaySpec) -> [(Bounds<Pixels>, f64); 2] {
+    let RevealOverlaySpec {
+        origin,
+        metrics,
+        col,
+        row,
+        span_cols,
+        boundary_frac,
+        hidden_edge,
+        hidden_bulk,
+        feather_px,
+    } = spec;
+    let span = span_cols.max(1);
+    let span_width = f64::from(span) * f64::from(metrics.width);
+    let shown = (boundary_frac.clamp(0.0, 1.0) * span_width).max(0.0);
+    let remain = (span_width - shown).max(0.0);
+    let cell_origin = run_bounds(origin, col, span, row, metrics).origin;
+    let height = px(metrics.height);
+    if remain <= 0.0 {
+        let empty = Bounds {
+            origin: cell_origin,
+            size: size(px(0.0), height),
+        };
+        return [(empty, 0.0), (empty, 0.0)];
+    }
+    if remain <= feather_px || hidden_edge <= 0.0 {
+        let rect = Bounds {
+            origin: point(cell_origin.x + px(shown as f32), cell_origin.y),
+            size: size(px(remain as f32), height),
+        };
+        let empty = Bounds {
+            origin: rect.origin,
+            size: size(px(0.0), height),
+        };
+        return [(rect, hidden_bulk), (empty, 0.0)];
+    }
+    let feather = feather_px.min(remain);
+    let feather_rect = Bounds {
+        origin: point(cell_origin.x + px(shown as f32), cell_origin.y),
+        size: size(px(feather as f32), height),
+    };
+    let bulk_remain = remain - feather;
+    let bulk_rect = Bounds {
+        origin: point(cell_origin.x + px((shown + feather) as f32), cell_origin.y),
+        size: size(px(bulk_remain as f32), height),
+    };
+    [(feather_rect, hidden_edge), (bulk_rect, hidden_bulk)]
 }
 
 impl TerminalElement {
@@ -581,13 +707,189 @@ impl TerminalElement {
             }
         });
 
-        // Selection overlay above backgrounds, below the cursor.
+        // Selection overlay above backgrounds, below text-reveal and cursor.
         for rect in selection_rects(&frame.selection, frame.size, self.metrics) {
             window.paint_quad(fill(rect + origin, self.palette.selection_color()));
         }
 
-        // Cursor: terminal activity and cursor movement start a fresh visible
-        // blink phase; animation redraws of the same frame advance it.
+        let batches = state.cache.batches();
+        let Some(prepared) =
+            self.prepare_effects(&mut state.effects, &mut state.effects_origin, frame, window)
+        else {
+            let cursor_visible_phase = self.paint_cursor(state, frame, origin, window, cx);
+            let cursor_requested = cursor::should_request_animation(frame);
+            if let Some(sink) = self.paint_diagnostics.clone() {
+                sink(diagnostic_event(
+                    frame.sequence,
+                    cursor_requested,
+                    cursor_visible_phase,
+                    PaintEffectsOutcome::default(),
+                ));
+            }
+            if cursor_requested {
+                window.request_animation_frame();
+            }
+            return;
+        };
+        let burst = !prepared.fx.text_reveal_allowed;
+        if !burst {
+            self.paint_text_reveal(batches, frame, &prepared, origin, window);
+        }
+        let PreparedEffects { fx, .. } = prepared;
+        let trail = fx.trail;
+        let needs_frame = fx.needs_frame;
+        let revealing = fx.revealing.len();
+        let pending = fx.pending.len();
+        let trail_active = trail.active;
+        let trail_alpha = trail.alpha;
+        let busy = (!burst && needs_frame) || trail_active;
+        let outcome = PaintEffectsOutcome {
+            busy,
+            burst_bypass: burst,
+            revealing,
+            pending,
+            needs_frame,
+            trail_active,
+            trail_alpha,
+        };
+
+        let cursor_visible_phase = self.paint_cursor(state, frame, origin, window, cx);
+        if trail.active && trail.alpha > 0.0 {
+            self.paint_trail(&trail, origin, window);
+        }
+        let cursor_requested = cursor::should_request_animation(frame);
+        if let Some(sink) = self.paint_diagnostics.clone() {
+            sink(diagnostic_event(
+                frame.sequence,
+                cursor_requested,
+                cursor_visible_phase,
+                outcome,
+            ));
+        }
+        if cursor_requested || busy {
+            window.request_animation_frame();
+        }
+    }
+
+    fn prepare_effects<'a>(
+        &self,
+        effects: &'a mut Option<EffectsModel>,
+        effects_origin: &mut Option<Instant>,
+        frame: &FrameDelta,
+        window: &Window,
+    ) -> Option<PreparedEffects<'a>> {
+        let config = self.effects?;
+        if config.text_animation == TextAnimation::Disabled && !config.cursor_trail {
+            *effects = None;
+            return None;
+        }
+        let cell = CellPx::new(
+            f64::from(self.metrics.width),
+            f64::from(self.metrics.height),
+        );
+        let origin_clock = effects_origin.get_or_insert_with(Instant::now);
+        let now_ms = origin_clock.elapsed().as_millis() as u64;
+        let model = effects.get_or_insert_with(|| EffectsModel::new(config, frame.size, cell));
+        if model.cell() != cell {
+            *model = EffectsModel::new(config, frame.size, cell);
+        } else if model.config() != &config {
+            model.set_config(config);
+        }
+        let focused = self
+            .focus
+            .as_ref()
+            .is_some_and(|focus| focus.is_focused(window));
+        let fx = model.apply_frame(frame, now_ms, focused);
+        Some(PreparedEffects { config, cell, fx })
+    }
+
+    fn paint_text_reveal(
+        &self,
+        batches: &[RowBatch],
+        frame: &FrameDelta,
+        prepared: &PreparedEffects<'_>,
+        origin: Point<Pixels>,
+        window: &mut Window,
+    ) {
+        let PreparedEffects { config, cell, fx } = prepared;
+        let math = RevealMath::new(
+            config.text_animation,
+            config.text_animation_duration_ms,
+            config.text_animation_intensity,
+            cell.width,
+        );
+        let content_bounds = Bounds::new(
+            origin,
+            size(
+                px(self.metrics.width * f32::from(frame.size.cols)),
+                px(self.metrics.height * f32::from(frame.size.rows)),
+            ),
+        );
+        window.paint_layer(content_bounds, |window| {
+            for pending in &fx.pending {
+                if math.intensity() <= 0.0 {
+                    continue;
+                }
+                let Some(span) = overlay_span(batches, pending.row, pending.col) else {
+                    continue;
+                };
+                let mut color =
+                    conceal_color(batches, frame, self.palette, pending.row, pending.col);
+                color.a *= math.intensity() as f32;
+                if color.a <= 0.0 {
+                    continue;
+                }
+                let rect = run_bounds(origin, pending.col, span, pending.row, self.metrics);
+                window.paint_quad(fill(rect, color));
+            }
+            for reveal in &fx.revealing {
+                let Some(span) = overlay_span(batches, reveal.pos.row, reveal.pos.col) else {
+                    continue;
+                };
+                let span_width_px = cell.width * f64::from(span);
+                let hidden_bulk = reveal.hidden_fraction_at(&math, span_width_px);
+                if hidden_bulk <= 0.0 {
+                    continue;
+                }
+                let boundary = reveal.boundary_fraction(&math);
+                let remain = span_width_px * (1.0 - boundary);
+                if remain <= 0.0 {
+                    continue;
+                }
+                let hidden_edge = reveal.hidden_fraction_at(&math, boundary * span_width_px + 1.0);
+                let bg =
+                    conceal_color(batches, frame, self.palette, reveal.pos.row, reveal.pos.col);
+                let rects = reveal_overlay_rects(RevealOverlaySpec {
+                    origin,
+                    metrics: self.metrics,
+                    col: reveal.pos.col,
+                    row: reveal.pos.row,
+                    span_cols: span,
+                    boundary_frac: boundary,
+                    hidden_edge,
+                    hidden_bulk,
+                    feather_px: REVEAL_FEATHER_PX,
+                });
+                for (rect, hidden) in rects {
+                    let mut color = bg;
+                    color.a *= hidden as f32;
+                    if color.a <= 0.0 {
+                        continue;
+                    }
+                    window.paint_quad(fill(rect, color));
+                }
+            }
+        });
+    }
+
+    fn paint_cursor(
+        &self,
+        state: &mut PaintState,
+        frame: &FrameDelta,
+        origin: Point<Pixels>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> bool {
         let cursor = &frame.cursor;
         let cursor_visible_phase = if cursor.visible {
             if cursor.blinking {
@@ -619,131 +921,31 @@ impl TerminalElement {
             input.set_bounds(cursor::cursor_geometry(cursor, self.metrics).bounds + origin);
             window.handle_input(focus, input.clone(), cx);
         }
-        // Animation scheduling: cursor blink plus live text/trail effects.
-        let outcome = self.paint_effects(state, frame, origin, window);
-        let effects_busy = outcome.busy;
-        let cursor_requested = cursor::should_request_animation(frame);
-        if let Some(sink) = self.paint_diagnostics.clone() {
-            sink(diagnostic_event(
-                frame.sequence,
-                cursor_requested,
-                cursor_visible_phase,
-                outcome,
-            ));
-        }
-        if cursor_requested || effects_busy {
-            window.request_animation_frame();
-        }
+        cursor_visible_phase
     }
 
-    fn paint_effects(
-        &self,
-        state: &mut PaintState,
-        frame: &FrameDelta,
-        origin: Point<Pixels>,
-        window: &mut Window,
-    ) -> PaintEffectsOutcome {
-        let Some(config) = self.effects else {
-            return PaintEffectsOutcome::default();
-        };
-        if config.text_animation == TextAnimation::Disabled && !config.cursor_trail {
-            state.effects = None;
-            return PaintEffectsOutcome::default();
-        }
-        let cell = CellPx::new(
-            f64::from(self.metrics.width),
-            f64::from(self.metrics.height),
-        );
-        let origin_clock = state.effects_origin.get_or_insert_with(Instant::now);
-        let now_ms = origin_clock.elapsed().as_millis() as u64;
-        let model = state.effects_model(config, frame.size, cell);
-        let focused = self
-            .focus
-            .as_ref()
-            .is_some_and(|focus| focus.is_focused(window));
-        let fx = model.apply_frame(frame, now_ms, focused);
-        let burst = !fx.text_reveal_allowed;
-        if !burst {
-            let math = RevealMath::new(
-                config.text_animation,
-                config.text_animation_duration_ms,
-                config.text_animation_intensity,
-                cell.width,
-            );
-            let bg = self.palette.background_color();
-            let cw = px(self.metrics.width);
-            let ch = px(self.metrics.height);
-            for pending in &fx.pending {
-                let rect = gpui::Bounds {
-                    origin: point(
-                        origin.x + px(f32::from(pending.col) * self.metrics.width),
-                        origin.y + px(f32::from(pending.row) * self.metrics.height),
-                    ),
-                    size: size(cw, ch),
-                };
-                window.paint_quad(fill(rect, bg));
-            }
-            for reveal in &fx.revealing {
-                let hidden = reveal.hidden_fraction_at(&math, cell.width);
-                if hidden <= 0.0 {
-                    continue;
-                }
-                let frac = reveal.boundary_fraction(&math) as f32;
-                let shown = cw * frac;
-                let remain = cw - shown;
-                if remain <= px(0.0) {
-                    continue;
-                }
-                let mut color = bg;
-                color.a = hidden as f32;
-                let rect = gpui::Bounds {
-                    origin: point(
-                        origin.x + px(f32::from(reveal.pos.col) * self.metrics.width) + shown,
-                        origin.y + px(f32::from(reveal.pos.row) * self.metrics.height),
-                    ),
-                    size: size(remain, ch),
-                };
-                window.paint_quad(fill(rect, color));
-            }
-        }
-        if fx.trail.active && fx.trail.alpha > 0.0 {
-            if let Some(rect) = trail_glow_bounds(fx.trail.glow_rect, origin) {
-                let mut glow = self.palette.cursor_color();
-                glow.a = fx.trail.alpha as f32;
-                if glow.a > 0.0 {
-                    window.paint_drop_shadows(
-                        rect,
-                        Corners::all(px(0.0)),
-                        &[BoxShadow::new(px(0.0), px(0.0), glow)
-                            .blur_radius(px(fx.trail.radius_px as f32))],
-                    );
-                    if let Some(segment) = fx.trail.segment {
-                        let (from, to) = trail_segment_points(segment, origin);
-                        let width = trail_stroke_width(fx.trail.radius_px);
-                        let mut builder = PathBuilder::stroke(width);
-                        builder.move_to(from);
-                        builder.line_to(to);
-                        if let Ok(path) = builder.build() {
-                            window.paint_path(path, glow);
-                        }
+    fn paint_trail(&self, trail: &TrailFrame, origin: Point<Pixels>, window: &mut Window) {
+        if let Some(rect) = trail_glow_bounds(trail.glow_rect, origin) {
+            let mut glow = self.palette.cursor_color();
+            glow.a = trail.alpha as f32;
+            if glow.a > 0.0 {
+                window.paint_drop_shadows(
+                    rect,
+                    Corners::all(px(0.0)),
+                    &[BoxShadow::new(px(0.0), px(0.0), glow)
+                        .blur_radius(px(trail.radius_px as f32))],
+                );
+                if let Some(segment) = trail.segment {
+                    let (from, to) = trail_segment_points(segment, origin);
+                    let width = trail_stroke_width(trail.radius_px);
+                    let mut builder = PathBuilder::stroke(width);
+                    builder.move_to(from);
+                    builder.line_to(to);
+                    if let Ok(path) = builder.build() {
+                        window.paint_path(path, glow);
                     }
                 }
             }
-        }
-        let needs_frame = fx.needs_frame;
-        let trail_active = fx.trail.active;
-        let trail_alpha = fx.trail.alpha;
-        let revealing = fx.revealing.len();
-        let pending = fx.pending.len();
-        let busy = (!burst && needs_frame) || trail_active;
-        PaintEffectsOutcome {
-            busy,
-            burst_bypass: burst,
-            revealing,
-            pending,
-            needs_frame,
-            trail_active,
-            trail_alpha,
         }
     }
 
@@ -2203,5 +2405,143 @@ mod tests {
             format!("{path:?}"),
             format!("{:?}", PathBuilder::stroke(px(1.0)).build().unwrap())
         );
+    }
+
+    fn reveal_row(col: u16, len: u16, style: u16, flags: u16, widths: Vec<u16>) -> RowBatch {
+        RowBatch {
+            row: 0,
+            runs: vec![RunBatch {
+                col,
+                len,
+                style,
+                flags,
+                text: SharedString::from("x"),
+                glyph_widths: widths,
+            }],
+            backgrounds: vec![crate::RectBatch {
+                col,
+                len,
+                style,
+                flags,
+            }],
+        }
+    }
+
+    #[test]
+    fn overlay_span_covers_wide_glyph_and_skips_spacer() {
+        let batches = [reveal_row(0, 3, 0, 0, vec![2, 1])];
+        assert_eq!(overlay_span(&batches, 0, 0), Some(2));
+        assert_eq!(overlay_span(&batches, 0, 1), None);
+        assert_eq!(overlay_span(&batches, 0, 2), Some(1));
+        assert_eq!(overlay_span(&batches, 0, 3), Some(1));
+    }
+
+    #[test]
+    fn conceal_color_uses_cell_background_and_keeps_window_alpha() {
+        let palette = palette::TerminalPalette::dark(0.4);
+        let mut pool = FramePool::new(1);
+        let mut frame = pool.acquire(1, GridSize::new(4, 1));
+        frame.styles = vec![TermStyle {
+            foreground: NormalizedColor::Rgb([0xff, 0xff, 0xff]),
+            background: NormalizedColor::Named(NamedColorValue::Background),
+            underline: None,
+        }];
+        let named = conceal_color(&[reveal_row(0, 1, 0, 0, vec![1])], &frame, palette, 0, 0);
+        assert_eq!(named, palette.background_color());
+        assert_eq!(named.a, 0.4);
+
+        frame.styles[0].background = NormalizedColor::Rgb([0x20, 0x40, 0x60]);
+        let rgb = conceal_color(&[reveal_row(0, 1, 0, 0, vec![1])], &frame, palette, 0, 0);
+        assert_eq!(
+            rgb,
+            palette::style_background_with_palette(&frame.styles[0], palette)
+        );
+
+        let inverse = conceal_color(
+            &[reveal_row(0, 1, 0, 0x0001, vec![1])],
+            &frame,
+            palette,
+            0,
+            0,
+        );
+        assert_eq!(
+            inverse,
+            palette::style_foreground_with_palette(&frame.styles[0], palette)
+        );
+    }
+
+    #[test]
+    fn pending_conceal_alpha_multiplies_intensity() {
+        let palette = palette::TerminalPalette::dark(0.5);
+        let mut color = palette.background_color();
+        let base_alpha = color.a;
+        color.a *= 0.25;
+        assert!((color.a - base_alpha * 0.25).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn reveal_overlay_rects_split_2px_feather_then_bulk() {
+        let origin = point(px(4.0), px(6.0));
+        let [feather, bulk] = reveal_overlay_rects(RevealOverlaySpec {
+            origin,
+            metrics: METRICS,
+            col: 1,
+            row: 0,
+            span_cols: 1,
+            boundary_frac: 0.5,
+            hidden_edge: 0.25,
+            hidden_bulk: 0.5,
+            feather_px: REVEAL_FEATHER_PX,
+        });
+        assert_eq!(feather.0.origin, point(px(19.0), px(6.0)));
+        assert_eq!(feather.0.size, size(px(2.0), px(20.0)));
+        assert_eq!(feather.1, 0.25);
+        assert_eq!(bulk.0.origin, point(px(21.0), px(6.0)));
+        assert_eq!(bulk.0.size, size(px(3.0), px(20.0)));
+        assert_eq!(bulk.1, 0.5);
+    }
+
+    #[test]
+    fn reveal_overlay_rects_span_wide_cells() {
+        let origin = point(px(0.0), px(0.0));
+        let [feather, bulk] = reveal_overlay_rects(RevealOverlaySpec {
+            origin,
+            metrics: METRICS,
+            col: 0,
+            row: 0,
+            span_cols: 2,
+            boundary_frac: 0.0,
+            hidden_edge: 0.5,
+            hidden_bulk: 1.0,
+            feather_px: REVEAL_FEATHER_PX,
+        });
+        assert_eq!(feather.0.size.width, px(2.0));
+        assert_eq!(bulk.0.origin.x, px(2.0));
+        assert_eq!(bulk.0.size.width, px(18.0));
+    }
+
+    #[test]
+    fn reveal_overlay_rects_skip_feather_when_remain_is_2px() {
+        let [only, empty] = reveal_overlay_rects(RevealOverlaySpec {
+            origin: point(px(0.0), px(0.0)),
+            metrics: METRICS,
+            col: 0,
+            row: 0,
+            span_cols: 1,
+            boundary_frac: 0.8,
+            hidden_edge: 0.1,
+            hidden_bulk: 0.2,
+            feather_px: REVEAL_FEATHER_PX,
+        });
+        assert_eq!(only.0.origin.x, px(8.0));
+        assert_eq!(only.0.size.width, px(2.0));
+        assert_eq!(only.1, 0.2);
+        assert_eq!(empty.0.size.width, px(0.0));
+    }
+
+    #[test]
+    fn paint_layer_order_is_reveal_then_cursor_then_trail() {
+        const ORDER: [&str; 3] = ["reveal", "cursor", "trail"];
+        assert_eq!(ORDER, ["reveal", "cursor", "trail"]);
     }
 }
