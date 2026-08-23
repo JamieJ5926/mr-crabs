@@ -261,6 +261,7 @@ impl AccessibilitySnapshot {
                                 "No conversation yet",
                             );
                             paths.insert(next_id, NodePath::Root);
+                            next_id += 1;
                             list.children.push(node);
                         }
                         chat.children.push(list);
@@ -546,6 +547,35 @@ fn chat_overlay_appears_when_effective_chat() {
         !snapshot2.root.children.iter().any(|n| n.label == "Chat"),
         "chat should hide after second toggle"
     );
+}
+
+#[test]
+fn empty_chat_placeholder_and_composer_have_unique_ids() {
+    let mut model = crate::model::app_model::AppModel::headless();
+    model
+        .focused_pane_mut()
+        .expect("pane")
+        .feed_test_output(b"\x1b]133;A\x07\x1b]133;B\x07")
+        .expect("feed");
+    assert!(
+        model
+            .dispatch(crate::action::AppAction::ToggleChatPresentation)
+            .performed
+    );
+    let snapshot = model.accessibility_snapshot();
+    let chat = snapshot
+        .root
+        .children
+        .iter()
+        .find(|node| node.label == "Chat")
+        .expect("chat");
+    let placeholder = &chat.children[0].children[0];
+    let composer = chat
+        .children
+        .iter()
+        .find(|node| node.role == AccessibilityRole::TextInput)
+        .expect("composer");
+    assert_ne!(placeholder.id, composer.id);
 }
 
 #[test]

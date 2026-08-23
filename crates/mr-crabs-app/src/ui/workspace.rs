@@ -1468,14 +1468,8 @@ fn handle_key_event(
                     shell_model.backspace_chat(pane_id);
                 } else if event.keystroke.key.eq_ignore_ascii_case("tab") {
                     shell_model.insert_chat_text(pane_id, " ");
-                } else if !event.keystroke.modifiers.control
-                    && !event.keystroke.modifiers.alt
-                    && !event.keystroke.modifiers.platform
-                    && !event.keystroke.modifiers.function
-                    && let Some(text) = printable_text(&event.keystroke)
-                    && text != "\n"
-                {
-                    shell_model.insert_chat_text(pane_id, &text);
+                } else if text_input_owns_keystroke(&event.keystroke) {
+                    return;
                 }
             }
             refresh_immediately = true;
