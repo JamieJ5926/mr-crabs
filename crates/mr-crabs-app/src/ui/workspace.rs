@@ -1450,13 +1450,6 @@ fn handle_key_event(
                 .is_some_and(|pane| pane.effective_mode(false, false) == SurfaceMode::Chat)
         });
         if let Some(pane_id) = chat_pane_id {
-            let keystroke = shell_keystroke(&event.keystroke);
-            if let Some(action) = shell_model.keymap_resolver().resolve(&keystroke, "") {
-                shell_model.dispatch(action);
-                refresh_immediately = true;
-                model_cx.stop_propagation();
-                return;
-            }
             if is_copy {
                 copied_text = shell_model
                     .focused_pane_mut()
@@ -1465,18 +1458,25 @@ fn handle_key_event(
                 if let Some(text) = paste_text.as_deref() {
                     shell_model.insert_chat_text(pane_id, text);
                 }
-            } else if event.keystroke.key.eq_ignore_ascii_case("enter") {
-                shell_model.submit_chat(pane_id);
-            } else if event.keystroke.key.eq_ignore_ascii_case("backspace") {
-                shell_model.backspace_chat(pane_id);
-            } else if !event.keystroke.modifiers.control
-                && !event.keystroke.modifiers.alt
-                && !event.keystroke.modifiers.platform
-                && !event.keystroke.modifiers.function
-                && let Some(text) = printable_text(&event.keystroke)
-                && !matches!(text.as_str(), "\n" | "\t")
-            {
-                shell_model.insert_chat_text(pane_id, &text);
+            } else {
+                let keystroke = shell_keystroke(&event.keystroke);
+                if let Some(action) = shell_model.keymap_resolver().resolve(&keystroke, "") {
+                    shell_model.dispatch(action);
+                } else if event.keystroke.key.eq_ignore_ascii_case("enter") {
+                    shell_model.submit_chat(pane_id);
+                } else if event.keystroke.key.eq_ignore_ascii_case("backspace") {
+                    shell_model.backspace_chat(pane_id);
+                } else if event.keystroke.key.eq_ignore_ascii_case("tab") {
+                    shell_model.insert_chat_text(pane_id, " ");
+                } else if !event.keystroke.modifiers.control
+                    && !event.keystroke.modifiers.alt
+                    && !event.keystroke.modifiers.platform
+                    && !event.keystroke.modifiers.function
+                    && let Some(text) = printable_text(&event.keystroke)
+                    && text != "\n"
+                {
+                    shell_model.insert_chat_text(pane_id, &text);
+                }
             }
             refresh_immediately = true;
             model_cx.stop_propagation();
@@ -2234,6 +2234,7 @@ mod tests {
         );
         cx.dispatch_keystroke(handle, Keystroke::parse("h").unwrap());
         cx.dispatch_keystroke(handle, Keystroke::parse("i").unwrap());
+        cx.dispatch_keystroke(handle, Keystroke::parse("tab").unwrap());
         assert!(
             writer_rx.try_recv().is_err(),
             "chat draft keys must not write PTY bytes"
@@ -2245,13 +2246,13 @@ mod tests {
                 .expect("pane")
                 .chat_draft()
                 .to_owned()),
-            "hi"
+            "hi "
         );
 
         cx.dispatch_keystroke(handle, Keystroke::parse("enter").unwrap());
         assert_eq!(
             writer_rx.try_recv().expect("launch command"),
-            b"'omp' 'hi'\r"
+            b"'omp' 'hi '\r"
         );
         assert!(cx.update(|cx| matches!(
             model.read(cx).focused_pane().expect("pane").chat_state(),
@@ -2289,8 +2290,8 @@ mod tests {
         );
         assert_eq!(
             generation_after_close,
-            generation_before + 5,
-            "open, two draft edits, submit, and close each mutate once"
+            generation_before + 6,
+            "open, three draft edits, submit, and close each mutate once"
         );
     }
 }
