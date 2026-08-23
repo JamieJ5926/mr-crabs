@@ -94,6 +94,7 @@ pub struct CompactEngine {
     damaged_rows: Vec<bool>,
     pending_replies: Vec<String>,
     capture_history: bool,
+    saved_clear_pending: bool,
     recycled_rows: Vec<Arc<[Cell]>>,
     #[cfg(test)]
     next_page_generation: u64,
@@ -147,6 +148,7 @@ impl CompactEngine {
             damaged_rows: vec![true; usize::from(size.rows)],
             pending_replies: Vec::new(),
             capture_history: max_history != 0,
+            saved_clear_pending: false,
             recycled_rows: if max_history == 0 {
                 Vec::new()
             } else {
@@ -254,6 +256,10 @@ impl CompactEngine {
             *flag = false;
         }
         kind
+    }
+
+    pub(crate) fn force_full_damage(&mut self) {
+        self.mark_full();
     }
 
     pub(crate) fn damage_kind(&self) -> DamageKind {
@@ -2023,14 +2029,15 @@ impl Handler for CompactEngine {
                     for row in &mut self.screen_mut().active {
                         row.fill_erased(0, cols, erased);
                     }
+                } else if self.saved_clear_pending {
+                    self.saved_clear_pending = false;
+                    for row in &mut self.primary.active {
+                        row.fill_erased(0, cols, erased);
+                    }
                 } else if !self.capture_history {
-                    // Recycle allocations: clear each active row in place.
                     for row in &mut self.screen_mut().active {
                         row.fill_erased(0, cols, erased);
                     }
-                    // History is already empty when capture is disabled; keep
-                    // the invariant without allocating/scanning a new history
-                    // descriptor per scroll line.
                 } else {
                     let count = self.primary.active.len();
                     for _ in 0..count {
@@ -2047,7 +2054,10 @@ impl Handler for CompactEngine {
                     self.trim_history();
                 }
             }
-            ClearMode::Saved => self.primary.history.clear(),
+            ClearMode::Saved => {
+                self.primary.history.clear();
+                self.saved_clear_pending = true;
+            }
         }
         self.mark_full();
     }
@@ -2082,6 +2092,7 @@ impl Handler for CompactEngine {
         self.cursor_style = None;
         self.primary.reset(self.size);
         self.alternate.reset(self.size);
+        self.saved_clear_pending = false;
         self.scroll_region = 0..self.size.rows;
         self.tabs = TabStops::new(usize::from(self.size.cols));
         self.title_stack.clear();

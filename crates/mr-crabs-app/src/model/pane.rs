@@ -26,8 +26,8 @@ use mr_crabs_pty::{
     CommandBuilder, ExitStatus, OutputWake, PtyConfig, PtyError, PtySession, PtySize, WriteError,
 };
 use mr_crabs_terminal::{
-    Cell, CellWidth, FrameDelta, FrameHyperlink, FramePoint, FrameRange, FrameSearchMatch,
-    GridSize, ScrollbackConfig, SelectionKind, SelectionState, TerminalError,
+    Cell, CellWidth, DamageKind, FrameDelta, FrameHyperlink, FramePoint, FrameRange,
+    FrameSearchMatch, GridSize, ScrollbackConfig, SelectionKind, SelectionState, TerminalError,
 };
 use parking_lot::Mutex;
 
@@ -1025,11 +1025,15 @@ impl PaneModel {
     pub fn rebuild_frame(&mut self) {
         #[cfg(feature = "phase-timing")]
         let _frame_guard = crate::phase::Guard::new("frame_build");
-        // Return uniquely-owned retired allocations before building replacements.
-        if let Some(previous) = self.latest_frame.take() {
-            if let Ok(frame) = Arc::try_unwrap(previous) {
-                self.core.release_frame(frame);
-            }
+        let mut unpublished_full = false;
+        if let Some(previous) = self.latest_frame.take()
+            && let Ok(frame) = Arc::try_unwrap(previous)
+        {
+            unpublished_full = frame.damage == DamageKind::Full;
+            self.core.release_frame(frame);
+        }
+        if unpublished_full {
+            self.core.terminal.force_full_damage();
         }
         let mut frame = self.core.build_frame_delta();
         match project_frame(&mut self.core.terminal, &mut self.viewport, &mut frame) {
@@ -2523,48 +2527,49 @@ mod tests {
 
     #[test]
     fn clear_screen_replaces_retained_terminal_rows() {
-        let mut pane = PaneModel::detached(PaneId::new(1), GridSize::new(12, 4)).expect("pane");
-        let mut cache = mr_crabs_element::RenderCache::new();
-        pane.feed_test_output(
-            b"OLD_ONE\r\nOLD_TWO\r\nOLD_THREE\r\nOLD_FOUR\r\nOLD_FIVE\r\nOLD_SIX",
-        )
-        .expect("pane fixture feed should succeed");
-        cache.apply_frame(&pane.frame().expect("frame before clear"));
+        let sequence = b"\x1b[3J\x1b[H\x1b[2Jprompt> ";
+        for split in 1..sequence.len() {
+            let mut pane = PaneModel::detached(PaneId::new(1), GridSize::new(12, 4)).expect("pane");
+            let mut cache = mr_crabs_element::RenderCache::new();
+            pane.feed_test_output(
+                b"OLD_ONE\r\nOLD_TWO\r\nOLD_THREE\r\nOLD_FOUR\r\nOLD_FIVE\r\nOLD_SIX",
+            )
+            .expect("pane fixture feed should succeed");
+            cache.apply_frame(&pane.frame().expect("frame before clear"));
 
-        pane.feed_test_output(b"\x1b[3J\x1b[H\x1b[2Jprompt> ")
-            .expect("clear sequence should succeed");
-        let clear_frame = pane.frame().expect("frame after clear");
-        cache.apply_frame(&clear_frame);
-        let painted: String = cache
-            .batches()
-            .iter()
-            .flat_map(|batch| batch.runs.iter())
-            .map(|run| run.text.as_str())
-            .collect();
-
-        assert_eq!(
-            pane.core.terminal.history_len(),
-            0,
-            "CSI 3 J must clear scrollback"
-        );
-        assert!(
-            !painted.contains("OLD_ONE"),
-            "first stale row survived clear"
-        );
-        assert!(
-            !painted.contains("OLD_SIX"),
-            "last stale row survived clear"
-        );
-        assert!(
-            painted.contains("prompt>"),
-            "new prompt was not painted: damage={:?}, rows={:?}, painted={painted:?}",
-            clear_frame.damage,
-            clear_frame
-                .rows
+            pane.feed_test_output(&sequence[..split])
+                .expect("first clear chunk should succeed");
+            pane.feed_test_output(&sequence[split..])
+                .expect("second clear chunk should succeed");
+            let clear_frame = pane.frame().expect("frame after clear");
+            cache.apply_frame(&clear_frame);
+            let painted: String = cache
+                .batches()
                 .iter()
-                .map(|row| row.row)
-                .collect::<Vec<_>>()
-        );
+                .flat_map(|batch| batch.runs.iter())
+                .map(|run| run.text.as_str())
+                .collect();
+
+            assert_eq!(
+                pane.core.terminal.history_len(),
+                0,
+                "CSI 3 J must clear scrollback at split {split}"
+            );
+            assert!(
+                !painted.contains("OLD_ONE") && !painted.contains("OLD_SIX"),
+                "stale rows survived clear at split {split}"
+            );
+            assert!(
+                painted.contains("prompt>"),
+                "new prompt was not painted at split {split}: damage={:?}, rows={:?}, painted={painted:?}",
+                clear_frame.damage,
+                clear_frame
+                    .rows
+                    .iter()
+                    .map(|row| row.row)
+                    .collect::<Vec<_>>()
+            );
+        }
     }
 
     #[test]
@@ -2649,7 +2654,7 @@ mod tests {
     }
 
     #[test]
-    fn resize_waits_for_reader_notification_without_frame_polling() {
+    fn resize_preserves_unpublished_full_until_reader_notification() {
         let (mut pane, reader_tx, _writer_rx) = fake_session_pane();
         let geometry = SurfaceGeometry::from_viewport(
             mr_crabs_element::PixelExtent {
@@ -2663,8 +2668,7 @@ mod tests {
         assert_eq!(geometry.grid, GridSize::new(100, 30));
         assert!(pane.resize(geometry).expect("resize"));
 
-        // SIGWINCH output has not arrived, so resize creates no speculative
-        // redraw work.
+        // The reader has not produced output, so pumping creates no new frame.
         assert_eq!(pane.pump(64), DrainStats::default());
 
         reader_tx.send(b"\r\n$ ".to_vec()).expect("feed redraw");
@@ -2674,7 +2678,7 @@ mod tests {
         assert!(!stats.pending);
         assert!(matches!(
             pane.frame().expect("frame after redraw").damage,
-            mr_crabs_terminal::DamageKind::Partial
+            mr_crabs_terminal::DamageKind::Full
         ));
         assert_eq!(pane.pump(64), DrainStats::default());
     }

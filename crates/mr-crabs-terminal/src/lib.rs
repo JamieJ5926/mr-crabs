@@ -727,6 +727,11 @@ impl Terminal {
         self.ingest_scrolled();
         Ok(())
     }
+    /// Force the next frame delta to contain the complete visible grid.
+    pub fn force_full_damage(&mut self) {
+        self.protocol.engine_mut().force_full_damage();
+    }
+
     /// Test-only helper to corrupt one cold page for probe failure-closed proof.
     /// crate-private so style_probe tests can force a decompression failure
     /// without exposing a public stable cold-page mutation API.
