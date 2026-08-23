@@ -25,7 +25,7 @@ pub const DEFAULT_CURSOR_TRAIL_DURATION_MS: u64 = 250;
 pub const DEFAULT_TEXT_ANIMATION: &str = "streaming";
 pub const DEFAULT_TEXT_ANIMATION_DURATION_MS: u64 = 120;
 pub const DEFAULT_TEXT_ANIMATION_INTENSITY: f32 = 1.0;
-pub const DEFAULT_FETCH_GIF_PATH: &str = "";
+pub const DEFAULT_FETCH_GIF_PATH: &str = "fetch/default.gif";
 /// Whether new windows auto-run the startup fetch command.
 pub const DEFAULT_STARTUP_FETCH: bool = true;
 /// POSIX command run on the PTY before the interactive shell starts.

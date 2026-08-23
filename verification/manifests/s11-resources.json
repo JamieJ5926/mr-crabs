@@ -7,14 +7,18 @@
     "build_zig_zon_hash": "N-V-__8AAPpcBAD4_75xLBbLiYqdojOwQP74eoWmpL3jPrBl"
   },
   "frozen_tree": {
-    "files": 634,
-    "bytes": 1810388,
-    "sha256": "9d3c2e629030fe0d3f2c2e8f4ec11e643851637bf70492e2083f5bd1a1562365"
+    "files": 636,
+    "bytes": 1846915,
+    "sha256": "da3b479841de1e3c5d5778a23fdccc7995366fb348c1d262bb3cf65ad0ba7354"
   },
-  "excluded_from_tree_hash": ["THIRD_PARTY_NOTICES.txt"],
+  "excluded_from_tree_hash": [
+    "THIRD_PARTY_NOTICES.txt"
+  ],
   "key_files": {
     "LICENSE": "386211873e5b7a02f663ae4d7adf96285999f91608f8f9f31fecfd0f4095e6f1",
     "terminfo/ghostty.terminfo": "e5e9cc4e9fddf6aab3088b40ec42fafe8309ef1ae5d3764d0bbf2fc44105ccf0",
-    "MrCrabs.icns": "3e4c9f9b63a187d85e4ca3851e745b9d11fb5eb3fb29cb73052840d922d2b01e"
+    "MrCrabs.icns": "3e4c9f9b63a187d85e4ca3851e745b9d11fb5eb3fb29cb73052840d922d2b01e",
+    "fetch/default.gif": "d3a4275edd1e04a937847430a064e0832655315d7746d326a56b9ae37d09a5ee",
+    "fetch/LICENSE.brrtfetch": "55251c7c1e1df796156c3ccb857da3f20b80432307afb223cfddcdb38f4ede54"
   }
 }
