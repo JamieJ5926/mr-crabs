@@ -31,17 +31,34 @@ fn frame(size: GridSize, sequence: u64, rows: Vec<RowDelta>) -> FrameDelta {
     frame
 }
 
-#[test]
-fn repeated_identical_partial_frame_starts_a_fresh_typewriter_reveal() {
+fn typewriter_model(duration_ms: u64) -> (GridSize, EffectsModel) {
     let size = GridSize::new(4, 1);
-    let config = EffectsConfig::new(TextAnimation::Typewriter, 120, 1.0, false, 0.35, 250, 16);
-    let mut model = EffectsModel::new(config, size, CellPx::new(10.0, 20.0));
-    let contents = [
+    let config = EffectsConfig::new(
+        TextAnimation::Typewriter,
+        duration_ms,
+        1.0,
+        false,
+        0.35,
+        250,
+        16,
+    );
+    let model = EffectsModel::new(config, size, CellPx::new(10.0, 20.0));
+    (size, model)
+}
+
+fn contents() -> [u32; 4] {
+    [
         u32::from('A'),
         u32::from('B'),
         u32::from(' '),
         u32::from(' '),
-    ];
+    ]
+}
+
+#[test]
+fn repeated_identical_partial_frame_starts_a_fresh_typewriter_reveal() {
+    let (size, mut model) = typewriter_model(120);
+    let contents = contents();
 
     let first = frame(size, 1, vec![row(1, &contents)]);
     assert!(model.apply_frame(&first, 1_000, true).needs_frame);
@@ -73,4 +90,81 @@ fn repeated_identical_partial_frame_starts_a_fresh_typewriter_reveal() {
             .apply_frame(&duplicate_generation, 3_000, true)
             .is_idle()
     );
+}
+
+#[test]
+fn five_cold_sequential_identical_executions_each_start_a_reveal() {
+    let (size, mut model) = typewriter_model(600);
+    let contents = contents();
+    let mut sequence = 1;
+
+    for execution in 0..5_u64 {
+        let now_ms = 1_000 + execution * 1_000;
+        let generation = execution + 1;
+        let output = frame(size, sequence, vec![row(generation, &contents)]);
+        let effect = model.apply_frame(&output, now_ms, true);
+
+        assert!(effect.text_reveal_allowed, "execution {execution}");
+        assert!(effect.needs_frame, "execution {execution}");
+        assert!(effect.revealing.iter().any(|reveal| {
+            reveal.pos == CellPos::new(0, 0) && reveal.change_ms == now_ms as f64
+        }));
+        assert!(
+            effect.pending.contains(&CellPos::new(0, 1)),
+            "execution {execution} must retain a pending second glyph"
+        );
+
+        let expiry_ms = model.last_change_ms().unwrap() as u64 + 600;
+        let expired = frame(size, sequence + 1, Vec::new());
+        assert!(
+            model.apply_frame(&expired, expiry_ms, true).is_idle(),
+            "execution {execution} must return to zero idle RAF"
+        );
+        sequence += 2;
+    }
+}
+
+#[test]
+fn third_overlapping_identical_execution_preserves_active_and_pending_reveals() {
+    let (size, mut model) = typewriter_model(600);
+    let contents = contents();
+
+    let first = frame(size, 1, vec![row(1, &contents)]);
+    assert!(model.apply_frame(&first, 1_000, true).needs_frame);
+
+    let second = frame(size, 2, vec![row(2, &contents)]);
+    let second_effect = model.apply_frame(&second, 1_040, true);
+    assert!(second_effect.text_reveal_allowed);
+    assert!(second_effect.needs_frame);
+
+    let third = frame(size, 3, vec![row(3, &contents)]);
+    let third_effect = model.apply_frame(&third, 1_080, true);
+    assert!(third_effect.text_reveal_allowed);
+    assert!(third_effect.needs_frame);
+    assert!(third_effect.revealing.is_empty());
+    assert_eq!(
+        third_effect.pending,
+        vec![
+            CellPos::new(0, 0),
+            CellPos::new(0, 1),
+            CellPos::new(0, 2),
+            CellPos::new(0, 3),
+        ]
+    );
+    assert_eq!(model.last_change_ms(), Some(1_525.0));
+
+    let cascade = frame(size, 4, Vec::new());
+    let cascade_effect = model.apply_frame(&cascade, 1_450, true);
+    assert!(cascade_effect.text_reveal_allowed);
+    assert!(cascade_effect.needs_frame);
+    assert!(
+        cascade_effect
+            .revealing
+            .iter()
+            .any(|reveal| reveal.pos == CellPos::new(0, 0))
+    );
+    assert!(cascade_effect.pending.contains(&CellPos::new(0, 1)));
+
+    let expired = frame(size, 5, Vec::new());
+    assert!(model.apply_frame(&expired, 2_125, true).is_idle());
 }
