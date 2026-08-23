@@ -3087,6 +3087,7 @@ dependencies = [
  "gpui",
  "gpui_platform",
  "image",
+ "libc",
  "mr-crabs-config",
  "mr-crabs-element",
  "mr-crabs-history",

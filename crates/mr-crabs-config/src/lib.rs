@@ -29,7 +29,7 @@ pub const DEFAULT_FETCH_GIF_PATH: &str = "";
 /// Whether new windows auto-run the startup fetch command.
 pub const DEFAULT_STARTUP_FETCH: bool = true;
 /// POSIX command run on the PTY before the interactive shell starts.
-pub const DEFAULT_STARTUP_FETCH_COMMAND: &str = "rustfetch";
+pub const DEFAULT_STARTUP_FETCH_COMMAND: &str = "\"$MR_CRABS_BIN\" +animated-fetch";
 
 pub const TERM_GHOSTTY: &str = "xterm-ghostty";
 pub const TERM_FALLBACK: &str = "xterm-256color";
@@ -1015,7 +1015,10 @@ mod tests {
     fn startup_fetch_round_trips_and_empty_command_disables() {
         let defaults = EffectiveConfig::defaults();
         assert!(defaults.startup_fetch);
-        assert_eq!(defaults.startup_fetch_command, "rustfetch");
+        assert_eq!(
+            defaults.startup_fetch_command,
+            DEFAULT_STARTUP_FETCH_COMMAND
+        );
 
         let mut overlay = ConfigOverlay::default();
         overlay

@@ -21,6 +21,7 @@ use gpui::{App, AppContext as _, QuitMode};
 use gpui_platform::application;
 
 use mr_crabs_app::action::AppAction;
+use mr_crabs_app::animated_fetch;
 use mr_crabs_app::model::app_model::AppModel;
 use mr_crabs_app::settings::{CliOverrides, SettingsError, SettingsStore, load_effective_from_cli};
 use mr_crabs_app::ui::{self, AppShell};
@@ -116,6 +117,9 @@ fn startup_settings(args: &[String]) -> Result<SettingsStore, SettingsError> {
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if animated_fetch::should_run_animated_fetch(&args) {
+        animated_fetch::run_animated_fetch_and_exit();
+    }
     match cli_output(&args) {
         Ok(Some(output)) => {
             println!("{output}");
@@ -185,7 +189,10 @@ mod tests {
         assert!(config.contains("text-animation-duration = 120ms"));
         assert!(config.contains("text-animation-intensity = 1"));
         assert!(config.contains("startup-fetch = true"));
-        assert!(config.contains("startup-fetch-command = rustfetch"));
+        assert!(config.contains(&format!(
+            "startup-fetch-command = {}",
+            mr_crabs_config::DEFAULT_STARTUP_FETCH_COMMAND
+        )));
     }
 
     #[test]
