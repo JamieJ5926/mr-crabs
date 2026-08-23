@@ -1453,7 +1453,7 @@ mod tests {
             .expect("normal pane");
         assert_eq!(
             original_pane.pending_startup_command(),
-            Some("rustfetch"),
+            Some(mr_crabs_config::DEFAULT_STARTUP_FETCH_COMMAND),
             "normal terminals keep the default startup fetch"
         );
 

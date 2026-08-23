@@ -213,10 +213,17 @@ impl PaneSession {
     /// so the fragment runs before the interactive shell on the same PTY.
     /// `cwd`/`env`/`TERM`/`COLORTERM` apply identically in both cases.
     pub fn spawn_with_output_wake(
-        config: PtySpawnConfig,
+        mut config: PtySpawnConfig,
         cell_px: (u16, u16),
         output_wake: Option<OutputWake>,
     ) -> Result<Self, PtyError> {
+        if !config.env.contains_key("MR_CRABS_BIN") {
+            if let Ok(exe) = std::env::current_exe() {
+                config
+                    .env
+                    .insert("MR_CRABS_BIN".to_string(), exe.display().to_string());
+            }
+        }
         let resolved_shell = CommandBuilder::discover_shell(config.shell.as_deref());
         let mut command = if config
             .startup_command
