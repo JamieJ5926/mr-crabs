@@ -704,6 +704,51 @@ impl TerminalElement {
                 };
                 window.paint_quad(fill(rect, color));
             }
+            // Baseline Tide: bottom-row background wipe + travelling rule.
+            if let Some(arrival) = fx.scroll_arrival {
+                let duration = config.text_animation_duration_ms as f64;
+                let intensity = config.text_animation_intensity;
+                if intensity > 0.0 && duration > 0.0 && arrival.row < frame.size.rows {
+                    let cover = arrival.covered_fraction(duration);
+                    if cover > 0.0 {
+                        let row = arrival.row;
+                        let cols = frame.size.cols as f32;
+                        let cw = self.metrics.width;
+                        let ch = self.metrics.height;
+                        let row_top = origin.y + px(f32::from(row) * ch);
+                        // Full-width background mask over the top `cover` of the row.
+                        let mask_h = ch * cover as f32;
+                        if mask_h > px(0.0) {
+                            let rect = gpui::Bounds {
+                                origin: point(origin.x, row_top),
+                                size: size(px(cols * cw), mask_h),
+                            };
+                            window.paint_quad(fill(rect, self.palette.background_color()));
+                        }
+                        // Travelling rule: 1/12 cell high, centred at the mask edge, clamped inside row.
+                        let rule_h = (ch / 12.0).max(px(1.0));
+                        let center = row_top + px((ch * cover as f32).max(0.0));
+                        let half = rule_h / 2.0;
+                        let mut y0 = center - half;
+                        let mut y1 = center + half;
+                        let row_bottom = row_top + ch;
+                        if y0 < row_top { y0 = row_top; }
+                        if y1 > row_bottom { y1 = row_bottom; }
+                        let rh = y1 - y0;
+                        if rh > px(0.0) {
+                            let mut rule_color = self.palette.cursor_color();
+                            rule_color.a = (intensity * cover * 0.28) as f32;
+                            if rule_color.a > 0.0 {
+                                let rect = gpui::Bounds {
+                                    origin: point(origin.x, y0),
+                                    size: size(px(cols * cw), rh),
+                                };
+                                window.paint_quad(fill(rect, rule_color));
+                            }
+                        }
+                    }
+                }
+            }
         }
         if fx.trail.active && fx.trail.alpha > 0.0 {
             if let Some(rect) = trail_glow_bounds(fx.trail.glow_rect, origin) {

@@ -22,6 +22,23 @@ use crate::schedule::TypewriterSchedule;
 use crate::trail::{CursorTrail, TrailConfig, TrailFrame, cursor_rect};
 use crate::{EffectsConfig, TextAnimation};
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ScrollArrival {
+    pub row: u16,
+    pub elapsed_ms: f64,
+}
+
+impl ScrollArrival {
+    pub fn covered_fraction(&self, duration_ms: f64) -> f64 {
+        if duration_ms <= 0.0 {
+            return 0.0;
+        }
+        let u = (self.elapsed_ms / duration_ms).clamp(0.0, 1.0);
+        let cover = 1.0 - u;
+        cover * cover * cover * cover
+    }
+}
+
 /// The per-frame payload: the changed cells still animating (or pending),
 /// the trail state, and the scheduling decision. All vectors are retained
 /// and refilled in place across frames.
@@ -39,6 +56,7 @@ pub struct EffectsFrame {
     pub text_reveal_allowed: bool,
     /// True when another animation frame must be scheduled after this one.
     pub needs_frame: bool,
+    pub scroll_arrival: Option<ScrollArrival>,
 }
 
 impl EffectsFrame {
@@ -59,6 +77,7 @@ pub struct EffectsModel {
     last_now_ms: f64,
     last_history_rows: Option<u32>,
     frame: EffectsFrame,
+    scroll_arrival_started_ms: Option<f64>,
 }
 
 impl EffectsModel {
@@ -96,6 +115,7 @@ impl EffectsModel {
             last_now_ms: 0.0,
             last_history_rows: None,
             frame: EffectsFrame::default(),
+            scroll_arrival_started_ms: None,
         }
     }
 
@@ -133,6 +153,8 @@ impl EffectsModel {
             config.cursor_trail_opacity,
             config.cursor_trail_duration_ms,
         ));
+        self.scroll_arrival_started_ms = None;
+        self.frame.scroll_arrival = None;
     }
 
     pub const fn config(&self) -> &EffectsConfig {
@@ -168,6 +190,7 @@ impl EffectsModel {
         out.trail = TrailFrame::default();
         out.needs_frame = false;
         out.text_reveal_allowed = false;
+        out.scroll_arrival = None;
 
         if size_changed {
             self.size = frame.size;
@@ -249,6 +272,29 @@ impl EffectsModel {
                 needs_text = elapsed < 0.0 || elapsed < duration_ms;
             }
             collect_reveals(tracker, self.config.text_animation, duration_ms, now, out);
+            // Baseline Tide: arm only after the proven one-row translate
+            // at live bottom; cancel whenever text reveal is disallowed
+            // or the viewport is not at live bottom (scrollback).
+            let at_live_bottom = frame.viewport.scroll_offset == 0;
+            if !out.text_reveal_allowed || !at_live_bottom {
+                self.scroll_arrival_started_ms = None;
+            } else if translated {
+                self.scroll_arrival_started_ms = Some(now);
+            }
+            if let Some(started) = self.scroll_arrival_started_ms {
+                let elapsed = now - started;
+                if elapsed < 0.0 || elapsed >= duration_ms || self.config.text_animation_intensity == 0.0 {
+                    self.scroll_arrival_started_ms = None;
+                } else {
+                    out.scroll_arrival = Some(ScrollArrival {
+                        row: self.size.rows.saturating_sub(1),
+                        elapsed_ms: elapsed,
+                    });
+                }
+            }
+        } else {
+            // No tracker (text animation disabled) => no tide.
+            self.scroll_arrival_started_ms = None;
         }
 
         out.trail = self.trail.frame(
@@ -257,7 +303,8 @@ impl EffectsModel {
             now,
             focus,
         );
-        out.needs_frame = needs_text || out.trail.active;
+        let arrival_active = out.scroll_arrival.is_some();
+        out.needs_frame = needs_text || out.trail.active || arrival_active;
         out
     }
 
