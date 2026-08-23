@@ -186,7 +186,6 @@ impl EffectsModel {
             let duration_ms = self.config.text_animation_duration_ms as f64;
             let is_full = frame.damage == DamageKind::Full;
             let is_alt = frame.viewport.alternate_screen;
-            let is_large = frame.rows.len() > 16;
             let history_consistent = previous_history_rows.is_some_and(|previous| {
                 frame.viewport.history_rows == previous
                     || previous.checked_add(1) == Some(frame.viewport.history_rows)
@@ -196,25 +195,16 @@ impl EffectsModel {
                 && is_full
                 && history_consistent
                 && tracker.can_translate_up_one(&frame.rows);
-            let process_rows = !is_full || can_translate;
-            let mut translated = false;
-            let mut bottom_only = false;
-            if is_full && can_translate {
+            let bottom_only = is_full && can_translate;
+            if bottom_only {
                 tracker.translate_up_one();
-                translated = true;
-                bottom_only = true;
             }
-            let frame_reveal_eligible =
-                !is_alt && !size_changed && (translated || (!is_full && !is_large));
+            let frame_reveal_eligible = !is_alt && !size_changed;
             out.text_reveal_allowed = frame_reveal_eligible;
 
-            if is_full && !can_translate {
-                if is_alt || size_changed {
-                    tracker.clear_changes();
-                    tracker.adopt_rows(&frame.rows);
-                } else {
-                    tracker.sync_rows_without_stamping(&frame.rows);
-                }
+            if is_full && !can_translate && (is_alt || size_changed) {
+                tracker.clear_changes();
+                tracker.adopt_rows(&frame.rows);
                 self.schedule = TypewriterSchedule::new(
                     if self.config.text_animation == TextAnimation::Typewriter {
                         duration_ms / 8.0
@@ -222,7 +212,16 @@ impl EffectsModel {
                         0.0
                     },
                 );
-            } else if process_rows {
+            } else {
+                if is_full && !can_translate {
+                    self.schedule = TypewriterSchedule::new(
+                        if self.config.text_animation == TextAnimation::Typewriter {
+                            duration_ms / 8.0
+                        } else {
+                            0.0
+                        },
+                    );
+                }
                 if frame_reveal_eligible {
                     self.schedule.begin_build(now, duration_ms);
                     if bottom_only {
