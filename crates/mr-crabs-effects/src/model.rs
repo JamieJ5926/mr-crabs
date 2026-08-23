@@ -198,30 +198,48 @@ impl EffectsModel {
             let process_rows = !is_full || can_translate;
             let mut translated = false;
             let mut bottom_only = false;
-            if is_full {
-                if can_translate {
-                    tracker.translate_up_one();
-                    translated = true;
-                    bottom_only = true;
-                } else {
-                    tracker.adopt_rows(&frame.rows);
-                    self.schedule = TypewriterSchedule::new(
-                        if self.config.text_animation == TextAnimation::Typewriter {
-                            duration_ms / 8.0
-                        } else {
-                            0.0
-                        },
-                    );
-                }
+            if is_full && can_translate {
+                tracker.translate_up_one();
+                translated = true;
+                bottom_only = true;
             }
-            out.text_reveal_allowed =
+            let frame_reveal_eligible =
                 !is_alt && !size_changed && (translated || (!is_full && !is_large));
-            if process_rows {
-                self.schedule.begin_build(now, duration_ms);
-                if bottom_only {
-                    let target = self.size.rows.saturating_sub(1);
-                    for rd in &frame.rows {
-                        if rd.row == target {
+            out.text_reveal_allowed = frame_reveal_eligible;
+
+            if is_full && !can_translate {
+                if is_alt || size_changed {
+                    tracker.clear_changes();
+                    tracker.adopt_rows(&frame.rows);
+                } else {
+                    tracker.sync_rows_without_stamping(&frame.rows);
+                }
+                self.schedule = TypewriterSchedule::new(
+                    if self.config.text_animation == TextAnimation::Typewriter {
+                        duration_ms / 8.0
+                    } else {
+                        0.0
+                    },
+                );
+            } else if process_rows {
+                if frame_reveal_eligible {
+                    self.schedule.begin_build(now, duration_ms);
+                    if bottom_only {
+                        let target = self.size.rows.saturating_sub(1);
+                        for rd in &frame.rows {
+                            if rd.row == target {
+                                tracker.update_row(
+                                    rd.row,
+                                    rd.generation,
+                                    &rd.cells,
+                                    now,
+                                    &mut self.schedule,
+                                );
+                                break;
+                            }
+                        }
+                    } else {
+                        for rd in &frame.rows {
                             tracker.update_row(
                                 rd.row,
                                 rd.generation,
@@ -229,19 +247,13 @@ impl EffectsModel {
                                 now,
                                 &mut self.schedule,
                             );
-                            break;
                         }
                     }
+                } else if is_alt || size_changed {
+                    tracker.clear_changes();
+                    tracker.adopt_rows(&frame.rows);
                 } else {
-                    for rd in &frame.rows {
-                        tracker.update_row(
-                            rd.row,
-                            rd.generation,
-                            &rd.cells,
-                            now,
-                            &mut self.schedule,
-                        );
-                    }
+                    tracker.sync_rows_without_stamping(&frame.rows);
                 }
             }
             if tracker.last_change_ms() != NEVER_MS {
@@ -249,6 +261,17 @@ impl EffectsModel {
                 needs_text = elapsed < 0.0 || elapsed < duration_ms;
             }
             collect_reveals(tracker, self.config.text_animation, duration_ms, now, out);
+            if !out.text_reveal_allowed
+                && !is_alt
+                && !size_changed
+                && (!out.revealing.is_empty() || !out.pending.is_empty())
+            {
+                // The current frame bypassed new reveal stamping, but
+                // unchanged cells from an earlier eligible frame are still
+                // active. Keep painting and scheduling only those retained
+                // timestamps until their bounded reveal window expires.
+                out.text_reveal_allowed = true;
+            }
         }
 
         out.trail = self.trail.frame(
@@ -441,7 +464,7 @@ mod tests {
     }
 
     #[test]
-    fn unchanged_cells_never_restamp() {
+    fn repeated_identical_generation_restamps_only_drawable_glyphs() {
         let size = GridSize::new(4, 1);
         let mut m = model(TextAnimation::Streaming, 4, 1);
         let cursor = CursorState::default();
@@ -450,11 +473,23 @@ mod tests {
         assert_eq!(f.revealing.len(), 4); // fresh tracker stamps all
         assert!(f.revealing.iter().all(|r| r.change_ms == 1000.0));
 
-        // Same content, new generation: no restamp, no re-animation.
+        // A new generation proves a fresh write cycle even when the
+        // final cells are identical. Re-time the drawable glyph only;
+        // spaces retain their previous stamps.
         let rows = vec![row(0, 2, &[65, 32, 32, 32])];
         let f = m.apply_frame(&frame_at(size, 2, rows, cursor), 1100, true);
         assert_eq!(f.revealing.len(), 4);
-        assert!(f.revealing.iter().all(|r| r.change_ms == 1000.0));
+        assert!(
+            f.revealing
+                .iter()
+                .any(|reveal| { reveal.pos == CellPos::new(0, 0) && reveal.change_ms == 1100.0 })
+        );
+        assert!(
+            f.revealing
+                .iter()
+                .filter(|reveal| { reveal.pos != CellPos::new(0, 0) })
+                .all(|reveal| reveal.change_ms == 1000.0)
+        );
     }
 
     #[test]
@@ -695,7 +730,7 @@ mod tests {
     }
 
     #[test]
-    fn resize_reveals_new_cells_and_preserves_prefix() {
+    fn resize_bypasses_reveal_and_adopts_new_snapshot() {
         let mut m = model(TextAnimation::Streaming, 2, 1);
         let cursor = CursorState::default();
         let old = GridSize::new(2, 1);
@@ -704,29 +739,30 @@ mod tests {
         assert_eq!(f.revealing.len(), 2);
         assert!(f.revealing.iter().all(|r| r.change_ms == 1000.0));
 
-        // Resize to 3x2 at t=1500: the stored prefix survives (cells 0,1
-        // keep their keys), new cells are marked changed at the resize
-        // time, and rebuilt rows diff against the preserved snapshot.
+        // A resize changes the cell coordinate space. The model must
+        // discard old timestamps, bypass animation for the resize
+        // frame, and adopt its final cells as the new snapshot.
         let new = GridSize::new(3, 2);
-        let rows = vec![row(0, 2, &[65, 66, 67]), row(1, 1, &[88, 32, 32])];
-        let f = m.apply_frame(&frame_at(new, 2, rows, cursor), 1500, true);
-        assert_eq!(f.revealing.len(), 4); // (0,2) + row 1's three cells
-        assert!(
-            f.revealing
-                .iter()
-                .all(|r| r.change_ms == 1500.0 && r.pos.row == 1 || r.pos == CellPos::new(0, 2))
-        );
-        // Unchanged prefix cells (0,0)/(0,1) were not restamped: after the
-        // 1500 window elapses, a real change at (0,0) restamps only it.
+        let resized_rows = vec![row(0, 2, &[65, 66, 67]), row(1, 1, &[88, 32, 32])];
+        let f = m.apply_frame(&frame_at(new, 2, resized_rows.clone(), cursor), 1500, true);
+        assert!(!f.text_reveal_allowed);
+        assert!(!f.needs_frame);
+        assert!(f.revealing.is_empty());
+        assert!(f.pending.is_empty());
+
+        // Repainting the adopted generations does not restart an
+        // effect, which also proves the resized snapshot was stored.
+        let f = m.apply_frame(&frame_at(new, 3, resized_rows, cursor), 1600, true);
+        assert!(f.is_idle());
+
+        // A subsequent real key change still receives one fresh
+        // timestamp, without reanimating the adopted cells.
         let rows = vec![row(0, 3, &[90, 66, 67])];
-        let f = m.apply_frame(&frame_at(new, 3, rows, cursor), 3000, true);
-        let z = f
-            .revealing
-            .iter()
-            .find(|r| r.pos == CellPos::new(0, 0))
-            .unwrap();
-        assert_eq!(z.change_ms, 3000.0);
-        assert_eq!(f.revealing.len(), 1); // (0,1)/(0,2) unchanged content
+        let f = m.apply_frame(&frame_at(new, 4, rows, cursor), 3000, true);
+        assert_eq!(f.revealing.len(), 1);
+        let changed = &f.revealing[0];
+        assert_eq!(changed.pos, CellPos::new(0, 0));
+        assert_eq!(changed.change_ms, 3000.0);
     }
 
     #[test]
