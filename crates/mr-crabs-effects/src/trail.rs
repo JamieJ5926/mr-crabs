@@ -121,6 +121,25 @@ impl TrailConfig {
     }
 }
 
+const ECHO_COUNT: usize = 3;
+const ECHO_BASE_POSITIONS: [f64; ECHO_COUNT] = [0.15, 0.45, 0.75];
+const ECHO_ALPHA_WEIGHTS: [f64; ECHO_COUNT] = [0.22, 0.45, 0.72];
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct TrailEcho {
+    pub rect: RectPx,
+    pub alpha: f64,
+}
+
+fn lerp_rect(a: RectPx, b: RectPx, t: f64) -> RectPx {
+    RectPx::new(
+        a.x + (b.x - a.x) * t,
+        a.y + (b.y - a.y) * t,
+        a.w + (b.w - a.w) * t,
+        a.h + (b.h - a.h) * t,
+    )
+}
+
 /// One frame of trail state for the renderer.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TrailFrame {
@@ -139,6 +158,8 @@ pub struct TrailFrame {
     /// The segment between the previous and current cursor centers; `None`
     /// until the cursor has moved at least once.
     pub segment: Option<LinePx>,
+    /// Shape-aware echoes collapsing into the live cursor.
+    pub echoes: [TrailEcho; ECHO_COUNT],
     /// The cached gradient descriptor for `radius_px`.
     pub gradient: GradientId,
 }
@@ -152,6 +173,7 @@ impl Default for TrailFrame {
             radius_px: 0.0,
             glow_rect: RectPx::default(),
             segment: None,
+            echoes: [TrailEcho::default(); ECHO_COUNT],
             gradient: GradientId(0),
         }
     }
@@ -334,6 +356,23 @@ impl CursorTrail {
         frame.segment = self
             .previous
             .map(|prev| LinePx::new(prev.center(), current.center()));
+        if let Some(prev) = self.previous {
+            let duration = self.config.duration_ms as f64;
+            let p = if duration > 0.0 {
+                (elapsed / duration).clamp(0.0, 1.0)
+            } else {
+                1.0
+            };
+            let settle = 1.0 - (1.0 - p) * (1.0 - p);
+            for i in 0..ECHO_COUNT {
+                let u = ECHO_BASE_POSITIONS[i] + (1.0 - ECHO_BASE_POSITIONS[i]) * settle;
+                let rect = lerp_rect(prev, current, u);
+                frame.echoes[i] = TrailEcho {
+                    rect,
+                    alpha: frame.alpha * ECHO_ALPHA_WEIGHTS[i],
+                };
+            }
+        }
         frame.gradient = self.gradient.get(frame.radius_px);
         frame
     }
