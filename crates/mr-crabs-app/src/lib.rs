@@ -46,6 +46,7 @@ pub mod keymap;
 pub mod menu;
 pub mod model;
 pub mod palette;
+pub mod phase;
 pub mod platform;
 pub mod quick_terminal;
 pub mod restore;
@@ -53,7 +54,6 @@ pub mod secure_input;
 pub mod settings;
 pub mod ui;
 pub mod updates;
-
 pub use action::AppAction;
 pub use diagnostics::{
     DiagnosticEvent, DiagnosticFrameEvent, DiagnosticPaintEvent, DiagnosticPumpEvent,
@@ -100,8 +100,8 @@ impl AppCore {
         })
     }
 
-    pub fn feed_terminal_output(&mut self, bytes: &[u8]) {
-        self.terminal.feed(bytes);
+    pub fn feed_terminal_output(&mut self, bytes: &[u8]) -> Result<(), TerminalError> {
+        self.terminal.feed(bytes)
     }
 
     /// Install the pane-owned protocol sink before the first feed.
@@ -117,6 +117,11 @@ impl AppCore {
     /// Current OSC 7 working-directory URL.
     pub fn pwd(&self) -> Option<&str> {
         self.terminal.pwd()
+    }
+
+    /// Live OSC 133 semantic-prompt state. Additive; terminal stays private.
+    pub fn semantic_state(&self) -> &mr_crabs_protocols::shell::SemanticPromptState {
+        self.terminal.semantic_state()
     }
     /// Live terminal modes used by keyboard/mouse input.
     pub fn modes(&self) -> Vec<TerminalMode> {
@@ -178,6 +183,12 @@ impl AppCore {
         self.terminal.build_frame_delta(&mut self.frame_pool)
     }
 
+    /// Return an owned frame to the pooled allocation. Only pane retirement
+    /// uses this: the caller must hand back a uniquely-owned frame.
+    pub fn release_frame(&mut self, frame: FrameDelta) {
+        self.frame_pool.release(frame);
+    }
+
     /// Build a `TerminalElement` for the current frame. Consumes the delta
     /// without locking the terminal; the element owns the frame it paints.
     pub fn terminal_element(&mut self, metrics: CellMetrics) -> TerminalElement {
@@ -200,7 +211,7 @@ mod tests {
     #[test]
     fn app_core_feed_produces_pooled_full_frame() {
         let mut core = AppCore::new(GridSize::new(80, 24)).expect("core creation");
-        core.feed_terminal_output(b"hi");
+        core.feed_terminal_output(b"hi").expect("feed");
         // The engine starts fully damaged: the first build covers every row
         // and comes back through the app-owned pool.
         let frame = core.build_frame_delta();
@@ -212,7 +223,7 @@ mod tests {
     #[test]
     fn app_core_terminal_element_consumes_owned_delta() {
         let mut core = AppCore::new(GridSize::new(80, 24)).expect("core creation");
-        core.feed_terminal_output(b"x");
+        core.feed_terminal_output(b"x").expect("feed");
         let metrics = CellMetrics::new(7.0, 14.0).expect("metrics");
         // Constructing the element takes the delta out of the app/terminal
         // path; nothing locks the engine afterwards.

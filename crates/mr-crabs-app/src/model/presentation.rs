@@ -1,29 +1,19 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SurfaceMode {
+    #[default]
     Terminal,
     Chat,
 }
 
-impl Default for SurfaceMode {
-    fn default() -> Self {
-        Self::Terminal
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ConversationSource {
     TuiRpc,
+    #[default]
     PtyTranscript,
-}
-
-impl Default for ConversationSource {
-    fn default() -> Self {
-        Self::PtyTranscript
-    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
@@ -107,18 +97,29 @@ mod tests {
 
     #[test]
     fn conversation_source_default_is_pty() {
-        assert_eq!(ConversationSource::default(), ConversationSource::PtyTranscript);
+        assert_eq!(
+            ConversationSource::default(),
+            ConversationSource::PtyTranscript
+        );
     }
 
     #[test]
     fn tui_rpc_variant_exists_but_unused() {
         let _ = ConversationSource::TuiRpc;
-        assert_ne!(ConversationSource::TuiRpc, ConversationSource::PtyTranscript);
+        assert_ne!(
+            ConversationSource::TuiRpc,
+            ConversationSource::PtyTranscript
+        );
     }
 
     #[test]
     fn conversation_event_is_immutable_clone() {
-        let a = ConversationEvent::new(1, ConversationKind::Input, "hi".into(), ConversationSource::PtyTranscript);
+        let a = ConversationEvent::new(
+            1,
+            ConversationKind::Input,
+            "hi".into(),
+            ConversationSource::PtyTranscript,
+        );
         let b = a.clone();
         assert_eq!(a, b);
         assert_eq!(a.id, 1);
@@ -126,8 +127,14 @@ mod tests {
 
     #[test]
     fn effective_mode_fail_closed() {
-        assert_eq!(effective_mode(SurfaceMode::Chat, false), SurfaceMode::Terminal);
-        assert_eq!(effective_mode(SurfaceMode::Terminal, false), SurfaceMode::Terminal);
+        assert_eq!(
+            effective_mode(SurfaceMode::Chat, false),
+            SurfaceMode::Terminal
+        );
+        assert_eq!(
+            effective_mode(SurfaceMode::Terminal, false),
+            SurfaceMode::Terminal
+        );
         assert_eq!(effective_mode(SurfaceMode::Chat, true), SurfaceMode::Chat);
     }
 
@@ -143,9 +150,17 @@ mod tests {
 
     #[test]
     fn projection_empty_when_not_eligible_or_terminal() {
-        let ev = vec![ConversationEvent::new(1, ConversationKind::Input, "x".into(), ConversationSource::PtyTranscript)];
+        let ev = vec![ConversationEvent::new(
+            1,
+            ConversationKind::Input,
+            "x".into(),
+            ConversationSource::PtyTranscript,
+        )];
         assert!(project_conversation_events(&ev, false, SurfaceMode::Chat).is_empty());
         assert!(project_conversation_events(&ev, true, SurfaceMode::Terminal).is_empty());
-        assert_eq!(project_conversation_events(&ev, true, SurfaceMode::Chat), ev);
+        assert_eq!(
+            project_conversation_events(&ev, true, SurfaceMode::Chat),
+            ev
+        );
     }
 }

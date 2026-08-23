@@ -19,6 +19,7 @@ mod element;
 mod geometry;
 mod paint_diagnostics;
 mod palette;
+pub mod phase;
 mod selection;
 
 pub use cache::{CacheAction, Capacities, RectBatch, RenderCache, RowBatch, RunBatch};

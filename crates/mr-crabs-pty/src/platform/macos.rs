@@ -7,8 +7,9 @@
 //! - applying the initial window size with [`rustix::termios::tcsetwinsize`],
 //! - `fork`/`exec` of the child as a session and process-group leader whose
 //!   controlling terminal is the PTY slave (via `setsid` + `TIOCSCTTY`),
-//! - nonblocking reaping ([`waitpid_nonblock`]) and process-group signalling
-//!   ([`kill_pgid`]) helpers used by the session lifecycle.
+//! - reaping helpers ([`waitpid_nonblock`] for nonblocking polls and
+//!   [`waitpid_block`] for the blocking exit waiter) and process-group
+//!   signalling ([`kill_pgid`]) helpers used by the session lifecycle.
 //!
 //! # Fork-safety
 //!
@@ -433,6 +434,41 @@ pub(crate) fn waitpid_nonblock(pid: pid_t) -> Option<ExitStatus> {
         }
         // ECHILD (already reaped / no such child) or any other error: no
         // status is available right now.
+        return None;
+    }
+}
+
+/// Blocking reaping helper: waits in the kernel until `pid` exits.
+///
+/// Returns `Some(ExitStatus)` once the child has been reaped, or `None`
+/// when the child is not a child of this process (`ECHILD`, e.g. already
+/// reaped by a racing `waitpid_nonblock`). `EINTR` is retried in a loop;
+/// any other error is treated as `ECHILD`-equivalent (`None`), so callers
+/// can fall back to the shared `OnceLock` status cached by the winner.
+pub(crate) fn waitpid_block(pid: pid_t) -> Option<ExitStatus> {
+    let mut raw_status: c_int = 0;
+    loop {
+        // SAFETY: `pid` names a child of this process when called from the
+        // exit waiter (its caller pre-checked the `OnceLock` fake guard), and
+        // `raw_status` points to valid writable memory. `flags == 0` blocks
+        // until the child changes state, so no polling is required. callers
+        // relying on `OnceLock` handle the `ECHILD` race below.
+        let ret = unsafe { libc::waitpid(pid, &mut raw_status, 0) };
+        if ret == pid {
+            return Some(exit_status_from_raw(raw_status));
+        }
+        if ret == -1 {
+            let err = io::Error::last_os_error();
+            if err.kind() == io::ErrorKind::Interrupted {
+                // EINTR: the wait was interrupted by a signal; retry.
+                continue;
+            }
+            // ECHILD (already reaped) or any other error: no status from
+            // this call; caller should consult the shared `OnceLock`.
+            return None;
+        }
+        // Any other `ret` is unreachable for `flags == 0` (`0` only with
+        // `WNOHANG`, which we do not pass); treat as no status.
         return None;
     }
 }

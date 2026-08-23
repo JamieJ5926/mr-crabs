@@ -42,7 +42,6 @@ use super::pane::{PaneModel, PtySpawnConfig, SearchApply};
 use super::split::{PaneId, SplitAxis, SplitDirection};
 use super::tab::{ClosePaneOutcome, TabId, TabModel};
 use super::window::{TabCloseOutcome, WindowId, WindowModel, WindowPumpStats};
-
 /// The result of dispatching one action.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ActionResult {
@@ -73,11 +72,12 @@ pub struct AppPumpStats {
     pub bytes: usize,
     pub frames: usize,
     pub pending: bool,
+    pub error: Option<mr_crabs_terminal::TerminalError>,
 }
 
 impl AppPumpStats {
     pub fn changed(self) -> bool {
-        self.chunks > 0
+        self.chunks > 0 || self.frames > 0
     }
 }
 
@@ -339,6 +339,11 @@ impl AppModel {
             if let Some(dir) = terminfo.terminfo_dir {
                 env.insert("TERMINFO".to_string(), dir.display().to_string());
             }
+            super::shell_integration::inject_shell_integration_env(
+                &mut env,
+                settings.shell.as_ref().map(PathBuf::from).as_deref(),
+                settings.cursor_blink,
+            );
             let config = PtySpawnConfig {
                 size,
                 shell: settings.shell.as_ref().map(PathBuf::from),
@@ -563,11 +568,15 @@ impl AppModel {
                 bytes,
                 frames,
                 pending,
+                error,
             } = window.pump(cap);
             stats.chunks += chunks;
             stats.bytes += bytes;
             stats.frames += frames;
             stats.pending |= pending;
+            if stats.error.is_none() {
+                stats.error = error;
+            }
         }
         let close_on_exit = self.settings.current().close_on_exit;
         let mut close = Vec::new();
@@ -1258,9 +1267,7 @@ impl AppModel {
                     }
                 }
             }
-            AppAction::ToggleChatPresentation => {
-                return self.toggle_chat_presentation();
-            }
+            AppAction::ToggleChatPresentation => self.toggle_chat_presentation(),
             AppAction::Quit => {
                 self.quit_requested = true;
                 self.shutdown_all();
@@ -1542,7 +1549,8 @@ mod tests {
             tab.panes
                 .get_mut(&pane_id)
                 .unwrap()
-                .feed_test_output(b"alpha\r\nbeta\r\nalpha\r\n");
+                .feed_test_output(b"alpha\r\nbeta\r\nalpha\r\n")
+                .expect("app_model fixture feed should succeed");
         }
         let resolver = model.keymap_resolver();
         // Search-next starts at the most recent match (line 2).
@@ -1590,7 +1598,8 @@ mod tests {
             tab.panes
                 .get_mut(&pane_id)
                 .unwrap()
-                .feed_test_output(b"alpha\n");
+                .feed_test_output(b"alpha\n")
+                .expect("app_model fixture feed should succeed");
         }
         assert!(model.dispatch(AppAction::SearchNext).performed);
         model.set_search_query("");
@@ -1742,6 +1751,33 @@ mod tests {
     }
 
     #[test]
+    fn chat_toggle_preserves_live_writer_and_scrollback() {
+        let mut model = headless();
+        let window_id = model.active_window.expect("window");
+        let pane_id = model.focused_pane_id().expect("focused pane");
+        let (reader_tx, writer_rx) = install_fake_session(&mut model);
+        reader_tx
+            .send(b"\x1b]133;A\x07existing output".to_vec())
+            .expect("feed semantic output");
+        assert!(model.pump(64).changed());
+        let sequence_before = model
+            .focused_frame(window_id)
+            .expect("focused frame")
+            .sequence;
+
+        assert!(model.dispatch(AppAction::ToggleChatPresentation).performed);
+        assert!(model.write_to_pane(pane_id, b"after-toggle"));
+        assert_eq!(writer_rx.try_recv(), Ok(b"after-toggle".to_vec()));
+        assert_eq!(
+            model
+                .focused_frame(window_id)
+                .expect("focused frame")
+                .sequence,
+            sequence_before
+        );
+    }
+
+    #[test]
     fn queued_echo_publishes_text_and_cursor_without_speculative_polling() {
         let mut model = headless();
         let window_id = model.active_window.expect("window");
@@ -1827,7 +1863,8 @@ mod tests {
             .panes
             .get_mut(&pane_id)
             .unwrap()
-            .feed_test_output(b"hi");
+            .feed_test_output(b"hi")
+            .expect("app_model fixture feed should succeed");
         let frame = model.focused_frame(window_id).expect("frame");
         assert_eq!(frame.size, GridSize::new(80, 24));
         // The frame is shared, not rebuilt by reading.
@@ -1847,11 +1884,13 @@ mod tests {
         tab.panes
             .get_mut(&first)
             .expect("first")
-            .feed_test_output(b"\x1b]52;c;?\x1b\\");
+            .feed_test_output(b"\x1b]52;c;?\x1b\\")
+            .expect("app_model fixture feed should succeed");
         tab.panes
             .get_mut(&second)
             .expect("second")
-            .feed_test_output(b"\x1b]52;c;c2Vjb25k\x1b\\");
+            .feed_test_output(b"\x1b]52;c;c2Vjb25k\x1b\\")
+            .expect("app_model fixture feed should succeed");
 
         let requests = model.drain_clipboard_requests();
         assert_eq!(requests.len(), 2);
@@ -1898,7 +1937,8 @@ mod tests {
                 .panes
                 .get_mut(&pid)
                 .unwrap()
-                .feed_test_output(b"x");
+                .feed_test_output(b"x")
+                .expect("app_model fixture feed should succeed");
         }
         let trace2 = model2.install_diagnostic_trace(4);
         model2.pump(8);
@@ -1986,7 +2026,8 @@ mod tests {
             .panes
             .get_mut(&pane_id)
             .unwrap()
-            .feed_test_output(b"\x1b[?1049h");
+            .feed_test_output(b"\x1b[?1049h")
+            .expect("app_model fixture feed should succeed");
         let _stats2 = model.pump(8);
         let snap2 = trace.snapshot();
         let last_frame = snap2

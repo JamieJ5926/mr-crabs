@@ -187,17 +187,10 @@ pub fn input_dock_footer(
     layout: InputDockLayout,
     tokens: InputDockTokens,
 ) -> Div {
+    let _ = snap;
     bounds_div(layout.footer)
         .bg(rgb(tokens.footer_bg))
         .occlude()
-        .child(
-            div()
-                .absolute()
-                .left(px(24.0))
-                .top(px((31.0 - 11.0) * 0.5))
-                .text_color(rgb(tokens.footer_fg))
-                .child(snap.footer.label.to_string()),
-        )
 }
 
 pub fn dock_is_active(snap: &InputDockSnapshot) -> bool {

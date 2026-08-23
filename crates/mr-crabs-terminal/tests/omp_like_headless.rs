@@ -44,10 +44,10 @@ fn sequence_and_damage_through_framedelta() {
 #[test]
 fn sgr_red_and_wide_emoji_widths() {
     let (mut term, _pool, size) = new_term();
-    term.feed(b"Hi");
-    term.feed(b"\x1b[31mR\x1b[0m");
-    term.feed("界".as_bytes());
-    term.feed("🎉".as_bytes());
+    term.feed(b"Hi").expect("terminal feed");
+    term.feed(b"\x1b[31mR\x1b[0m").expect("terminal feed");
+    term.feed("界".as_bytes()).expect("terminal feed");
+    term.feed("🎉".as_bytes()).expect("terminal feed");
 
     let snap = term.snapshot();
     assert_eq!(snap.cursor.col, 7);
@@ -80,8 +80,8 @@ fn exact_fill_wrap_pending_el_right_noop_and_cr_clear() {
     let (mut term, _pool, size) = new_term();
 
     // Fill exactly 10 cols -> wrap_pending without wrap.
-    term.feed(b"\r");
-    term.feed(b"XXXXXXXXXX");
+    term.feed(b"\r").expect("terminal feed");
+    term.feed(b"XXXXXXXXXX").expect("terminal feed");
     let snap = term.snapshot();
     assert_eq!(snap.cursor.row, 0);
     assert_eq!(snap.cursor.col, 9);
@@ -94,7 +94,7 @@ fn exact_fill_wrap_pending_el_right_noop_and_cr_clear() {
     );
 
     // EL Right with wrap_pending is a no-op.
-    term.feed(b"\x1b[K");
+    term.feed(b"\x1b[K").expect("terminal feed");
     let snap2 = term.snapshot();
     assert!(snap2.cursor.wrap_pending);
     assert!(
@@ -104,9 +104,9 @@ fn exact_fill_wrap_pending_el_right_noop_and_cr_clear() {
     );
 
     // CR clears wrap_pending; EL Right from col 0 then clears the row.
-    term.feed(b"\r");
+    term.feed(b"\r").expect("terminal feed");
     assert!(!term.snapshot().cursor.wrap_pending);
-    term.feed(b"\x1b[K");
+    term.feed(b"\x1b[K").expect("terminal feed");
     let snap3 = term.snapshot();
     assert_eq!(snap3.cursor.col, 0);
     for (i, cell) in snap3.cells[0..cols].iter().enumerate() {
@@ -118,9 +118,9 @@ fn exact_fill_wrap_pending_el_right_noop_and_cr_clear() {
 #[test]
 fn printable_wrap_after_pending() {
     let (mut term, _pool, size) = new_term();
-    term.feed(b"XXXXXXXXXX"); // wrap_pending on row 0
+    term.feed(b"XXXXXXXXXX").expect("terminal feed"); // wrap_pending on row 0
     assert!(term.snapshot().cursor.wrap_pending);
-    term.feed(b"Y");
+    term.feed(b"Y").expect("terminal feed");
     let snap = term.snapshot();
     assert_eq!(snap.cursor.row, 1);
     assert_eq!(snap.cursor.col, 1);
@@ -138,41 +138,41 @@ fn printable_wrap_after_pending() {
 #[test]
 fn cursor_visibility_shape_blink_through_frames() {
     let (mut term, mut pool, _size) = new_term();
-    term.feed(b"\x1b[2;3H");
+    term.feed(b"\x1b[2;3H").expect("terminal feed");
     let pos = term.snapshot();
     assert_eq!((pos.cursor.row, pos.cursor.col), (1, 2));
 
-    term.feed(b"\x1b[?25l");
+    term.feed(b"\x1b[?25l").expect("terminal feed");
     let f = term.build_frame_delta(&mut pool);
     assert!(!f.cursor.visible);
     assert_eq!((f.cursor.row, f.cursor.col), (1, 2));
     pool.release(f);
 
-    term.feed(b"\x1b[?25h");
+    term.feed(b"\x1b[?25h").expect("terminal feed");
     let f = term.build_frame_delta(&mut pool);
     assert!(f.cursor.visible);
     assert_eq!(f.cursor.shape, CursorShape::Block);
     pool.release(f);
 
-    term.feed(b"\x1b[2 q");
+    term.feed(b"\x1b[2 q").expect("terminal feed");
     let f = term.build_frame_delta(&mut pool);
     assert_eq!(f.cursor.shape, CursorShape::Block);
     assert!(!f.cursor.blinking);
     pool.release(f);
 
-    term.feed(b"\x1b[4 q");
+    term.feed(b"\x1b[4 q").expect("terminal feed");
     let f = term.build_frame_delta(&mut pool);
     assert_eq!(f.cursor.shape, CursorShape::Underline);
     assert!(!f.cursor.blinking);
     pool.release(f);
 
-    term.feed(b"\x1b[5 q");
+    term.feed(b"\x1b[5 q").expect("terminal feed");
     let f = term.build_frame_delta(&mut pool);
     assert_eq!(f.cursor.shape, CursorShape::Bar);
     assert!(f.cursor.blinking);
     pool.release(f);
 
-    term.feed(b"\x1b[0 q");
+    term.feed(b"\x1b[0 q").expect("terminal feed");
     let f = term.build_frame_delta(&mut pool);
     assert_eq!(f.cursor.shape, CursorShape::Block);
     assert!(!f.cursor.blinking);
@@ -182,23 +182,23 @@ fn cursor_visibility_shape_blink_through_frames() {
 #[test]
 fn alt_screen_flag_and_primary_restoration() {
     let (mut term, mut pool, size) = new_term();
-    term.feed(b"\x1b[1;1H");
-    term.feed(b"PRIM");
+    term.feed(b"\x1b[1;1H").expect("terminal feed");
+    term.feed(b"PRIM").expect("terminal feed");
     let before = term.snapshot();
     assert_eq!((before.cursor.row, before.cursor.col), (0, 4));
 
-    term.feed(b"\x1b[?1049h");
+    term.feed(b"\x1b[?1049h").expect("terminal feed");
     let f = term.build_frame_delta(&mut pool);
     assert!(f.viewport.alternate_screen);
     assert_eq!((f.cursor.row, f.cursor.col), (0, 4));
     pool.release(f);
 
-    term.feed(b"\x1b[2;2H");
-    term.feed(b"ALT");
+    term.feed(b"\x1b[2;2H").expect("terminal feed");
+    term.feed(b"ALT").expect("terminal feed");
     let mid = term.snapshot();
     assert_eq!((mid.cursor.row, mid.cursor.col), (1, 4));
 
-    term.feed(b"\x1b[?1049l");
+    term.feed(b"\x1b[?1049l").expect("terminal feed");
     let f = term.build_frame_delta(&mut pool);
     assert!(!f.viewport.alternate_screen);
     pool.release(f);
@@ -215,8 +215,8 @@ fn alt_screen_flag_and_primary_restoration() {
 #[test]
 fn visible_rows_snapshot_parity() {
     let (mut term, _pool, size) = new_term();
-    term.feed(b"hello");
-    term.feed(b"\x1b[31mR\x1b[0m");
+    term.feed(b"hello").expect("terminal feed");
+    term.feed(b"\x1b[31mR\x1b[0m").expect("terminal feed");
     let snap = term.snapshot();
     let rows = term.visible_rows();
     assert_eq!(rows.len(), size.rows as usize);

@@ -163,11 +163,13 @@ impl CommandRegistry {
         matches
     }
 
-    /// Register one palette command per shell action plus the update-check
-    /// action (already part of the action set). Ids are `shell.<name>`.
+    /// Register palette-visible shell actions.
     pub fn install_shell_commands(&mut self) {
         let bindings = crate::keymap::default_keybindings();
         for action in AppAction::ALL {
+            if action == AppAction::ToggleChatPresentation {
+                continue;
+            }
             let keys = bindings
                 .iter()
                 .find(|binding| binding.action == action)
@@ -294,15 +296,19 @@ mod tests {
     fn shell_commands_cover_every_action_exactly_once() {
         let mut registry = CommandRegistry::new();
         registry.install_shell_commands();
-        assert_eq!(registry.len(), AppAction::ALL.len());
+        assert_eq!(registry.len(), AppAction::ALL.len() - 1);
         for action in AppAction::ALL {
             let id = format!("shell.{}", action.name());
-            assert!(registry.contains(&id), "missing command for {action:?}");
+            assert_eq!(
+                registry.contains(&id),
+                action != AppAction::ToggleChatPresentation,
+                "unexpected palette registration for {action:?}"
+            );
         }
         // Unregistering removes the id exactly once.
         assert!(registry.unregister("shell.quit"));
         assert!(!registry.unregister("shell.quit"));
-        assert_eq!(registry.len(), AppAction::ALL.len() - 1);
+        assert_eq!(registry.len(), AppAction::ALL.len() - 2);
     }
 
     #[test]

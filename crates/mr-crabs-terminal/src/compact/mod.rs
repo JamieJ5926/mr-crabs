@@ -10,6 +10,9 @@ mod engine;
 
 pub use engine::CompactEngine;
 #[cfg(test)]
+pub(crate) use engine::EngineCensusDiag;
+pub(crate) use engine::EngineStyleRemap;
+#[cfg(test)]
 pub use row::{CompactPage, CompactRow, RowExtras};
 
 #[cfg(test)]

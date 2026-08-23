@@ -28,7 +28,7 @@
   "artifacts": {
     "oracle-freeze.json": "9717d110e1be66e81d6e19e8a4c821513e6a9740efd849d867c828e60b33f9e7",
     "dirty-oracle.patch": "6260fcd96857a6c0e6aca96da68d9694927f7dbb826d71db50e3d85dfe8274fa",
-    "pins-and-toolchains.json": "b60a4816c39b94fb1f3f3823ba644317c47238526d7e1805edb829c80f16bd06",
+    "pins-and-toolchains.json": "0b3fa43e0d507cda68ee0b45d200c2143b860c16064bc5eb0575d609bcb5e1b4",
     "callable-parity.json": "f62fd8b0ec81965bd9b368e0a2738eef5eee63b49179104806913c96c631a9ca",
     "baseline.schema.json": "d7aaa921562e87343d0285a65ffb5b3ee7c0dada9780c2937e3c926ec52a6aa5",
     "oracle-baseline.json": "913fc1cf1ab1fc5516b4a866f380af7f549ab1bad29ee4297852792533322926",

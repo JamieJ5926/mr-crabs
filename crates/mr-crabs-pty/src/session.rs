@@ -8,14 +8,15 @@
 //! channels in the production PTY path.
 //!
 //! Reaping discipline: exactly one child status is produced. The exit waiter
-//! thread and `try_wait`/`shutdown_and_reap` all go through a shared
-//! [`OnceLock<ExitStatus>`] and use *nonblocking* `waitpid` only, so any
-//! interleaving is safe: the kernel lets exactly one `waitpid` reap the child
-//! and any loser observes `ECHILD` (mapped to `None` by the platform layer),
-//! then reads the status the winner cached in the shared `OnceLock`. The
-//! `OnceLock` makes the status available to every caller and guarantees the
-//! child is reported exactly once.
-//!
+//! blocks in the kernel via [`crate::platform::waitpid_block`] (no 5 ms
+//! polling), `try_wait`/`shutdown_and_reap` poll via nonblocking
+//! [`crate::platform::waitpid_nonblock`], and all sides go through a shared
+//! [`OnceLock<ExitStatus>`] so any interleaving is safe: the kernel lets
+//! exactly one `waitpid` reap the child and any loser observes `ECHILD`
+//! (mapped to `None` by the platform layer), then reads the status the
+//! winner cached in the shared `OnceLock`. The `OnceLock` makes the status
+//! available to every caller and guarantees the child is reported exactly
+//! once.
 //! Optional [`OutputWake`] callbacks are cloned into the reader and exit
 //! threads. They fire after each successful output enqueue, once when the
 //! reader terminates (EOF/EIO/error/disconnect), and after exit-status
@@ -46,10 +47,6 @@ pub type OutputWake = Arc<dyn Fn() + Send + Sync + 'static>;
 /// `poll(2)` below, so normal I/O wakes immediately rather than sleeping.
 const BACKPRESSURE_SLEEP: Duration = Duration::from_millis(1);
 const IO_POLL_TIMEOUT_MS: libc::c_int = 100;
-const EXIT_POLL_SLEEP: Duration = Duration::from_millis(5);
-
-/// Exit status of a spawned child, as mapped from a `waitpid` result.
-///
 /// Exactly one of [`ExitStatus::code`] and [`ExitStatus::signal`] is `Some`:
 /// `code` is set when the process terminated normally (the `WEXITSTATUS`
 /// value), `signal` when it was killed by a signal (the `WTERMSIG` value).
@@ -528,28 +525,54 @@ impl Drop for PtySession {
 /// Waits for the child to exit, caching and reporting its status exactly
 /// once.
 ///
-/// Polls nonblocking `waitpid` every 5 ms (never blocking in `waitpid`, so
-/// concurrent `try_wait` calls are always safe), publishes the status to the
-/// shared guard, and delivers it on the single-slot exit channel. If the
-/// caller has already reaped the child, the cached status is delivered
-/// instead. The channel send may fail (caller dropped the receiver); the
-/// cached status remains authoritative. After publication the configured
-/// wake is invoked without carrying the status.
+/// Blocks in the kernel via [`crate::platform::waitpid_block`] (no 5 ms
+/// polling). If the caller has already set the shared guard (fake pre-set
+/// guard used by tests) the waiter returns that status without issuing
+/// `waitpid`. If the blocking wait observes `ECHILD` (already reaped by a
+/// racing `try_wait`), it reads the status the winner cached in
+/// `wait_guard` before publishing. The status is cached in `wait_guard`
+/// before the exit channel send and the wake, so `try_wait`/`shutdown` and
+/// wake observers always see a coherent ordering.
 fn exit_waiter(
     child_pid: i32,
     exit_tx: SyncSender<ExitStatus>,
     wait_guard: Arc<OnceLock<ExitStatus>>,
     output_wake: Option<OutputWake>,
 ) {
-    let status = loop {
-        if let Some(status) = wait_guard.get().copied() {
-            break status;
-        }
-        if let Some(status) = crate::platform::waitpid_nonblock(child_pid) {
+    // Fake pre-set guard: tests pre-populate `wait_guard` and expect the
+    // waiter to deliver that value without waiting for a real child. This
+    // branch is taken only when the guard is already set at entry.
+    if let Some(status) = wait_guard.get().copied() {
+        let _ = exit_tx.send(status);
+        invoke_output_wake(output_wake.as_ref());
+        return;
+    }
+    let status = match crate::platform::waitpid_block(child_pid) {
+        Some(status) => {
+            // `OnceLock::set` may fail if `try_wait` raced and already set
+            // the status; both raced values are the same child's exit.
             let _ = wait_guard.set(status);
-            break status;
+            // `set` above may have lost the race; return the canonical
+            // cached value so every observer sees one status.
+            wait_guard.get().copied().unwrap_or(status)
         }
-        thread::sleep(EXIT_POLL_SLEEP);
+        None => {
+            // `ECHILD`: `try_wait`/shutdown already reaped and cached the
+            // status. The shared guard now holds it; if not yet visible
+            // (narrow pre-publish window), yield until it appears rather
+            // than polling at 5 ms — the winner always sets the guard
+            // immediately after its successful `waitpid`.
+            loop {
+                if let Some(status) = wait_guard.get().copied() {
+                    break status;
+                }
+                // No busy-wait: `try_wait` holds the same pid and reaps
+                // under the same lock discipline; a single yield covers the
+                // publish; a short backoff bounds the wait even under
+                // pathological interleaving.
+                thread::sleep(Duration::from_millis(1));
+            }
+        }
     };
     let _ = exit_tx.send(status);
     invoke_output_wake(output_wake.as_ref());
@@ -593,6 +616,8 @@ fn reader_loop(
             Err(err) => match err.kind() {
                 io::ErrorKind::Interrupted => continue,
                 io::ErrorKind::WouldBlock => {
+                    #[cfg(feature = "phase-timing")]
+                    let _phase_guard = crate::phase::Guard::new("pty_poll_wait");
                     if !wait_until_ready(&reader_master, libc::POLLIN) {
                         break;
                     }
@@ -620,6 +645,12 @@ fn reader_loop(
                         break 'outer;
                     }
                     data = pending;
+                    #[cfg(feature = "phase-timing")]
+                    {
+                        let _g = crate::phase::Guard::new("pty_queue_full_wait");
+                        thread::sleep(BACKPRESSURE_SLEEP);
+                    }
+                    #[cfg(not(feature = "phase-timing"))]
                     thread::sleep(BACKPRESSURE_SLEEP);
                 }
                 Err(TrySendError::Disconnected(_)) => {
@@ -884,5 +915,53 @@ mod tests {
 
         exit_waiter(-1, exit_tx, wait_guard, Some(wake));
         assert!(published.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn exit_waiter_sets_guard_before_wake_and_channel() {
+        let wait_guard = Arc::new(OnceLock::new());
+        wait_guard.set(ExitStatus::exited(42)).unwrap();
+        let (exit_tx, exit_rx) = sync_channel(1);
+        let exit_rx = Arc::new(Mutex::new(exit_rx));
+        let guard_seen = Arc::new(AtomicBool::new(false));
+        let saw_guard = Arc::clone(&guard_seen);
+        let channel_seen = Arc::new(AtomicBool::new(false));
+        let saw_channel = Arc::clone(&channel_seen);
+        let guard_for_wake = Arc::clone(&wait_guard);
+        let exit_rx_for_wake = Arc::clone(&exit_rx);
+        let wake: OutputWake = Arc::new(move || {
+            // OnceLock must be set before the channel is readable and before
+            // the wake fires — otherwise try_wait/shutdown would see None.
+            assert_eq!(
+                guard_for_wake.get().copied(),
+                Some(ExitStatus::exited(42)),
+                "wake must observe OnceLock already set"
+            );
+            saw_guard.store(true, Ordering::SeqCst);
+            assert_eq!(
+                exit_rx_for_wake.lock().try_recv().ok(),
+                Some(ExitStatus::exited(42)),
+                "wake must observe channel already queued"
+            );
+            saw_channel.store(true, Ordering::SeqCst);
+        });
+        exit_waiter(-1, exit_tx, wait_guard, Some(wake));
+        assert!(guard_seen.load(Ordering::SeqCst));
+        assert!(channel_seen.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn exit_waiter_fake_preset_guard_does_not_block() {
+        let wait_guard = Arc::new(OnceLock::new());
+        wait_guard.set(ExitStatus::exited(9)).unwrap();
+        let (exit_tx, exit_rx) = sync_channel(1);
+        let started = std::time::Instant::now();
+        exit_waiter(-1, exit_tx, Arc::clone(&wait_guard), None);
+        assert!(
+            started.elapsed() < Duration::from_millis(50),
+            "fake pre-set guard must not block in waitpid"
+        );
+        assert_eq!(exit_rx.try_recv().ok(), Some(ExitStatus::exited(9)));
+        assert_eq!(wait_guard.get().copied(), Some(ExitStatus::exited(9)));
     }
 }

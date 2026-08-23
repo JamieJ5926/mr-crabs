@@ -499,7 +499,11 @@ fn throughput_workload(id: &'static str) -> WorkloadOutcome {
     while offset < total {
         let len = ((total - offset) as usize).min(CHUNK);
         source.fill_chunk(&mut scratch, offset, len);
-        term.feed(&scratch);
+        if let Err(err) = term.feed(&scratch) {
+            return failed(format!(
+                "throughput feed failed at offset {offset}: {err:?}"
+            ));
+        }
         tracker.tick();
         offset += len as u64;
     }
@@ -617,12 +621,16 @@ fn scrollback_workload() -> WorkloadOutcome {
     // retaining a second 5 MiB copy beside the terminal under measurement.
     let full_batches = payloads::SCROLLBACK_LINES / RECORDS_PER_BATCH;
     for _ in 0..full_batches {
-        term.feed(&batch);
+        if let Err(err) = term.feed(&batch) {
+            return failed(format!("scrollback feed failed: {err:?}"));
+        }
         tracker.tick();
     }
     let remaining = payloads::SCROLLBACK_LINES % RECORDS_PER_BATCH;
     if remaining != 0 {
-        term.feed(&batch[..remaining * RECORD.len()]);
+        if let Err(err) = term.feed(&batch[..remaining * RECORD.len()]) {
+            return failed(format!("scrollback feed failed (tail): {err:?}"));
+        }
         tracker.tick();
     }
     let mut metrics = memory_metrics(start, &mut tracker, before);
@@ -694,7 +702,9 @@ fn resize_storm_workload() -> WorkloadOutcome {
             return failed(format!("resize failed at step {step}: {err:?}"));
         }
         let chunk = payloads::seeded_chunk(RESIZE_STORM_SEED, step, RESIZE_STORM_CHUNK);
-        term.feed(&chunk);
+        if let Err(err) = term.feed(&chunk) {
+            return failed(format!("resize_storm feed failed at step {step}: {err:?}"));
+        }
         tracker.tick();
     }
     let mut metrics = memory_metrics(start, &mut tracker, before);
@@ -744,7 +754,9 @@ fn redraw_replay_workload() -> WorkloadOutcome {
             }
         }
         let chunk = payloads::seeded_chunk(REPLAY_SEED, step, REPLAY_CHUNK);
-        term.feed(&chunk);
+        if let Err(err) = term.feed(&chunk) {
+            return failed(format!("redraw_replay feed failed at step {step}: {err:?}"));
+        }
         let frame_start = Instant::now();
         let frame = term.build_frame_delta(&mut pool);
         frame_times.push(frame_start.elapsed().as_nanos() as u64);
@@ -790,7 +802,9 @@ fn engines_workload(count: u64) -> WorkloadOutcome {
             Ok(term) => term,
             Err(err) => return failed(format!("Terminal::new failed: {err:?}")),
         };
-        term.feed(&payload);
+        if let Err(err) = term.feed(&payload) {
+            return failed(format!("engines_{count} feed failed: {err:?}"));
+        }
         tracker.tick();
         terms.push(term);
     }
@@ -822,12 +836,13 @@ fn headless_idle_workload() -> WorkloadOutcome {
     let mut tracker = FootprintTracker::new();
     let before = crate::alloc::stats();
     let start = Instant::now();
-
     // Drain the burst into frames until the engine reports Clean.
     let mut redraw_requests = 0u64;
     let mut frames_built = 0u64;
     for chunk in burst.chunks(64 * 1024) {
-        term.feed(chunk);
+        if let Err(err) = term.feed(chunk) {
+            return failed(format!("headless_idle feed failed: {err:?}"));
+        }
     }
     let mut last_sequence;
     loop {
@@ -1284,7 +1299,9 @@ fn effects_workload() -> WorkloadOutcome {
     let mut active_frames = 0u64;
     for step in 0..EFFECTS_CHUNKS {
         let chunk = payloads::seeded_chunk(EFFECTS_SEED, step, EFFECTS_CHUNK_BYTES);
-        term.feed(&chunk);
+        if let Err(err) = term.feed(&chunk) {
+            return failed(format!("effects feed failed at step {step}: {err:?}"));
+        }
         let frame = term.build_frame_delta(&mut pool);
         let frame_start = Instant::now();
         let fx = model.apply_frame(&frame, now_ms, true);
@@ -1393,7 +1410,9 @@ fn search_workload() -> WorkloadOutcome {
     let mut config = term.scrollback_config();
     config.max_lines = payloads::SEARCH_LINES + usize::from(term.size().rows);
     term.set_scrollback_config(config);
-    term.feed(&payload);
+    if let Err(err) = term.feed(&payload) {
+        return failed(format!("search history feed failed: {err:?}"));
+    }
     term.drain_compression();
     term.force_compress_all();
 

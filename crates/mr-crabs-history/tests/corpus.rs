@@ -49,7 +49,13 @@ fn run_search_case(case: &Value) {
     let mut term = build_term(&case["size"]);
     term.feed(&hex_to_bytes(
         case["input_hex"].as_str().expect("input_hex"),
-    ));
+    ))
+    .unwrap_or_else(|error| {
+        panic!(
+            "search corpus case {:?} feed should succeed: {error}",
+            case["name"].as_str().unwrap()
+        )
+    });
     if case["compress"].as_bool().unwrap_or(false) {
         term.force_compress_all();
     }
@@ -100,12 +106,17 @@ fn run_search_case(case: &Value) {
         case["name"].as_str().unwrap()
     );
 }
-
 fn run_viewport_case(case: &Value) {
     let mut term = build_term(&case["size"]);
     term.feed(&hex_to_bytes(
         case["input_hex"].as_str().expect("input_hex"),
-    ));
+    ))
+    .unwrap_or_else(|error| {
+        panic!(
+            "viewport corpus case {:?} feed should succeed: {error}",
+            case["name"].as_str().unwrap()
+        )
+    });
     if case["compress"].as_bool().unwrap_or(false) {
         term.force_compress_all();
     }
@@ -130,12 +141,17 @@ fn run_viewport_case(case: &Value) {
         case["name"].as_str().unwrap()
     );
 }
-
 fn run_selection_case(case: &Value) {
     let mut term = build_term(&case["size"]);
     term.feed(&hex_to_bytes(
         case["input_hex"].as_str().expect("input_hex"),
-    ));
+    ))
+    .unwrap_or_else(|error| {
+        panic!(
+            "selection corpus case {:?} feed should succeed: {error}",
+            case["name"].as_str().unwrap()
+        )
+    });
     let snap = term.snapshot();
     let visible = visible_rows(&snap);
     let sel_value = &case["selection"];
@@ -217,7 +233,13 @@ fn run_persist_case(case: &Value) {
     let mut term = build_term(&case["size"]);
     term.feed(&hex_to_bytes(
         case["input_hex"].as_str().expect("input_hex"),
-    ));
+    ))
+    .unwrap_or_else(|error| {
+        panic!(
+            "persist corpus case {:?} feed should succeed: {error}",
+            case["name"].as_str().unwrap()
+        )
+    });
     let file = HistoryFile::capture(&mut term, &config).expect("capture");
     let encoded = file.encode(&config).expect("encode");
     let decoded = HistoryFile::decode(&encoded, &config).expect("decode");
@@ -237,7 +259,13 @@ fn run_restore_case(case: &Value) {
     let mut term = build_term(&case["size"]);
     term.feed(&hex_to_bytes(
         case["input_hex"].as_str().expect("input_hex"),
-    ));
+    ))
+    .unwrap_or_else(|error| {
+        panic!(
+            "restore corpus case {:?} feed should succeed: {error}",
+            case["name"].as_str().unwrap()
+        )
+    });
     let before = term.snapshot();
     let snapshot = TerminalSnapshot::capture(&mut term, 1000).expect("capture");
     let mut restored = Terminal::new(snapshot.size).expect("fresh terminal");
@@ -256,7 +284,13 @@ fn run_replay_case(case: &Value) {
     let mut term = build_term(&case["size"]);
     term.feed(&hex_to_bytes(
         case["input_hex"].as_str().expect("input_hex"),
-    ));
+    ))
+    .unwrap_or_else(|error| {
+        panic!(
+            "replay corpus case {:?} feed should succeed: {error}",
+            case["name"].as_str().unwrap()
+        )
+    });
     let snapshot = TerminalSnapshot::capture(&mut term, 1000).expect("capture");
     let mut log = ReplayLog::new(snapshot);
     for event in case["events"].as_array().expect("events") {
@@ -286,7 +320,13 @@ fn run_altscreen_case(case: &Value) {
     let mut term = build_term(&case["size"]);
     term.feed(&hex_to_bytes(
         case["input_hex"].as_str().expect("input_hex"),
-    ));
+    ))
+    .unwrap_or_else(|error| {
+        panic!(
+            "altscreen corpus case {:?} feed should succeed: {error}",
+            case["name"].as_str().unwrap()
+        )
+    });
     let snap = term.snapshot();
     assert_eq!(
         term.history_len(),
@@ -309,7 +349,13 @@ fn run_resize_case(case: &Value) {
     let mut term = build_term(&case["size"]);
     term.feed(&hex_to_bytes(
         case["input_hex"].as_str().expect("input_hex"),
-    ));
+    ))
+    .unwrap_or_else(|error| {
+        panic!(
+            "resize corpus case {:?} feed should succeed: {error}",
+            case["name"].as_str().unwrap()
+        )
+    });
     for resize in case["resizes"].as_array().expect("resizes") {
         term.resize(GridSize::new(
             resize["cols"].as_u64().expect("cols") as u16,
@@ -318,7 +364,13 @@ fn run_resize_case(case: &Value) {
         .expect("resize");
     }
     if let Some(after_resize) = case["after_resize_input_hex"].as_str() {
-        term.feed(&hex_to_bytes(after_resize));
+        term.feed(&hex_to_bytes(after_resize))
+            .unwrap_or_else(|error| {
+                panic!(
+                    "resize corpus case {:?} after-resize feed should succeed: {error}",
+                    case["name"].as_str().unwrap()
+                )
+            });
     }
     let cols: Vec<u16> = (0..term.history_len())
         .map(|i| term.history_line_cols(i).expect("cols") as u16)
