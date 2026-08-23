@@ -9,7 +9,7 @@ Produce evidence the user can review without watching the live app.
 
 ## Workflow
 
-1. Build and package the current animations worktree with `package/macos/package.sh /Users/jamie/Applications` and the configured shared Cargo target directory.
+1. Build and package the exact target worktree with `package/macos/package.sh /Users/jamie/Applications` and the configured shared Cargo target directory.
 2. Launch a new `dev.jamie.mr-crabs` instance through `cua-driver launch_app`. Pass exaggerated CLI settings when subtle behavior needs to be legible.
 3. Bring the exact returned PID and window ID forward only when the user has authorized visible verification.
 4. Snapshot the window. Pixel-click the terminal canvas. Snapshot again.
@@ -22,8 +22,14 @@ cua-driver start_recording '{"output_dir":"<absolute-directory>","record_video":
 
 7. Type the real scenario. Snapshot and inspect the command before pressing Enter. Record long enough for the scenario to finish. Snapshot and inspect the final output.
 8. Stop recording with `cua-driver stop_recording '{}'`. Require a non-null `last_video_path`, `last_error: null`, and an existing non-empty `recording.mp4`.
-9. Review the MP4 with a configured video-capable model. Prefer Gemini 3.7 Flash when that role is available. Otherwise inspect timed window frames. State only behavior visible in the artifact.
-10. Return the absolute MP4 path, settings, command, observed result, build revision, and any unverified behavior.
+9. Extract ordered target-window frames across the action boundary. Capture must begin before the action and continue through settled cleanup. Main-display video is provenance only when another app or display is visible.
+10. Encode one labeled MP4 per scenario from the exact target-window frames. Run an independent `animation-verifier` over each MP4 or ordered frame sequence.
+11. Copy the full recording, per-scenario MP4s, representative frames, binary SHA, runtime settings, and verdicts into `~/Desktop/Mr Crabs Animation Evidence <date>/`.
+12. Return the Desktop folder, exact artifacts, observed defects, build revision, and every inconclusive criterion.
+
+## Capture invariant
+
+Every animation change produces recorded motion before completion. Start recording before the first scenario action. Settled screenshots, tests, and tool success never prove motion. A main-display recording that misses the Mr Crabs window is not acceptance evidence. Use target-window capture and slow runtime-only durations when default motion is shorter than the capture interval.
 
 ## Scenarios
 
@@ -41,4 +47,4 @@ Record opening, searching, selecting, closing, and post-close terminal input. Co
 
 ## Acceptance
 
-A visual check passes only when the recording visibly exercises the changed behavior. A video that only shows an idle window fails. Tool success, tests, diagnostics, and final screenshots do not substitute for the recorded transition.
+A visual check passes only when the recording visibly exercises the changed behavior. Each scenario needs start, transition, settled, and cleanup evidence. A video that shows an idle window, the wrong display, or only settled endpoints fails. Tool success, tests, diagnostics, and final screenshots do not substitute for recorded motion. An inconclusive motion criterion blocks completion.
