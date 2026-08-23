@@ -205,6 +205,14 @@ impl ChangeTracker {
         self.update_row_with_policy(row, generation, cells, anim_ms, schedule, false);
     }
 
+    fn tracked_row_span(&self, row: usize, cell_count: usize) -> Option<(usize, usize)> {
+        let base = row.checked_mul(self.cols)?;
+        (base < self.cap).then(|| {
+            let len = cell_count.min(self.cols).min(self.cap - base);
+            (base, len)
+        })
+    }
+
     fn update_row_with_policy(
         &mut self,
         row: u16,
@@ -222,11 +230,9 @@ impl ChangeTracker {
             return;
         }
         self.row_generations[row] = generation;
-        let base = row * self.cols;
-        if base >= self.cap {
+        let Some((base, len)) = self.tracked_row_span(row, cells.len()) else {
             return;
-        }
-        let len = cells.len().min(self.cols).min(self.cap - base);
+        };
         let mut last = self.last_change_ms;
         let mut key_changed = false;
         let mut stamped = false;

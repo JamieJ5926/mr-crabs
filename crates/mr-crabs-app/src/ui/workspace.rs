@@ -2380,8 +2380,6 @@ mod tests {
             })
             .unwrap();
 
-        // This ordering is the regression: Escape closes the palette before
-        // any draw has a chance to drain the queued IME commit.
         cx.dispatch_keystroke(handle, Keystroke::parse("escape").unwrap());
         assert!(
             !cx.update(|cx| model.read(cx).palette.is_open()),
