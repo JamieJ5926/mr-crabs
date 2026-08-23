@@ -277,10 +277,6 @@ impl EffectsModel {
                 && !size_changed
                 && (!out.revealing.is_empty() || !out.pending.is_empty())
             {
-                // The current frame bypassed new reveal stamping, but
-                // unchanged cells from an earlier eligible frame are still
-                // active. Keep painting and scheduling only those retained
-                // timestamps until their bounded reveal window expires.
                 out.text_reveal_allowed = true;
             }
         }

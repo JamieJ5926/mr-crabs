@@ -165,6 +165,10 @@ impl AppShell {
         self.arm_fetch_schedule(cx);
     }
 
+    pub fn reschedule_fetch(&mut self, cx: &mut Context<Self>) {
+        self.arm_fetch_schedule(cx);
+    }
+
     fn arm_fetch_schedule(&mut self, cx: &mut Context<Self>) {
         let deadline_ms = self.model.read(cx).next_fetch_deadline_ms();
         if self.fetch_schedule.deadline_ms == deadline_ms

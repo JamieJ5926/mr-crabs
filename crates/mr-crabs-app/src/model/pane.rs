@@ -1626,6 +1626,13 @@ impl PaneModel {
         self.sync_title_from_terminal();
         self.viewport
             .note_history_growth(previous_history, self.core.terminal.history_len());
+        if stats.chunks > 0 && self.fetch_driver.is_some() {
+            if let Some(driver) = self.fetch_driver.as_mut() {
+                if driver.animation_region().is_some() {
+                    driver.invalidate();
+                }
+            }
+        }
         if stats.chunks > 0 {
             self.invalidate_stale_history_views();
             stats.frames = 1;
@@ -1640,13 +1647,6 @@ impl PaneModel {
         // Retain ordering: if graphics responses backpressured, pending stays
         // true and old-front responses will be retried before newer ones.
         stats.pending |= !self.pending_graphics_responses.is_empty();
-        if stats.chunks > 0 && self.fetch_driver.is_some() {
-            if let Some(driver) = self.fetch_driver.as_mut() {
-                if driver.animation_region().is_some() {
-                    driver.invalidate();
-                }
-            }
-        }
         if self.lifecycle == PtyLifecycle::Live
             && !stats.pending
             && self.session.output_drained()
@@ -1684,17 +1684,23 @@ impl PaneModel {
     }
 
     pub fn tick_fetch_animation(&mut self, now_ms: u64) -> bool {
-        let Some(driver) = self.fetch_driver.as_mut() else { return false; };
-        if !driver.needs_frame() { return false; }
-        let Some((size, cells)) = driver.tick(now_ms) else { return false; };
-        let styles = driver.styles().unwrap_or_default();
+        let Some(driver) = self.fetch_driver.as_mut() else {
+            return false;
+        };
+        let Some(frame_index) = driver.tick(now_ms) else {
+            return false;
+        };
         let (row, col) = driver.origin();
-        let hist = self.core.terminal.history_len();
-        if self.core.blit_region(row, col, size, &cells, &styles).is_err() {
+        let Some((size, cells, styles)) = driver.frame(frame_index) else {
+            driver.invalidate();
+            return false;
+        };
+        let history = self.core.terminal.history_len();
+        if self.core.blit_region(row, col, size, cells, styles).is_err() {
             driver.invalidate();
             return false;
         }
-        if self.core.terminal.history_len() != hist {
+        if self.core.terminal.history_len() != history {
             driver.invalidate();
             return false;
         }
@@ -1894,9 +1900,8 @@ mod tests {
     use mr_crabs_terminal::{DamageKind, Style};
     use std::sync::mpsc::sync_channel;
 
-    #[test]
-    fn fetch_deadline_does_not_set_pty_pending() {
-        let animation = super::super::fetch_animation::FetchAnimation {
+    fn test_fetch_animation() -> super::super::fetch_animation::FetchAnimation {
+        super::super::fetch_animation::FetchAnimation {
             size: GridSize::new(1, 1),
             loop_policy: super::super::fetch_animation::LoopPolicy::Forever,
             frames: vec![
@@ -1910,7 +1915,12 @@ mod tests {
                 },
             ],
             styles: vec![Style::default()],
-        };
+        }
+    }
+
+    #[test]
+    fn fetch_deadline_does_not_set_pty_pending() {
+        let animation = test_fetch_animation();
         let mut pane =
             PaneModel::detached(PaneId::new(1), GridSize::new(8, 4)).expect("detached pane");
         pane.set_fetch_driver_for_test(FetchDriver::new(Some(animation)));
@@ -1919,6 +1929,24 @@ mod tests {
         assert!(!stats.pending);
         assert_eq!(stats.frames, 0);
         assert_eq!(pane.next_fetch_deadline_ms(), Some(50));
+    }
+
+    #[test]
+    fn pty_output_clears_the_published_fetch_region() {
+        let size = GridSize::new(8, 4);
+        let (sender, receiver) = sync_channel::<Vec<u8>>(1);
+        let mut pane = PaneModel::detached(PaneId::new(1), size).expect("detached pane");
+        pane.session = PaneSession::from_receivers(size, Some(receiver), None);
+        pane.set_fetch_driver_for_test(FetchDriver::new(Some(test_fetch_animation())));
+        pane.rebuild_frame();
+        assert!(pane.frame().expect("fetch frame").animation_region.is_some());
+
+        sender.send(b"x".to_vec()).expect("PTY output");
+        let stats = pane.pump(1);
+
+        assert_eq!(stats.chunks, 1);
+        assert_eq!(pane.next_fetch_deadline_ms(), None);
+        assert_eq!(pane.frame().expect("PTY frame").animation_region, None);
     }
 
     #[test]

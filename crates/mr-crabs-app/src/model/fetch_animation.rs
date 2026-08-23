@@ -304,7 +304,7 @@ impl FetchDriver {
         self.animation = Some(anim);
     }
 
-    pub fn tick(&mut self, now_ms: u64) -> Option<(GridSize, Vec<Cell>)> {
+    pub fn tick(&mut self, now_ms: u64) -> Option<usize> {
         if !self.is_active() {
             return None;
         }
@@ -315,9 +315,6 @@ impl FetchDriver {
         }
         let anim = self.animation.as_ref()?;
         let current = self.index;
-        let frame = &anim.frames[current];
-        let cells = frame.cells.clone();
-        let size = anim.size;
         let mut next_index = current + 1;
         let mut finished = false;
         if next_index >= anim.frames.len() {
@@ -348,17 +345,13 @@ impl FetchDriver {
             self.index = next_index;
             self.next_deadline = now.saturating_add(anim.frames[next_index].delay_ms);
         }
-        Some((size, cells))
+        Some(current)
     }
 
-    pub fn current_frame_cells(&self) -> Option<(GridSize, Vec<Cell>)> {
-        let anim = self.animation.as_ref()?;
-        let frame = anim.frames.get(self.index)?;
-        Some((anim.size, frame.cells.clone()))
-    }
-
-    pub fn styles(&self) -> Option<Vec<Style>> {
-        self.animation.as_ref().map(|a| a.styles.clone())
+    pub fn frame(&self, index: usize) -> Option<(GridSize, &[Cell], &[Style])> {
+        let animation = self.animation.as_ref()?;
+        let frame = animation.frames.get(index)?;
+        Some((animation.size, &frame.cells, &animation.styles))
     }
 }
 
@@ -440,9 +433,11 @@ mod tests {
         assert_eq!(driver.next_deadline_ms(), Some(50));
         assert!(driver.tick(49).is_none());
         let first = driver.tick(50).expect("first frame at deadline");
+        let first_style = driver.frame(first).expect("first frame").1[0].style;
         assert!(driver.tick(50).is_none());
         let second = driver.tick(100).expect("one next frame at deadline");
-        assert_ne!(first.1[0].style, second.1[0].style);
+        let second_style = driver.frame(second).expect("second frame").1[0].style;
+        assert_ne!(first_style, second_style);
     }
 
     #[test]
@@ -465,5 +460,19 @@ mod tests {
         assert!(driver.next_deadline_ms().is_some());
         driver.invalidate();
         assert_eq!(driver.next_deadline_ms(), None);
+    }
+
+    #[test]
+    fn resize_can_move_the_next_deadline_earlier() {
+        let mut animation =
+            decode_gif_bytes(&tiny_gif_bytes(), GridSize::new(80, 24)).unwrap();
+        animation.frames[0].delay_ms = 16;
+        animation.frames[1].delay_ms = 5000;
+        let mut driver = FetchDriver::new(Some(animation));
+
+        assert!(driver.tick(16).is_some());
+        assert_eq!(driver.next_deadline_ms(), Some(5016));
+        driver.on_resize(GridSize::new(1, 1), Path::new(""));
+        assert_eq!(driver.next_deadline_ms(), Some(32));
     }
 }

@@ -361,6 +361,9 @@ impl Render for WindowView {
             self.model.update(cx, |model, _| {
                 model.commit_geometry(self.window_id, geometry);
             });
+            if let Some(shell) = self.shell.upgrade() {
+                shell.update(cx, |shell, cx| shell.reschedule_fetch(cx));
+            }
         }
 
         // 3. Keep the native title in sync with the shell model.

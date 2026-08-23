@@ -219,12 +219,6 @@ impl ChangeTracker {
             changed = true;
         }
 
-        // A terminal row generation advances when the engine observes a new
-        // write cycle. If that cycle produced the same final cell keys (for
-        // example, running the same printf twice), the key diff alone cannot
-        // see it. Re-time drawable glyph cells and the spacer that carries
-        // the trailing half of a wide glyph. Ordinary spaces remain untouched,
-        // and the same generation still returns through the fast path above.
         if !changed {
             for (x, cell) in cells.iter().take(len).enumerate() {
                 if !cell_paints_glyph(*cell) {
