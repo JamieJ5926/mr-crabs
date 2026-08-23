@@ -10,7 +10,7 @@ Produce evidence the user can review without watching the live app.
 ## Workflow
 
 1. Build and package the exact target worktree with `package/macos/package.sh /Users/jamie/Applications` and the configured shared Cargo target directory.
-2. Launch a new `dev.jamie.mr-crabs` instance through `cua-driver launch_app`. Pass exaggerated CLI settings when subtle behavior needs to be legible.
+2. Reuse one declared `dev.jamie.mr-crabs` instance for the full run. Change runtime modes through the command palette. When launch-only settings require a relaunch, close the prior harness instance before creating the next one. Keep exactly one Mr Crabs process and window after each scenario.
 3. Bring the exact returned PID and window ID forward only when the user has authorized visible verification.
 4. Snapshot the window. Pixel-click the terminal canvas. Snapshot again.
 5. Type a harmless sentinel command. Snapshot the window and inspect the image to prove the complete command is waiting at the prompt. Press Enter. Snapshot again and inspect the output to prove terminal input works before recording the real scenario.
