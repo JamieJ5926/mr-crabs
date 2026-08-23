@@ -25,6 +25,7 @@ pub enum AccessibilityRole {
     Popover,
     List,
     ListItem,
+    TextInput,
 }
 
 /// Actions a client can perform on a node.
@@ -263,6 +264,14 @@ impl AccessibilitySnapshot {
                             list.children.push(node);
                         }
                         chat.children.push(list);
+                        let composer = AccessibilityNode::new(
+                            next_id,
+                            AccessibilityRole::TextInput,
+                            "Message",
+                        )
+                        .with_value(pane.chat_draft().to_owned());
+                        paths.insert(next_id, NodePath::Root);
+                        chat.children.push(composer);
                         root.children.push(chat);
                     }
                 }
@@ -510,11 +519,25 @@ fn chat_overlay_appears_when_effective_chat() {
         "chat toggle should succeed when eligible: {}",
         res.note
     );
+    let pane_id = model.focused_pane_id().expect("pane");
+    assert!(model.insert_chat_text(pane_id, "hello agent"));
     let snapshot = model.accessibility_snapshot();
     assert!(
         snapshot.root.children.iter().any(|n| n.label == "Chat"),
         "chat popover should appear in a11y tree"
     );
+    let chat = snapshot
+        .root
+        .children
+        .iter()
+        .find(|node| node.label == "Chat")
+        .expect("chat");
+    let composer = chat
+        .children
+        .iter()
+        .find(|node| node.role == AccessibilityRole::TextInput)
+        .expect("composer");
+    assert_eq!(composer.value.as_deref(), Some("hello agent"));
     // Toggle back
     let res2 = model.dispatch(crate::action::AppAction::ToggleChatPresentation);
     assert!(res2.performed);

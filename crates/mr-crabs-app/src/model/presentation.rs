@@ -11,9 +11,9 @@ pub enum SurfaceMode {
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ConversationSource {
-    TuiRpc,
+    HostInput,
     #[default]
-    PtyTranscript,
+    PtySnapshot,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
@@ -46,25 +46,8 @@ pub fn is_eligible_for_chat(
     alt_screen: bool,
     mouse_reporting: bool,
     has_trusted_osc133: bool,
-    palette_open: bool,
-    unknown_fullscreen: bool,
 ) -> bool {
-    if alt_screen {
-        return false;
-    }
-    if mouse_reporting {
-        return false;
-    }
-    if !has_trusted_osc133 {
-        return false;
-    }
-    if palette_open {
-        return false;
-    }
-    if unknown_fullscreen {
-        return false;
-    }
-    true
+    !alt_screen && !mouse_reporting && has_trusted_osc133
 }
 
 pub fn effective_mode(preferred: SurfaceMode, eligible: bool) -> SurfaceMode {
@@ -96,19 +79,10 @@ mod tests {
     }
 
     #[test]
-    fn conversation_source_default_is_pty() {
+    fn conversation_source_default_is_pty_snapshot() {
         assert_eq!(
             ConversationSource::default(),
-            ConversationSource::PtyTranscript
-        );
-    }
-
-    #[test]
-    fn tui_rpc_variant_exists_but_unused() {
-        let _ = ConversationSource::TuiRpc;
-        assert_ne!(
-            ConversationSource::TuiRpc,
-            ConversationSource::PtyTranscript
+            ConversationSource::PtySnapshot
         );
     }
 
@@ -118,7 +92,7 @@ mod tests {
             1,
             ConversationKind::Input,
             "hi".into(),
-            ConversationSource::PtyTranscript,
+            ConversationSource::HostInput,
         );
         let b = a.clone();
         assert_eq!(a, b);
@@ -139,13 +113,11 @@ mod tests {
     }
 
     #[test]
-    fn eligibility_fails_closed_on_every_ambiguity() {
-        assert!(!is_eligible_for_chat(true, false, true, false, false));
-        assert!(!is_eligible_for_chat(false, true, true, false, false));
-        assert!(!is_eligible_for_chat(false, false, false, false, false));
-        assert!(!is_eligible_for_chat(false, false, true, true, false));
-        assert!(!is_eligible_for_chat(false, false, true, false, true));
-        assert!(is_eligible_for_chat(false, false, true, false, false));
+    fn eligibility_requires_shell_semantics_without_fullscreen_modes() {
+        assert!(!is_eligible_for_chat(true, false, true));
+        assert!(!is_eligible_for_chat(false, true, true));
+        assert!(!is_eligible_for_chat(false, false, false));
+        assert!(is_eligible_for_chat(false, false, true));
     }
 
     #[test]
@@ -154,7 +126,7 @@ mod tests {
             1,
             ConversationKind::Input,
             "x".into(),
-            ConversationSource::PtyTranscript,
+            ConversationSource::HostInput,
         )];
         assert!(project_conversation_events(&ev, false, SurfaceMode::Chat).is_empty());
         assert!(project_conversation_events(&ev, true, SurfaceMode::Terminal).is_empty());

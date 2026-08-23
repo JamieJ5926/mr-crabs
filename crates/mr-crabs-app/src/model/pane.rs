@@ -21,18 +21,22 @@ use mr_crabs_history::{
     Selection, SelectionGesture, SelectionPoint, Viewport, hyperlink_span, project_frame,
     search_slice, selection_text, visible_rows,
 };
+use mr_crabs_input::encode_paste;
 use mr_crabs_protocols::apc::{self, ScanStep};
 use mr_crabs_pty::{
     CommandBuilder, ExitStatus, OutputWake, PtyConfig, PtyError, PtySession, PtySize, WriteError,
 };
 use mr_crabs_terminal::{
     Cell, FrameDelta, FrameHyperlink, FramePoint, FrameRange, FrameSearchMatch, GridSize,
-    ScrollbackConfig, SelectionKind, SelectionState, TerminalError,
+    ScrollbackConfig, SelectionKind, SelectionState, TerminalError, TerminalMode,
 };
 use parking_lot::Mutex;
 
 use crate::AppCore;
 
+use super::agent_session::{
+    AgentLaunchSpec, AgentSessionState, ChatSession, ChatSubmitError, PreparedChatSubmit,
+};
 use super::geometry::SurfaceGeometry;
 use super::pane_sink::{PaneProtocolSink, PaneSinkEvent};
 use super::presentation::SurfaceMode;
@@ -861,8 +865,7 @@ pub struct PaneModel {
     /// Last derived dock snapshot; layout-independent, retained across Clean frames.
     latest_dock: Option<Arc<super::input_dock::InputDockSnapshot>>,
     pub preferred_mode: SurfaceMode,
-    transcript: Vec<super::presentation::ConversationEvent>,
-    /// Conservative PtyTranscript grid projection, rebuilt on frame publish.
+    chat: ChatSession,
     cached_grid_projection: Option<Arc<super::presentation::ConversationEvent>>,
     apc_scanner: apc::Scanner,
     apc_handler: apc::Handler,
@@ -924,7 +927,7 @@ impl PaneModel {
             ever_seen_osc133: false,
             latest_dock: None,
             preferred_mode: SurfaceMode::Terminal,
-            transcript: Vec::new(),
+            chat: ChatSession::default(),
             cached_grid_projection: None,
             apc_scanner: apc::Scanner::new(),
             apc_handler: apc::Handler::new(),
@@ -1624,6 +1627,7 @@ impl PaneModel {
             && self.session.output_drained()
             && let Some(status) = self.session.exit_status()
         {
+            self.chat.outer_pty_exited(status.code);
             self.lifecycle = PtyLifecycle::Exited { status };
             if stats.frames == 0 {
                 stats.frames = 1;
@@ -1670,34 +1674,66 @@ impl PaneModel {
     }
 
     pub fn is_chat_eligible(&self, palette_open: bool, unknown_fullscreen: bool) -> bool {
-        let alt = self
-            .core
-            .has_mode(mr_crabs_terminal::TerminalMode::AltScreen)
+        if palette_open || unknown_fullscreen {
+            return false;
+        }
+        if self.chat.state().keeps_chat_available() {
+            return true;
+        }
+        let alt = self.core.has_mode(TerminalMode::AltScreen)
             || self
                 .latest_frame
                 .as_ref()
-                .is_some_and(|f| f.viewport.alternate_screen);
-        let mouse = self
-            .core
-            .has_mode(mr_crabs_terminal::TerminalMode::MouseReportClick)
-            || self
-                .core
-                .has_mode(mr_crabs_terminal::TerminalMode::MouseDrag)
-            || self
-                .core
-                .has_mode(mr_crabs_terminal::TerminalMode::MouseMotion);
-        crate::model::presentation::is_eligible_for_chat(
-            alt,
-            mouse,
-            self.ever_seen_osc133,
-            palette_open,
-            unknown_fullscreen,
-        )
+                .is_some_and(|frame| frame.viewport.alternate_screen);
+        let mouse = self.core.has_mode(TerminalMode::MouseReportClick)
+            || self.core.has_mode(TerminalMode::MouseDrag)
+            || self.core.has_mode(TerminalMode::MouseMotion);
+        crate::model::presentation::is_eligible_for_chat(alt, mouse, self.ever_seen_osc133)
     }
 
     pub fn effective_mode(&self, palette_open: bool, unknown_fullscreen: bool) -> SurfaceMode {
         let eligible = self.is_chat_eligible(palette_open, unknown_fullscreen);
         crate::model::presentation::effective_mode(self.preferred_mode, eligible)
+    }
+
+    pub fn chat_state(&self) -> AgentSessionState {
+        self.chat.state()
+    }
+
+    pub fn chat_draft(&self) -> &str {
+        self.chat.draft()
+    }
+
+    pub fn insert_chat_text(&mut self, text: &str) {
+        self.chat.insert(text);
+    }
+
+    pub fn backspace_chat(&mut self) {
+        self.chat.backspace();
+    }
+
+    pub fn submit_chat(&mut self, spec: &AgentLaunchSpec) -> Result<(), ChatSubmitError> {
+        let prepared = if matches!(self.chat.state(), AgentSessionState::Running { .. }) {
+            let mut bytes = Vec::new();
+            encode_paste(
+                self.chat.draft(),
+                self.core.has_mode(TerminalMode::BracketedPaste),
+                &mut bytes,
+            );
+            bytes.push(b'\r');
+            self.chat.prepare_follow_up(bytes)?
+        } else {
+            self.chat.prepare_launch(spec)?
+        };
+        self.write_prepared_chat(prepared)
+    }
+
+    fn write_prepared_chat(&mut self, prepared: PreparedChatSubmit) -> Result<(), ChatSubmitError> {
+        self.session
+            .write(&prepared.bytes)
+            .map_err(|_| ChatSubmitError::PtyWrite)?;
+        self.chat.commit_submit(prepared);
+        Ok(())
     }
 
     pub fn conversation_events(
@@ -1707,12 +1743,10 @@ impl PaneModel {
     ) -> Vec<super::presentation::ConversationEvent> {
         let eligible = self.is_chat_eligible(palette_open, unknown_fullscreen);
         let mode = self.effective_mode(palette_open, unknown_fullscreen);
-        let mut events = crate::model::presentation::project_conversation_events(
-            &self.transcript,
-            eligible,
-            mode,
-        );
-        if !eligible || mode != SurfaceMode::Chat || !events.is_empty() {
+        let durable: Vec<_> = self.chat.events().cloned().collect();
+        let mut events =
+            crate::model::presentation::project_conversation_events(&durable, eligible, mode);
+        if !eligible || mode != SurfaceMode::Chat {
             return events;
         }
         if let Some(cached) = self.cached_grid_projection.as_ref() {
@@ -1722,10 +1756,10 @@ impl PaneModel {
     }
 
     fn refresh_conversation_cache(&mut self) {
-        self.cached_grid_projection = self.project_grid_transcript().map(Arc::new);
+        self.cached_grid_projection = self.project_grid_snapshot().map(Arc::new);
     }
 
-    fn project_grid_transcript(&self) -> Option<super::presentation::ConversationEvent> {
+    fn project_grid_snapshot(&self) -> Option<super::presentation::ConversationEvent> {
         let snapshot = self.core.terminal_snapshot();
         let cols = usize::from(snapshot.size.cols);
         if cols == 0 {
@@ -1753,22 +1787,8 @@ impl PaneModel {
             self.latest_frame.as_ref().map_or(0, |frame| frame.sequence),
             super::presentation::ConversationKind::Output,
             lines.join("\n"),
-            super::presentation::ConversationSource::PtyTranscript,
+            super::presentation::ConversationSource::PtySnapshot,
         ))
-    }
-
-    pub fn push_transcript_event(&mut self, event: super::presentation::ConversationEvent) {
-        // Only PtyTranscript source is accepted; TuiRpc variant exists but no transport.
-        if event.source != super::presentation::ConversationSource::PtyTranscript {
-            return;
-        }
-        self.transcript.push(event);
-        // Bound the transcript to avoid unbounded growth (keep last 200).
-        const CAP: usize = 200;
-        if self.transcript.len() > CAP {
-            let excess = self.transcript.len() - CAP;
-            self.transcript.drain(0..excess);
-        }
     }
 
     /// True after the first OSC 133 semantic content on this pane.
@@ -1794,8 +1814,10 @@ impl PaneModel {
             self.title = title.to_owned();
         }
         for event in self.protocol_sink.drain_events() {
-            if let PaneSinkEvent::Title(title) = event {
-                self.title = title;
+            match event {
+                PaneSinkEvent::Title(title) => self.title = title,
+                PaneSinkEvent::Semantic(command) => self.chat.apply_semantic(&command),
+                PaneSinkEvent::Pwd(_) => {}
             }
         }
     }
@@ -2220,6 +2242,16 @@ mod tests {
         let mut pane = PaneModel::detached(PaneId::new(1), size).expect("pane");
         pane.session = PaneSession::from_receivers(size, Some(reader_rx), Some(exit_rx));
         pane.lifecycle = PtyLifecycle::Live;
+        pane.chat.insert("hello");
+        let prepared = pane
+            .chat
+            .prepare_launch(&AgentLaunchSpec::default())
+            .expect("prepare");
+        pane.chat.commit_submit(prepared);
+        pane.chat
+            .apply_semantic(&mr_crabs_protocols::semantic_prompt::SemanticPrompt::new(
+                mr_crabs_protocols::semantic_prompt::Action::EndInputStartOutput,
+            ));
         reader_tx.send(b"output".to_vec()).expect("output");
         exit_tx.send(ExitStatus::exited(7)).expect("exit");
         drop(reader_tx);
@@ -2231,6 +2263,10 @@ mod tests {
             PtyLifecycle::Exited {
                 status: ExitStatus::exited(7)
             }
+        );
+        assert_eq!(
+            pane.chat_state(),
+            AgentSessionState::Exited { code: Some(7) }
         );
         assert!(pane.frame().is_some(), "final frame is published");
     }
@@ -3137,7 +3173,7 @@ mod tests {
         assert_eq!(events.len(), 1);
         assert_eq!(
             events[0].source,
-            crate::model::presentation::ConversationSource::PtyTranscript
+            crate::model::presentation::ConversationSource::PtySnapshot
         );
         assert!(events[0].text.contains("visible transcript"));
         assert_eq!(
@@ -3147,29 +3183,137 @@ mod tests {
     }
 
     #[test]
-    fn transcript_only_pty_source_and_bounded() {
+    fn managed_agent_keeps_chat_available_on_alternate_screen() {
         let mut pane = PaneModel::detached(PaneId::new(1), GridSize::new(80, 24)).expect("pane");
-        pane.push_transcript_event(crate::model::presentation::ConversationEvent::new(
-            1,
-            crate::model::presentation::ConversationKind::Input,
-            "hi".into(),
-            crate::model::presentation::ConversationSource::TuiRpc,
+        let (writer_tx, writer_rx) = sync_channel(4);
+        pane.session = PaneSession::from_receivers_with_writer(
+            GridSize::new(80, 24),
+            None,
+            None,
+            Some(writer_tx),
+        );
+        pane.feed_test_output(b"\x1b]133;A\x07\x1b]133;B\x07")
+            .expect("feed");
+        pane.preferred_mode = crate::model::presentation::SurfaceMode::Chat;
+        pane.insert_chat_text("hello");
+        pane.submit_chat(&AgentLaunchSpec::default())
+            .expect("submit");
+        assert_eq!(writer_rx.try_recv().unwrap(), b"'omp' 'hello'\r");
+
+        pane.feed_test_output(b"\x1b]133;C\x07\x1b[?1049h\x1b[?2004h")
+            .expect("feed");
+        assert!(matches!(
+            pane.chat_state(),
+            AgentSessionState::Running { .. }
         ));
         assert_eq!(
-            pane.conversation_events(false, false).len(),
-            0,
-            "TuiRpc must not be stored"
+            pane.effective_mode(false, false),
+            crate::model::presentation::SurfaceMode::Chat
         );
-        pane.push_transcript_event(crate::model::presentation::ConversationEvent::new(
-            2,
-            crate::model::presentation::ConversationKind::Input,
-            "hello".into(),
-            crate::model::presentation::ConversationSource::PtyTranscript,
+        pane.insert_chat_text("again");
+        pane.submit_chat(&AgentLaunchSpec::default())
+            .expect("follow-up");
+        assert_eq!(writer_rx.try_recv().unwrap(), b"\x1b[200~again\x1b[201~\r");
+        assert!(
+            pane.conversation_events(false, false)
+                .iter()
+                .any(|event| event.source
+                    == crate::model::presentation::ConversationSource::HostInput)
+        );
+        pane.feed_test_output(b"\x1b[?1049l\x1b]133;D;0\x07\x1b]133;A\x07\x1b]133;B\x07")
+            .expect("exit");
+        assert_eq!(
+            pane.chat_state(),
+            AgentSessionState::Exited { code: Some(0) }
+        );
+        pane.insert_chat_text("restart");
+        pane.submit_chat(&AgentLaunchSpec::default())
+            .expect("restart");
+        assert_eq!(writer_rx.try_recv().unwrap(), b"'omp' 'restart'\r");
+    }
+    #[test]
+    fn real_pty_chat_launch_and_view_switch_keep_one_child() {
+        let mut config = PtySpawnConfig::new(GridSize::new(80, 24)).with_shell("/bin/sh");
+        config.startup_command = Some(
+            "printf '\\033]133;A\\007\\033]133;B\\007'; \
+             IFS= read -r launch; \
+             printf '\\033]133;C\\007\\033[?1049h'; \
+             IFS= read -r follow; \
+             printf '\\033[?1049l\\033]133;D;0\\007'"
+                .to_owned(),
+        );
+        let mut pane = PaneModel::pending(PaneId::new(2), config).expect("pending");
+        let geometry = SurfaceGeometry::from_viewport(
+            mr_crabs_element::PixelExtent {
+                width: 800.0,
+                height: 480.0,
+            },
+            mr_crabs_element::CellMetrics::new(10.0, 20.0).expect("metrics"),
+            crate::model::geometry::PaddingPx::default(),
+        )
+        .expect("geometry");
+        assert!(pane.commit_geometry(geometry, None).expect("spawn"));
+        let child_pid = pane.session.child_pid().expect("child");
+        let deadline = std::time::Instant::now() + Duration::from_secs(3);
+        while !pane.ever_seen_osc133() && std::time::Instant::now() < deadline {
+            pane.pump(8);
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(pane.ever_seen_osc133());
+
+        pane.preferred_mode = SurfaceMode::Chat;
+        pane.insert_chat_text("first");
+        pane.submit_chat(&AgentLaunchSpec {
+            argv: vec!["fixture-agent".into()],
+        })
+        .expect("launch");
+        let deadline = std::time::Instant::now() + Duration::from_secs(3);
+        while !matches!(pane.chat_state(), AgentSessionState::Running { .. })
+            && std::time::Instant::now() < deadline
+        {
+            pane.pump(8);
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(matches!(
+            pane.chat_state(),
+            AgentSessionState::Running { .. }
         ));
-        pane.feed_test_output(b"\x1b]133;A\x07").expect("feed");
-        // Not in Chat mode yet -> no projection even though transcript exists
-        assert_eq!(pane.conversation_events(false, false).len(), 0);
-        pane.preferred_mode = crate::model::presentation::SurfaceMode::Chat;
-        assert_eq!(pane.conversation_events(false, false).len(), 1);
+        assert_eq!(pane.session.child_pid(), Some(child_pid));
+        pane.preferred_mode = SurfaceMode::Terminal;
+        assert_eq!(pane.effective_mode(false, false), SurfaceMode::Terminal);
+        pane.preferred_mode = SurfaceMode::Chat;
+        assert_eq!(pane.effective_mode(false, false), SurfaceMode::Chat);
+
+        pane.insert_chat_text("follow up");
+        pane.submit_chat(&AgentLaunchSpec::default())
+            .expect("follow-up");
+        let deadline = std::time::Instant::now() + Duration::from_secs(3);
+        while !matches!(pane.chat_state(), AgentSessionState::Exited { .. })
+            && std::time::Instant::now() < deadline
+        {
+            pane.pump(8);
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert_eq!(
+            pane.chat_state(),
+            AgentSessionState::Exited { code: Some(0) }
+        );
+        assert_eq!(pane.session.child_pid(), Some(child_pid));
+        pane.session
+            .shutdown(Duration::from_millis(200))
+            .expect("shutdown");
+    }
+
+    #[test]
+    fn failed_chat_write_keeps_draft_and_idle_state() {
+        let mut pane = PaneModel::detached(PaneId::new(1), GridSize::new(80, 24)).expect("pane");
+        pane.insert_chat_text("hello");
+        assert_eq!(
+            pane.submit_chat(&AgentLaunchSpec::default()),
+            Err(ChatSubmitError::PtyWrite)
+        );
+        assert_eq!(pane.chat_state(), AgentSessionState::Idle);
+        assert_eq!(pane.chat_draft(), "hello");
+        assert!(pane.chat.events().next().is_none());
     }
 }

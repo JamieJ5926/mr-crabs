@@ -47,11 +47,11 @@ use mr_crabs_input::{
 };
 use mr_crabs_terminal::FrameDelta;
 
+use crate::model::agent_session::AgentSessionState;
 use crate::model::app_model::AppModel;
 use crate::model::geometry::{PaddingPx, SurfaceGeometry};
 use crate::model::input_dock::{
-    CHROME_TOTAL, InputDockLayout, InputDockSnapshot, InputDockState, PointF, hit_test_dock,
-    remap_pointer,
+    InputDockLayout, InputDockSnapshot, InputDockState, PointF, hit_test_dock, remap_pointer,
 };
 use crate::model::presentation::{ConversationEvent, SurfaceMode};
 use crate::model::split::{GridRect, PaneId};
@@ -184,7 +184,20 @@ impl WindowView {
 
     fn drain_ime_commits(&mut self, cx: &mut Context<Self>) {
         while let Ok((pane_id, text)) = self.ime_rx.try_recv() {
-            if self.model.read(cx).palette.is_open() {
+            let chat_active = {
+                let model = self.model.read(cx);
+                if model.palette.is_open() {
+                    continue;
+                }
+                model
+                    .window(self.window_id)
+                    .and_then(|window| window.active_tab())
+                    .and_then(|tab| tab.panes.get(&pane_id))
+                    .is_some_and(|pane| pane.effective_mode(false, false) == SurfaceMode::Chat)
+            };
+            if chat_active {
+                self.model
+                    .update(cx, |model, _| model.insert_chat_text(pane_id, &text));
                 continue;
             }
             let bytes = encode_ime(&text, false);
@@ -410,8 +423,28 @@ impl Render for WindowView {
         let palette = self.model.read(cx).palette.clone();
         let secure_input = self.model.read(cx).secure_input.is_enabled();
         let trace_for_paint = self.model.read(cx).diagnostic_trace();
+        let chat_info = {
+            let model = self.model.read(cx);
+            model
+                .window(self.window_id)
+                .and_then(|window| window.active_tab())
+                .and_then(|tab| {
+                    let pane_id = tab.focused_pane_id()?;
+                    let pane = tab.panes.get(&pane_id)?;
+                    Some((
+                        pane.effective_mode(palette.is_open(), false),
+                        pane.conversation_events(palette.is_open(), false),
+                        pane.chat_draft().to_owned(),
+                        pane.chat_state(),
+                        pane_id,
+                    ))
+                })
+        };
+        let chat_active = chat_info
+            .as_ref()
+            .is_some_and(|(mode, _, _, _, _)| *mode == SurfaceMode::Chat);
         let focused_dock = bundles.iter().find_map(|bundle| {
-            if !bundle.focused {
+            if chat_active || !bundle.focused {
                 return None;
             }
             let snap = bundle.dock.clone()?;
@@ -436,7 +469,6 @@ impl Render for WindowView {
                 bundle.pane_geometry.content.height,
             )
         });
-        let dock_chrome_active = focused_dock.is_some();
 
         let key_model = self.model.clone();
         let key_shell = self.shell.clone();
@@ -791,37 +823,17 @@ impl Render for WindowView {
             }
         }
 
-        // Chat presentation: per-pane preference, effective mode fails closed.
-        // TerminalElement remains mounted underneath; chat is a read-only overlay
-        // clipped to the pane geometry, not a replacement.
-        let chat_info = {
-            let model = self.model.read(cx);
-            let focused_pane_id = model.focused_pane_id();
-            focused_pane_id.and_then(|pid| {
-                model
-                    .active_tab()
-                    .and_then(|tab| tab.panes.get(&pid))
-                    .map(|pane| {
-                        let effective = pane.effective_mode(palette.is_open(), false);
-                        let events = pane.conversation_events(palette.is_open(), false);
-                        (effective, events, pid)
-                    })
-            })
-        };
-        let chat_active = chat_info
-            .as_ref()
-            .is_some_and(|(mode, _, _)| *mode == SurfaceMode::Chat);
         if chat_active {
-            if let (Some((_, events, _)), Some((left, top, width, height))) =
+            if let (Some((_, events, draft, state, _)), Some((left, top, width, height))) =
                 (chat_info, focused_pane_bounds)
             {
                 root = root.child(chat_overlay(
-                    &events,
+                    events,
+                    draft,
+                    state,
                     terminal_palette,
-                    left,
-                    top,
-                    width,
-                    chat_overlay_height(height, dock_chrome_active),
+                    PointF { x: left, y: top },
+                    PixelExtent { width, height },
                 ));
             }
         }
@@ -1225,22 +1237,13 @@ fn route_drop_paths(
     });
 }
 
-fn chat_overlay_height(pane_height: f32, dock_chrome_active: bool) -> f32 {
-    let reserved = if dock_chrome_active {
-        CHROME_TOTAL
-    } else {
-        0.0
-    };
-    (pane_height - reserved).max(0.0)
-}
-
 fn chat_overlay(
-    events: &[ConversationEvent],
+    events: Vec<ConversationEvent>,
+    draft: String,
+    state: AgentSessionState,
     terminal_palette: TerminalPalette,
-    pane_left: f32,
-    pane_top: f32,
-    pane_width: f32,
-    pane_height: f32,
+    origin: PointF,
+    extent: PixelExtent,
 ) -> impl gpui::IntoElement {
     let is_light = terminal_palette.background[0] > 0x80;
     let panel: gpui::Hsla = if is_light {
@@ -1258,12 +1261,21 @@ fn chat_overlay(
     } else {
         gpui::rgba(0xe5e5_e533).into()
     };
+    let status: SharedString = match state {
+        AgentSessionState::Idle => SharedString::new_static("Start agent"),
+        AgentSessionState::Launching { .. } => SharedString::new_static("Launching agent"),
+        AgentSessionState::Running { .. } => SharedString::new_static("Agent running"),
+        AgentSessionState::Exited { code } => match code {
+            Some(code) => format!("Agent exited with code {code}").into(),
+            None => SharedString::new_static("Agent exited"),
+        },
+    };
     let mut list = gpui::div()
         .absolute()
-        .left(gpui::px(pane_left + 8.0))
-        .top(gpui::px(pane_top + 8.0))
-        .w(gpui::px((pane_width - 16.0).max(0.0)))
-        .h(gpui::px((pane_height - 16.0).max(0.0)))
+        .left(gpui::px(origin.x + 8.0))
+        .top(gpui::px(origin.y + 8.0))
+        .w(gpui::px((extent.width - 16.0).max(0.0)))
+        .h(gpui::px((extent.height - 16.0).max(0.0)))
         .flex()
         .flex_col()
         .gap(gpui::px(6.0))
@@ -1273,25 +1285,52 @@ fn chat_overlay(
         .border_color(border)
         .bg(panel)
         .text_color(foreground)
+        .occlude()
         .id(gpui::ElementId::Name(gpui::SharedString::from(
             "chat-overlay",
         )))
-        .role(gpui::Role::Region);
-    for ev in events {
+        .role(gpui::Role::Region)
+        .child(gpui::div().child(status));
+    for event in events {
+        let label = match event.kind {
+            crate::model::presentation::ConversationKind::Input => "You",
+            crate::model::presentation::ConversationKind::Output => "Live PTY",
+        };
+        let source = match event.source {
+            crate::model::presentation::ConversationSource::HostInput => "host",
+            crate::model::presentation::ConversationSource::PtySnapshot => "pty",
+        };
         list = list.child(
             gpui::div()
                 .id(gpui::ElementId::Name(gpui::SharedString::from(format!(
-                    "chat-event-{}",
-                    ev.id
+                    "chat-event-{source}-{}",
+                    event.id
                 ))))
                 .w_full()
                 .p(gpui::px(4.0))
                 .rounded(gpui::px(4.0))
                 .role(gpui::Role::ListItem)
-                .child(ev.text.clone()),
+                .child(format!("{label}: {}", event.text)),
         );
     }
-    list
+    let composer: SharedString = if draft.is_empty() {
+        SharedString::new_static("Type a message")
+    } else {
+        draft.into()
+    };
+    list.child(
+        gpui::div()
+            .id(gpui::ElementId::Name(gpui::SharedString::from(
+                "chat-composer",
+            )))
+            .w_full()
+            .p(gpui::px(8.0))
+            .border_1()
+            .border_color(border)
+            .rounded(gpui::px(4.0))
+            .role(gpui::Role::TextInput)
+            .child(composer),
+    )
 }
 
 /// The command-palette overlay: a popover listing the current search
@@ -1356,7 +1395,6 @@ fn palette_overlay(palette: &PaletteState, terminal_palette: TerminalPalette) ->
     list
 }
 
-/// Route one key event: keymap action, palette, or terminal bytes.
 fn handle_key_event(
     model: &Entity<AppModel>,
     shell: &WeakEntity<AppShell>,
@@ -1402,6 +1440,44 @@ fn handle_key_event(
                 &event.keystroke.key,
                 printable_text(&event.keystroke).as_deref(),
             );
+            refresh_immediately = true;
+            model_cx.stop_propagation();
+            return;
+        }
+        let chat_pane_id = shell_model.focused_pane_id().filter(|_| {
+            shell_model
+                .focused_pane()
+                .is_some_and(|pane| pane.effective_mode(false, false) == SurfaceMode::Chat)
+        });
+        if let Some(pane_id) = chat_pane_id {
+            let keystroke = shell_keystroke(&event.keystroke);
+            if let Some(action) = shell_model.keymap_resolver().resolve(&keystroke, "") {
+                shell_model.dispatch(action);
+                refresh_immediately = true;
+                model_cx.stop_propagation();
+                return;
+            }
+            if is_copy {
+                copied_text = shell_model
+                    .focused_pane_mut()
+                    .and_then(crate::model::pane::PaneModel::selected_text);
+            } else if is_paste {
+                if let Some(text) = paste_text.as_deref() {
+                    shell_model.insert_chat_text(pane_id, text);
+                }
+            } else if event.keystroke.key.eq_ignore_ascii_case("enter") {
+                shell_model.submit_chat(pane_id);
+            } else if event.keystroke.key.eq_ignore_ascii_case("backspace") {
+                shell_model.backspace_chat(pane_id);
+            } else if !event.keystroke.modifiers.control
+                && !event.keystroke.modifiers.alt
+                && !event.keystroke.modifiers.platform
+                && !event.keystroke.modifiers.function
+                && let Some(text) = printable_text(&event.keystroke)
+                && !matches!(text.as_str(), "\n" | "\t")
+            {
+                shell_model.insert_chat_text(pane_id, &text);
+            }
             refresh_immediately = true;
             model_cx.stop_propagation();
             return;
@@ -1496,6 +1572,13 @@ fn handle_key_release(model: &Entity<AppModel>, event: &KeyUpEvent, cx: &mut App
         let Some(pane_id) = shell_model.focused_pane_id() else {
             return;
         };
+        if shell_model
+            .focused_pane()
+            .is_some_and(|pane| pane.effective_mode(false, false) == SurfaceMode::Chat)
+        {
+            cx.stop_propagation();
+            return;
+        }
         let Some(input) = to_input_key_event(&event.keystroke, InputKeyAction::Release) else {
             return;
         };
@@ -1846,16 +1929,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn chat_overlay_reserves_dock_chrome_below_transcript() {
-        let pane_height = 480.0;
-        let reserved = chat_overlay_height(pane_height, true);
-        let unreserved = chat_overlay_height(pane_height, false);
-        assert_eq!(unreserved, pane_height);
-        assert_eq!(reserved, pane_height - CHROME_TOTAL);
-        assert!(reserved + CHROME_TOTAL <= pane_height);
-        assert_eq!(chat_overlay_height(50.0, true), 0.0);
-    }
     #[gpui::test]
     fn palette_printable_keys_do_not_leak_to_pty_writer(cx: &mut gpui::TestAppContext) {
         use crate::model::app_model::AppModel;
@@ -2159,6 +2232,31 @@ mod tests {
             generation_before + 1,
             "double dispatch would restore Terminal and bump generation by 2"
         );
+        cx.dispatch_keystroke(handle, Keystroke::parse("h").unwrap());
+        cx.dispatch_keystroke(handle, Keystroke::parse("i").unwrap());
+        assert!(
+            writer_rx.try_recv().is_err(),
+            "chat draft keys must not write PTY bytes"
+        );
+        assert_eq!(
+            cx.update(|cx| model
+                .read(cx)
+                .focused_pane()
+                .expect("pane")
+                .chat_draft()
+                .to_owned()),
+            "hi"
+        );
+
+        cx.dispatch_keystroke(handle, Keystroke::parse("enter").unwrap());
+        assert_eq!(
+            writer_rx.try_recv().expect("launch command"),
+            b"'omp' 'hi'\r"
+        );
+        assert!(cx.update(|cx| matches!(
+            model.read(cx).focused_pane().expect("pane").chat_state(),
+            AgentSessionState::Launching { .. }
+        )));
 
         cx.dispatch_keystroke(handle, Keystroke::parse("cmd-shift-j").unwrap());
         cx.update_window(handle, |_, window, cx| {
@@ -2191,8 +2289,8 @@ mod tests {
         );
         assert_eq!(
             generation_after_close,
-            generation_before + 2,
-            "each press must increment generation exactly once"
+            generation_before + 5,
+            "open, two draft edits, submit, and close each mutate once"
         );
     }
 }

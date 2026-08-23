@@ -37,6 +37,7 @@ use crate::secure_input::SecureInputState;
 use crate::settings::{SettingsError, SettingsStore};
 use crate::updates::{UpdateCheckResult, UpdateService};
 
+use super::agent_session::AgentLaunchSpec;
 use super::geometry::SurfaceGeometry;
 use super::pane::{PaneModel, PtySpawnConfig, SearchApply};
 use super::split::{PaneId, SplitAxis, SplitDirection};
@@ -115,6 +116,7 @@ pub struct AppModel {
     /// Event-driven notification shared by every live PTY reader. `None` for
     /// headless models and tests that pump explicit fake queues.
     output_wake: Option<OutputWake>,
+    agent_launch_spec: AgentLaunchSpec,
     next_window: u64,
     next_tab: u64,
     next_pane: u64,
@@ -200,6 +202,7 @@ impl AppModel {
             search_query: String::new(),
             diagnostic_trace: None,
             output_wake,
+            agent_launch_spec: AgentLaunchSpec::default(),
             next_window: 1,
             next_tab: 1,
             next_pane: 1,
@@ -672,6 +675,64 @@ impl AppModel {
         if pane.session.write(bytes).is_err() {
             return false;
         }
+        true
+    }
+    pub fn set_agent_launch_spec(&mut self, spec: AgentLaunchSpec) {
+        self.agent_launch_spec = spec;
+    }
+
+    pub fn submit_chat(&mut self, pane_id: PaneId) -> ActionResult {
+        let spec = self.agent_launch_spec.clone();
+        let Some((window_id, tab_id)) = self.locate_pane(pane_id) else {
+            return ActionResult::ignored("unknown pane");
+        };
+        let Some(pane) = self
+            .windows
+            .get_mut(&window_id)
+            .and_then(|window| window.tabs.get_mut(&tab_id))
+            .and_then(|tab| tab.panes.get_mut(&pane_id))
+        else {
+            return ActionResult::ignored("unknown pane");
+        };
+        match pane.submit_chat(&spec) {
+            Ok(()) => {
+                self.generation += 1;
+                ActionResult::performed("chat submitted")
+            }
+            Err(error) => ActionResult::ignored(format!("chat submit failed: {error:?}")),
+        }
+    }
+    pub fn insert_chat_text(&mut self, pane_id: PaneId, text: &str) -> bool {
+        let Some((window_id, tab_id)) = self.locate_pane(pane_id) else {
+            return false;
+        };
+        let Some(pane) = self
+            .windows
+            .get_mut(&window_id)
+            .and_then(|window| window.tabs.get_mut(&tab_id))
+            .and_then(|tab| tab.panes.get_mut(&pane_id))
+        else {
+            return false;
+        };
+        pane.insert_chat_text(text);
+        self.generation += 1;
+        true
+    }
+
+    pub fn backspace_chat(&mut self, pane_id: PaneId) -> bool {
+        let Some((window_id, tab_id)) = self.locate_pane(pane_id) else {
+            return false;
+        };
+        let Some(pane) = self
+            .windows
+            .get_mut(&window_id)
+            .and_then(|window| window.tabs.get_mut(&tab_id))
+            .and_then(|tab| tab.panes.get_mut(&pane_id))
+        else {
+            return false;
+        };
+        pane.backspace_chat();
+        self.generation += 1;
         true
     }
 
