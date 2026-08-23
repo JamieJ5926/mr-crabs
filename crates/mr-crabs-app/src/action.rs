@@ -16,7 +16,7 @@
 //! | `updates`              | `CheckForUpdates`                               |
 //! | `keyboard-only-operation` | every action is keyboard-dispatachable     |
 //! | `menus` / `dock-behavior` / `app-intents` / `accessibility` | consumed by their modules |
-//! | `presentation`         | `ToggleChatPresentation`                        |
+//! | `presentation`         | `ToggleExternalChatPresentation`                |
 //!
 //! `AppAction` is deliberately payload-free so it can be serialized into
 //! keymaps, menus, palette entries, and restore state. Payload actions
@@ -82,8 +82,8 @@ pub enum AppAction {
     SetTextAnimationTypewriter,
     /// Toggle the cursor trail for this process.
     ToggleCursorTrail,
-    /// Toggle the Chat presentation overlay for the focused pane.
-    ToggleChatPresentation,
+    /// Toggle the data-free ExternalChat paint signal for the focused pane.
+    ToggleExternalChatPresentation,
 }
 
 impl AppAction {
@@ -116,7 +116,7 @@ impl AppAction {
         AppAction::SetTextAnimationStreaming,
         AppAction::SetTextAnimationTypewriter,
         AppAction::ToggleCursorTrail,
-        AppAction::ToggleChatPresentation,
+        AppAction::ToggleExternalChatPresentation,
     ];
 
     /// Stable machine name (used for palette command ids and serialization).
@@ -149,7 +149,7 @@ impl AppAction {
             AppAction::SetTextAnimationStreaming => "set_text_animation_streaming",
             AppAction::SetTextAnimationTypewriter => "set_text_animation_typewriter",
             AppAction::ToggleCursorTrail => "toggle_cursor_trail",
-            AppAction::ToggleChatPresentation => "toggle_chat_presentation",
+            AppAction::ToggleExternalChatPresentation => "toggle_external_chat_presentation",
         }
     }
 
@@ -183,7 +183,7 @@ impl AppAction {
             AppAction::SetTextAnimationStreaming => "Text Animation: Streaming",
             AppAction::SetTextAnimationTypewriter => "Text Animation: Typewriter",
             AppAction::ToggleCursorTrail => "Toggle Cursor Trail",
-            AppAction::ToggleChatPresentation => "Chat Presentation",
+            AppAction::ToggleExternalChatPresentation => "External Chat Presentation",
         }
     }
 
@@ -212,7 +212,7 @@ impl AppAction {
             | AppAction::SetTextAnimationStreaming
             | AppAction::SetTextAnimationTypewriter
             | AppAction::ToggleCursorTrail
-            | AppAction::ToggleChatPresentation => "View",
+            | AppAction::ToggleExternalChatPresentation => "View",
             AppAction::CheckForUpdates | AppAction::Quit => "App",
         }
     }

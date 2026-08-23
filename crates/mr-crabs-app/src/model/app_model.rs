@@ -37,7 +37,6 @@ use crate::secure_input::SecureInputState;
 use crate::settings::{SettingsError, SettingsStore};
 use crate::updates::{UpdateCheckResult, UpdateService};
 
-use super::agent_session::AgentLaunchSpec;
 use super::geometry::SurfaceGeometry;
 use super::pane::{PaneModel, PtySpawnConfig, SearchApply};
 use super::split::{PaneId, SplitAxis, SplitDirection};
@@ -116,7 +115,6 @@ pub struct AppModel {
     /// Event-driven notification shared by every live PTY reader. `None` for
     /// headless models and tests that pump explicit fake queues.
     output_wake: Option<OutputWake>,
-    agent_launch_spec: AgentLaunchSpec,
     next_window: u64,
     next_tab: u64,
     next_pane: u64,
@@ -202,7 +200,6 @@ impl AppModel {
             search_query: String::new(),
             diagnostic_trace: None,
             output_wake,
-            agent_launch_spec: AgentLaunchSpec::default(),
             next_window: 1,
             next_tab: 1,
             next_pane: 1,
@@ -677,65 +674,6 @@ impl AppModel {
         }
         true
     }
-    pub fn set_agent_launch_spec(&mut self, spec: AgentLaunchSpec) {
-        self.agent_launch_spec = spec;
-    }
-
-    pub fn submit_chat(&mut self, pane_id: PaneId) -> ActionResult {
-        let spec = self.agent_launch_spec.clone();
-        let Some((window_id, tab_id)) = self.locate_pane(pane_id) else {
-            return ActionResult::ignored("unknown pane");
-        };
-        let Some(pane) = self
-            .windows
-            .get_mut(&window_id)
-            .and_then(|window| window.tabs.get_mut(&tab_id))
-            .and_then(|tab| tab.panes.get_mut(&pane_id))
-        else {
-            return ActionResult::ignored("unknown pane");
-        };
-        match pane.submit_chat(&spec) {
-            Ok(()) => {
-                self.generation += 1;
-                ActionResult::performed("chat submitted")
-            }
-            Err(error) => ActionResult::ignored(format!("chat submit failed: {error:?}")),
-        }
-    }
-    pub fn insert_chat_text(&mut self, pane_id: PaneId, text: &str) -> bool {
-        let Some((window_id, tab_id)) = self.locate_pane(pane_id) else {
-            return false;
-        };
-        let Some(pane) = self
-            .windows
-            .get_mut(&window_id)
-            .and_then(|window| window.tabs.get_mut(&tab_id))
-            .and_then(|tab| tab.panes.get_mut(&pane_id))
-        else {
-            return false;
-        };
-        pane.insert_chat_text(text);
-        self.generation += 1;
-        true
-    }
-
-    pub fn backspace_chat(&mut self, pane_id: PaneId) -> bool {
-        let Some((window_id, tab_id)) = self.locate_pane(pane_id) else {
-            return false;
-        };
-        let Some(pane) = self
-            .windows
-            .get_mut(&window_id)
-            .and_then(|window| window.tabs.get_mut(&tab_id))
-            .and_then(|tab| tab.panes.get_mut(&pane_id))
-        else {
-            return false;
-        };
-        pane.backspace_chat();
-        self.generation += 1;
-        true
-    }
-
     /// Drain OSC 52 requests from every pane while retaining the pane identity
     /// needed to route read replies back to the originating PTY.
     pub fn drain_clipboard_requests(&mut self) -> Vec<(PaneId, ClipboardEvent)> {
@@ -999,7 +937,7 @@ impl AppModel {
         Ok(())
     }
 
-    pub fn toggle_chat_presentation(&mut self) -> ActionResult {
+    pub fn toggle_external_chat_presentation(&mut self) -> ActionResult {
         let Some(pane_id) = self.focused_pane_id() else {
             return ActionResult::ignored("no focused pane");
         };
@@ -1015,23 +953,23 @@ impl AppModel {
             Some(pane) => pane,
             None => return ActionResult::ignored("no focused pane"),
         };
-        let eligible = pane.is_chat_eligible(self.palette.is_open(), false);
+        let eligible = pane.is_external_chat_eligible(self.palette.is_open(), false);
         if !eligible {
-            return ActionResult::ignored("chat not eligible on this pane");
+            return ActionResult::ignored("external chat not eligible on this pane");
         }
         let next = match pane.preferred_mode {
             crate::model::presentation::SurfaceMode::Terminal => {
-                crate::model::presentation::SurfaceMode::Chat
+                crate::model::presentation::SurfaceMode::ExternalChat
             }
-            crate::model::presentation::SurfaceMode::Chat => {
+            crate::model::presentation::SurfaceMode::ExternalChat => {
                 crate::model::presentation::SurfaceMode::Terminal
             }
         };
         pane.preferred_mode = next;
         self.generation += 1;
         ActionResult::performed(match next {
-            crate::model::presentation::SurfaceMode::Chat => "chat shown",
-            crate::model::presentation::SurfaceMode::Terminal => "chat hidden",
+            crate::model::presentation::SurfaceMode::ExternalChat => "external chat shown",
+            crate::model::presentation::SurfaceMode::Terminal => "external chat hidden",
         })
     }
 
@@ -1328,7 +1266,7 @@ impl AppModel {
                     }
                 }
             }
-            AppAction::ToggleChatPresentation => self.toggle_chat_presentation(),
+            AppAction::ToggleExternalChatPresentation => self.toggle_external_chat_presentation(),
             AppAction::Quit => {
                 self.quit_requested = true;
                 self.shutdown_all();
@@ -1812,7 +1750,7 @@ mod tests {
     }
 
     #[test]
-    fn chat_toggle_preserves_live_writer_and_scrollback() {
+    fn external_chat_toggle_preserves_live_writer_and_scrollback() {
         let mut model = headless();
         let window_id = model.active_window.expect("window");
         let pane_id = model.focused_pane_id().expect("focused pane");
@@ -1826,7 +1764,7 @@ mod tests {
             .expect("focused frame")
             .sequence;
 
-        assert!(model.dispatch(AppAction::ToggleChatPresentation).performed);
+        assert!(model.dispatch(AppAction::ToggleExternalChatPresentation).performed);
         assert!(model.write_to_pane(pane_id, b"after-toggle"));
         assert_eq!(writer_rx.try_recv(), Ok(b"after-toggle".to_vec()));
         assert_eq!(

@@ -237,7 +237,7 @@ mod tests {
             AppAction::SetTextAnimationStreaming,
             AppAction::SetTextAnimationTypewriter,
             AppAction::ToggleCursorTrail,
-            AppAction::ToggleChatPresentation,
+            AppAction::ToggleExternalChatPresentation,
         ];
         for action in AppAction::ALL {
             if HIDDEN_FROM_MENUS.contains(&action) {

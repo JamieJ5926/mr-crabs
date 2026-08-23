@@ -167,7 +167,7 @@ impl CommandRegistry {
     pub fn install_shell_commands(&mut self) {
         let bindings = crate::keymap::default_keybindings();
         for action in AppAction::ALL {
-            if action == AppAction::ToggleChatPresentation {
+            if action == AppAction::ToggleExternalChatPresentation {
                 continue;
             }
             let keys = bindings
@@ -301,7 +301,7 @@ mod tests {
             let id = format!("shell.{}", action.name());
             assert_eq!(
                 registry.contains(&id),
-                action != AppAction::ToggleChatPresentation,
+                action != AppAction::ToggleExternalChatPresentation,
                 "unexpected palette registration for {action:?}"
             );
         }

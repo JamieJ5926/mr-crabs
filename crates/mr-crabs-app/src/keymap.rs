@@ -135,7 +135,7 @@ pub fn default_keybindings() -> Vec<KeyBindingDef> {
         KeyBindingDef::new("ctrl+cmd+left", AppAction::GotoSplitLeft),
         KeyBindingDef::new("ctrl+cmd+right", AppAction::GotoSplitRight),
         KeyBindingDef::new("cmd+shift+p", AppAction::TogglePalette),
-        KeyBindingDef::new("cmd+shift+j", AppAction::ToggleChatPresentation),
+        KeyBindingDef::new("cmd+shift+j", AppAction::ToggleExternalChatPresentation),
         KeyBindingDef::new("ctrl+`", AppAction::ToggleQuickTerminal),
         KeyBindingDef::new("ctrl+cmd+o", AppAction::ToggleSecureInput),
         KeyBindingDef::new("cmd+shift+r", AppAction::ReloadConfig),
@@ -256,6 +256,10 @@ mod tests {
         assert_eq!(
             resolver.resolve("cmd+shift+p", ""),
             Some(AppAction::TogglePalette)
+        );
+        assert_eq!(
+            resolver.resolve("cmd+shift+j", ""),
+            Some(AppAction::ToggleExternalChatPresentation)
         );
         assert_eq!(resolver.resolve("cmd+q", ""), Some(AppAction::Quit));
         assert_eq!(
