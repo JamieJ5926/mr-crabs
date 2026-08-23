@@ -1,0 +1,18 @@
+name: Issue 19 verification
+
+on:
+  push:
+    branches:
+      - fix/issue-19-text-animation-render-dedup
+
+permissions:
+  contents: read
+
+jobs:
+  test-effects:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Run effects tests
+        run: cargo test -p mr-crabs-effects
