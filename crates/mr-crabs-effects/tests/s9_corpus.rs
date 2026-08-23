@@ -145,6 +145,40 @@ fn check_revealing(
 fn check_trail(actual: mr_crabs_effects::TrailFrame, expected: &serde_json::Value, step: usize) {
     let exp_active = expected["active"].as_bool().unwrap();
     assert_eq!(actual.active, exp_active, "step {step} trail.active");
+    let expected_echoes = expected["echoes"].as_array().expect("trail.echoes");
+    assert_eq!(
+        expected_echoes.len(),
+        actual.echoes.len(),
+        "step {step} trail.echoes.len"
+    );
+    for (i, (actual, expected)) in actual.echoes.iter().zip(expected_echoes).enumerate() {
+        let rect = expected["rect"].as_array().expect("trail echo rect");
+        assert_close(
+            actual.rect.x,
+            rect[0].as_f64().unwrap(),
+            &format!("step {step} trail.echoes[{i}].rect.x"),
+        );
+        assert_close(
+            actual.rect.y,
+            rect[1].as_f64().unwrap(),
+            &format!("step {step} trail.echoes[{i}].rect.y"),
+        );
+        assert_close(
+            actual.rect.w,
+            rect[2].as_f64().unwrap(),
+            &format!("step {step} trail.echoes[{i}].rect.w"),
+        );
+        assert_close(
+            actual.rect.h,
+            rect[3].as_f64().unwrap(),
+            &format!("step {step} trail.echoes[{i}].rect.h"),
+        );
+        assert_close(
+            actual.alpha,
+            expected["alpha"].as_f64().unwrap(),
+            &format!("step {step} trail.echoes[{i}].alpha"),
+        );
+    }
     if !exp_active {
         assert_eq!(actual.alpha, 0.0, "step {step} trail.alpha");
         return;
@@ -185,35 +219,6 @@ fn check_trail(actual: mr_crabs_effects::TrailFrame, expected: &serde_json::Valu
         glow[3].as_f64().unwrap(),
         &format!("step {step} trail.glow.h"),
     );
-    match (&actual.segment, expected["segment"].as_array()) {
-        (None, None) => {}
-        (Some(seg), Some(exp)) => {
-            assert_close(
-                seg.from.x,
-                exp[0][0].as_f64().unwrap(),
-                &format!("step {step} trail.segment.from.x"),
-            );
-            assert_close(
-                seg.from.y,
-                exp[0][1].as_f64().unwrap(),
-                &format!("step {step} trail.segment.from.y"),
-            );
-            assert_close(
-                seg.to.x,
-                exp[1][0].as_f64().unwrap(),
-                &format!("step {step} trail.segment.to.x"),
-            );
-            assert_close(
-                seg.to.y,
-                exp[1][1].as_f64().unwrap(),
-                &format!("step {step} trail.segment.to.y"),
-            );
-        }
-        (seg, exp) => panic!(
-            "step {step}: trail.segment mismatch (actual {:?}, expected {exp:?})",
-            seg.map(|s| (s.from, s.to))
-        ),
-    }
 }
 
 fn run_sequence_case(case: &serde_json::Value, id: &str) {

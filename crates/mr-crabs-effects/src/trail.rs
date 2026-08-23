@@ -1,46 +1,6 @@
-//! The cursor glow/trail effect: shape-aware cursor rectangles, the linear
-//! fade, and the bounded gradient-resource descriptor cache.
-//!
-//! Port of the oracle's cursor-trail contract
-//! (`verification/manifests/dirty-oracle-v2.patch`):
-//!
-//! * `src/renderer/shaders/cursor-trail.glsl:11-27` — defaults: enabled,
-//!   opacity 0.35, duration 250 ms.
-//! * `cursor-trail.glsl:53-88` — a soft glow around the current cursor
-//!   rectangle (`exp(-d / radius)` with `radius = 0.5 * max(w, h)`) plus a
-//!   trail along the segment connecting the previous and current rectangle
-//!   centers, blended with `fade * opacity` where `fade = 1 - elapsed /
-//!   duration` (linear); nothing is drawn when the cursor is hidden, the
-//!   surface is unfocused, or the rectangle is degenerate.
-//! * `src/renderer/generic.zig` (committed cursor-change plumbing): the
-//!   previous rect is captured and the change time reset whenever the
-//!   cursor rect changes.
-//!
-//! The gradient resource descriptor comes from a bounded LRU cache keyed
-//! by the quantized glow radius, so a renderer caches one radial-gradient
-//! texture per radius bucket and reuses it across frames (the same
-//! `GradientId` is returned while the radius bucket is unchanged).
-//!
-//! Coordinates are grid-relative pixels (top-left origin, y down); alpha,
-//! radius, and segment geometry are origin-independent, so the renderer
-//! adds its own paint origin.
-
 use mr_crabs_terminal::{CursorShape, CursorState};
 
 use crate::coords::CellPx;
-
-/// A pixel point.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct PointPx {
-    pub x: f64,
-    pub y: f64,
-}
-
-impl PointPx {
-    pub const fn new(x: f64, y: f64) -> Self {
-        Self { x, y }
-    }
-}
 
 /// An axis-aligned pixel rectangle (`x`, `y` are the top-left corner).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -56,28 +16,8 @@ impl RectPx {
         Self { x, y, w, h }
     }
 
-    /// True when the rectangle has no area (the oracle shader's
-    /// degenerate-rectangle guard: `current.z <= 0 || current.w <= 0`).
     pub const fn degenerate(self) -> bool {
         self.w <= 0.0 || self.h <= 0.0
-    }
-
-    pub const fn center(self) -> PointPx {
-        PointPx::new(self.x + 0.5 * self.w, self.y + 0.5 * self.h)
-    }
-}
-
-/// A trail segment between two points (the previous and current cursor
-/// rectangle centers).
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct LinePx {
-    pub from: PointPx,
-    pub to: PointPx,
-}
-
-impl LinePx {
-    pub const fn new(from: PointPx, to: PointPx) -> Self {
-        Self { from, to }
     }
 }
 
@@ -121,25 +61,34 @@ impl TrailConfig {
     }
 }
 
+const ECHO_COUNT: usize = 3;
+const ECHO_BASE_POSITIONS: [f64; ECHO_COUNT] = [0.15, 0.45, 0.75];
+const ECHO_ALPHA_WEIGHTS: [f64; ECHO_COUNT] = [0.22, 0.45, 0.72];
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct TrailEcho {
+    pub rect: RectPx,
+    pub alpha: f64,
+}
+
+fn lerp_rect(a: RectPx, b: RectPx, t: f64) -> RectPx {
+    RectPx::new(
+        a.x + (b.x - a.x) * t,
+        a.y + (b.y - a.y) * t,
+        a.w + (b.w - a.w) * t,
+        a.h + (b.h - a.h) * t,
+    )
+}
+
 /// One frame of trail state for the renderer.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TrailFrame {
-    /// True when the effect should draw: enabled, focused, cursor visible,
-    /// current rectangle valid, and still inside the fade window.
     pub active: bool,
-    /// Milliseconds since the last cursor change.
     pub elapsed_ms: f64,
-    /// The blend alpha: `(1 - elapsed / duration) * opacity`, 0 when
-    /// inactive.
     pub alpha: f64,
-    /// The glow falloff radius: `0.5 * max(w, h)` of the current rect.
     pub radius_px: f64,
-    /// The current cursor rectangle (glow anchor).
     pub glow_rect: RectPx,
-    /// The segment between the previous and current cursor centers; `None`
-    /// until the cursor has moved at least once.
-    pub segment: Option<LinePx>,
-    /// The cached gradient descriptor for `radius_px`.
+    pub echoes: [TrailEcho; ECHO_COUNT],
     pub gradient: GradientId,
 }
 
@@ -151,7 +100,7 @@ impl Default for TrailFrame {
             alpha: 0.0,
             radius_px: 0.0,
             glow_rect: RectPx::default(),
-            segment: None,
+            echoes: [TrailEcho::default(); ECHO_COUNT],
             gradient: GradientId(0),
         }
     }
@@ -195,8 +144,6 @@ impl GradientCache {
         }
     }
 
-    /// Resolve the gradient descriptor for a glow radius, touching the
-    /// entry's recency. A radius bucket of `ceil(radius * 2)` px.
     pub fn get(&mut self, radius_px: f64) -> GradientId {
         let bucket = (radius_px * 2.0).ceil().max(0.0) as u64;
         self.clock += 1;
@@ -229,7 +176,6 @@ impl GradientCache {
         GradientId(id)
     }
 
-    /// The number of retained descriptors.
     pub fn len(&self) -> usize {
         self.entries.len()
     }
@@ -238,7 +184,6 @@ impl GradientCache {
         self.entries.is_empty()
     }
 
-    /// Retained heap bytes.
     pub fn retained_capacity(&self) -> usize {
         self.entries.capacity() * std::mem::size_of::<GradientEntry>()
     }
@@ -273,10 +218,6 @@ impl CursorTrail {
         }
     }
 
-    /// Replace the trail configuration, keeping the retained geometry and
-    /// gradient descriptors (changing opacity/duration does not invalidate
-    /// radius buckets). Disabling resets the state so the disabled path
-    /// retains nothing.
     pub fn set_config(&mut self, config: TrailConfig) {
         if !config.enabled {
             *self = Self::new(config);
@@ -293,17 +234,10 @@ impl CursorTrail {
         &self.gradient
     }
 
-    /// Retained heap bytes (the gradient descriptor cache only; geometry
-    /// is stack-sized).
     pub fn retained_capacity(&self) -> usize {
         self.gradient.retained_capacity()
     }
 
-    /// Advance the trail to a frame: track cursor movement, compute the
-    /// fade, and resolve the gradient descriptor. The cursor rect is
-    /// tracked regardless of visibility/focus (matching the oracle, which
-    /// updates `iPreviousCursor`/`iTimeCursorChange` on every rect
-    /// change); drawing is gated by `active`.
     pub fn frame(&mut self, rect: RectPx, visible: bool, now_ms: f64, focus: bool) -> TrailFrame {
         if self.last_rect != Some(rect) {
             self.previous = self.current;
@@ -331,9 +265,18 @@ impl CursorTrail {
         frame.alpha = (1.0 - elapsed / self.config.duration_ms as f64) * self.config.opacity;
         frame.radius_px = 0.5 * current.w.max(current.h);
         frame.glow_rect = current;
-        frame.segment = self
-            .previous
-            .map(|prev| LinePx::new(prev.center(), current.center()));
+        if let Some(prev) = self.previous {
+            let p = elapsed / self.config.duration_ms as f64;
+            let settle = 1.0 - (1.0 - p) * (1.0 - p);
+            for i in 0..ECHO_COUNT {
+                let u = ECHO_BASE_POSITIONS[i] + (1.0 - ECHO_BASE_POSITIONS[i]) * settle;
+                let rect = lerp_rect(prev, current, u);
+                frame.echoes[i] = TrailEcho {
+                    rect,
+                    alpha: frame.alpha * ECHO_ALPHA_WEIGHTS[i],
+                };
+            }
+        }
         frame.gradient = self.gradient.get(frame.radius_px);
         frame
     }
@@ -380,7 +323,7 @@ mod tests {
     }
 
     #[test]
-    fn first_frame_glows_without_segment() {
+    fn first_frame_glows_without_echoes() {
         let mut t = CursorTrail::new(config());
         let f = t.frame(RectPx::new(0.0, 0.0, 10.0, 20.0), true, 2000.0, true);
         assert!(f.active);
@@ -388,7 +331,7 @@ mod tests {
         assert_eq!(f.alpha, 0.35);
         assert_eq!(f.radius_px, 10.0);
         assert_eq!(f.glow_rect, RectPx::new(0.0, 0.0, 10.0, 20.0));
-        assert_eq!(f.segment, None);
+        assert_eq!(f.echoes, [TrailEcho::default(); 3]);
         assert_eq!(f.gradient, GradientId(0));
     }
 
@@ -398,18 +341,69 @@ mod tests {
         _ = t.frame(RectPx::new(0.0, 0.0, 10.0, 20.0), true, 2000.0, true);
         let f = t.frame(RectPx::new(50.0, 0.0, 10.0, 20.0), true, 2016.0, true);
         assert!(f.active);
-        assert_eq!(f.elapsed_ms, 0.0); // fade restarted at the move
+        assert_eq!(f.elapsed_ms, 0.0);
         assert_eq!(f.alpha, 0.35);
         assert_eq!(f.glow_rect, RectPx::new(50.0, 0.0, 10.0, 20.0));
-        assert_eq!(
-            f.segment,
-            Some(LinePx::new(
-                PointPx::new(5.0, 10.0),
-                PointPx::new(55.0, 10.0)
-            ))
-        );
-        // Same radius bucket: the descriptor is reused.
+        assert_eq!(f.echoes.len(), 3);
+        let expected = [
+            TrailEcho {
+                rect: RectPx::new(7.5, 0.0, 10.0, 20.0),
+                alpha: 0.35 * 0.22,
+            },
+            TrailEcho {
+                rect: RectPx::new(22.5, 0.0, 10.0, 20.0),
+                alpha: 0.35 * 0.45,
+            },
+            TrailEcho {
+                rect: RectPx::new(37.5, 0.0, 10.0, 20.0),
+                alpha: 0.35 * 0.72,
+            },
+        ];
+        assert_eq!(f.echoes, expected);
         assert_eq!(f.gradient, GradientId(0));
+    }
+
+    #[test]
+    fn echo_horizontal_interpolation_mid_settles_quadratically() {
+        let mut t = CursorTrail::new(config());
+        _ = t.frame(RectPx::new(0.0, 0.0, 10.0, 20.0), true, 1900.0, true);
+        _ = t.frame(RectPx::new(50.0, 0.0, 10.0, 20.0), true, 2000.0, true);
+        let f = t.frame(RectPx::new(50.0, 0.0, 10.0, 20.0), true, 2125.0, true);
+        assert!(f.active);
+        let p = 125.0 / 250.0;
+        let settle = 1.0 - (1.0 - p) * (1.0 - p);
+        let u0 = 0.15 + 0.85 * settle;
+        let u1 = 0.45 + 0.55 * settle;
+        let u2 = 0.75 + 0.25 * settle;
+        let alpha = 0.35 * (1.0 - p);
+        let expected = [
+            TrailEcho {
+                rect: RectPx::new(50.0 * u0, 0.0, 10.0, 20.0),
+                alpha: alpha * 0.22,
+            },
+            TrailEcho {
+                rect: RectPx::new(50.0 * u1, 0.0, 10.0, 20.0),
+                alpha: alpha * 0.45,
+            },
+            TrailEcho {
+                rect: RectPx::new(50.0 * u2, 0.0, 10.0, 20.0),
+                alpha: alpha * 0.72,
+            },
+        ];
+        for (actual, expected) in f.echoes.iter().zip(expected) {
+            assert!((actual.rect.x - expected.rect.x).abs() < 1e-9);
+            assert!((actual.alpha - expected.alpha).abs() < 1e-9);
+        }
+    }
+
+    #[test]
+    fn echo_vertical_interpolation() {
+        let mut t = CursorTrail::new(config());
+        _ = t.frame(RectPx::new(0.0, 0.0, 10.0, 20.0), true, 2000.0, true);
+        let f = t.frame(RectPx::new(0.0, 40.0, 10.0, 20.0), true, 2016.0, true);
+        assert_eq!(f.echoes[0].rect, RectPx::new(0.0, 6.0, 10.0, 20.0));
+        assert_eq!(f.echoes[1].rect, RectPx::new(0.0, 18.0, 10.0, 20.0));
+        assert_eq!(f.echoes[2].rect, RectPx::new(0.0, 30.0, 10.0, 20.0));
     }
 
     #[test]
@@ -419,11 +413,62 @@ mod tests {
         let mid = t.frame(RectPx::new(0.0, 0.0, 10.0, 20.0), true, 2125.0, true);
         assert!(mid.active);
         assert_eq!(mid.elapsed_ms, 125.0);
-        assert_eq!(mid.alpha, 0.175); // (1 - 125/250) * 0.35
+        assert_eq!(mid.alpha, 0.175);
         assert_eq!(mid.gradient, GradientId(0));
         let end = t.frame(RectPx::new(0.0, 0.0, 10.0, 20.0), true, 2250.0, true);
         assert!(!end.active);
         assert_eq!(end.alpha, 0.0);
+        assert_eq!(end.echoes, [TrailEcho::default(); 3]);
+    }
+
+    #[test]
+    fn echo_alpha_weights_applied() {
+        let mut t = CursorTrail::new(config());
+        _ = t.frame(RectPx::new(0.0, 0.0, 10.0, 20.0), true, 2000.0, true);
+        let f = t.frame(RectPx::new(50.0, 0.0, 10.0, 20.0), true, 2016.0, true);
+        assert_eq!(f.echoes[0].alpha, 0.35 * 0.22);
+        assert_eq!(f.echoes[1].alpha, 0.35 * 0.45);
+        assert_eq!(f.echoes[2].alpha, 0.35 * 0.72);
+        let mid = t.frame(RectPx::new(50.0, 0.0, 10.0, 20.0), true, 2141.0, true);
+        let mid_alpha = 0.175;
+        assert!((mid.echoes[0].alpha - mid_alpha * 0.22).abs() < 1e-9);
+        assert!((mid.echoes[1].alpha - mid_alpha * 0.45).abs() < 1e-9);
+        assert!((mid.echoes[2].alpha - mid_alpha * 0.72).abs() < 1e-9);
+    }
+
+    #[test]
+    fn echoes_shape_aware_bar_rect() {
+        let mut t = CursorTrail::new(config());
+        let bar_prev = RectPx::new(0.0, 0.0, 1.25, 20.0);
+        let bar_cur = RectPx::new(40.0, 0.0, 1.25, 20.0);
+        _ = t.frame(bar_prev, true, 2000.0, true);
+        let f = t.frame(bar_cur, true, 2016.0, true);
+        assert_eq!(f.echoes[0].rect, RectPx::new(6.0, 0.0, 1.25, 20.0));
+        assert_eq!(f.echoes[1].rect.w, 1.25);
+        assert_eq!(f.echoes[2].rect.w, 1.25);
+    }
+
+    #[test]
+    fn echoes_bounded_to_three() {
+        let mut t = CursorTrail::new(config());
+        _ = t.frame(RectPx::new(0.0, 0.0, 10.0, 20.0), true, 2000.0, true);
+        let f = t.frame(RectPx::new(50.0, 0.0, 10.0, 20.0), true, 2016.0, true);
+        assert_eq!(f.echoes.len(), 3);
+        assert_eq!(
+            std::mem::size_of_val(&f.echoes),
+            3 * std::mem::size_of::<TrailEcho>()
+        );
+    }
+
+    #[test]
+    fn echo_expiry_at_duration() {
+        let mut t = CursorTrail::new(config());
+        _ = t.frame(RectPx::new(0.0, 0.0, 10.0, 20.0), true, 2000.0, true);
+        _ = t.frame(RectPx::new(50.0, 0.0, 10.0, 20.0), true, 2016.0, true);
+        let end = t.frame(RectPx::new(50.0, 0.0, 10.0, 20.0), true, 2266.0, true);
+        assert!(!end.active);
+        assert_eq!(end.alpha, 0.0);
+        assert_eq!(end.echoes, [TrailEcho::default(); 3]);
     }
 
     #[test]
@@ -440,17 +485,31 @@ mod tests {
     }
 
     #[test]
+    fn hidden_gate_keeps_tracking_but_no_echo_alpha() {
+        let mut t = CursorTrail::new(config());
+        let a = RectPx::new(0.0, 0.0, 10.0, 20.0);
+        let b = RectPx::new(50.0, 0.0, 10.0, 20.0);
+        _ = t.frame(a, true, 2000.0, true);
+        let hidden = t.frame(b, false, 2016.0, true);
+        assert!(!hidden.active);
+        assert_eq!(hidden.alpha, 0.0);
+        assert_eq!(hidden.echoes, [TrailEcho::default(); 3]);
+        let resumed = t.frame(b, true, 2032.0, true);
+        assert!(resumed.active);
+        assert!(resumed.echoes[0].alpha > 0.0);
+    }
+
+    #[test]
     fn degenerate_rect_draws_nothing() {
         let mut t = CursorTrail::new(config());
         let f = t.frame(RectPx::new(0.0, 0.0, 0.0, 20.0), true, 2000.0, true);
         assert!(!f.active);
+        assert_eq!(f.echoes, [TrailEcho::default(); 3]);
     }
 
     #[test]
     fn gradient_cache_is_bounded_and_evicts_lru() {
         let mut t = CursorTrail::new(config());
-        // 16 distinct radius buckets fill the cache: vary the rect height
-        // (radius = 0.5 * max(w, h)).
         let mut first = GradientId(0);
         for i in 0..MAX_GRADIENTS {
             let h = 20.0 + f64::from(i as u32) * 2.0;
@@ -461,11 +520,9 @@ mod tests {
             assert_eq!(t.gradient_cache().len(), i + 1);
         }
         assert_eq!(t.gradient_cache().len(), MAX_GRADIENTS);
-        // Touching bucket 0 again reuses its id (cache hit).
         let f = t.frame(RectPx::new(0.0, 0.0, 10.0, 20.0), true, 2000.0, true);
         assert_eq!(f.gradient, first);
         assert_eq!(t.gradient_cache().len(), MAX_GRADIENTS);
-        // A new bucket evicts the least-recently-used entry with a fresh id.
         let f = t.frame(
             RectPx::new(0.0, 0.0, 10.0, 20.0 + 2.0 * 32.0),
             true,
