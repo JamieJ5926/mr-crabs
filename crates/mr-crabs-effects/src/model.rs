@@ -730,7 +730,7 @@ mod tests {
     }
 
     #[test]
-    fn resize_reveals_new_cells_and_preserves_prefix() {
+    fn resize_bypasses_reveal_and_adopts_new_snapshot() {
         let mut m = model(TextAnimation::Streaming, 2, 1);
         let cursor = CursorState::default();
         let old = GridSize::new(2, 1);
@@ -739,29 +739,30 @@ mod tests {
         assert_eq!(f.revealing.len(), 2);
         assert!(f.revealing.iter().all(|r| r.change_ms == 1000.0));
 
-        // Resize to 3x2 at t=1500: the stored prefix survives (cells 0,1
-        // keep their keys), new cells are marked changed at the resize
-        // time, and rebuilt rows diff against the preserved snapshot.
+        // A resize changes the cell coordinate space. The model must
+        // discard old timestamps, bypass animation for the resize
+        // frame, and adopt its final cells as the new snapshot.
         let new = GridSize::new(3, 2);
-        let rows = vec![row(0, 2, &[65, 66, 67]), row(1, 1, &[88, 32, 32])];
-        let f = m.apply_frame(&frame_at(new, 2, rows, cursor), 1500, true);
-        assert_eq!(f.revealing.len(), 4); // (0,2) + row 1's three cells
-        assert!(
-            f.revealing
-                .iter()
-                .all(|r| r.change_ms == 1500.0 && r.pos.row == 1 || r.pos == CellPos::new(0, 2))
-        );
-        // Unchanged prefix cells (0,0)/(0,1) were not restamped: after the
-        // 1500 window elapses, a real change at (0,0) restamps only it.
+        let resized_rows = vec![row(0, 2, &[65, 66, 67]), row(1, 1, &[88, 32, 32])];
+        let f = m.apply_frame(&frame_at(new, 2, resized_rows.clone(), cursor), 1500, true);
+        assert!(!f.text_reveal_allowed);
+        assert!(!f.needs_frame);
+        assert!(f.revealing.is_empty());
+        assert!(f.pending.is_empty());
+
+        // Repainting the adopted generations does not restart an
+        // effect, which also proves the resized snapshot was stored.
+        let f = m.apply_frame(&frame_at(new, 3, resized_rows, cursor), 1600, true);
+        assert!(f.is_idle());
+
+        // A subsequent real key change still receives one fresh
+        // timestamp, without reanimating the adopted cells.
         let rows = vec![row(0, 3, &[90, 66, 67])];
-        let f = m.apply_frame(&frame_at(new, 3, rows, cursor), 3000, true);
-        let z = f
-            .revealing
-            .iter()
-            .find(|r| r.pos == CellPos::new(0, 0))
-            .unwrap();
-        assert_eq!(z.change_ms, 3000.0);
-        assert_eq!(f.revealing.len(), 1); // (0,1)/(0,2) unchanged content
+        let f = m.apply_frame(&frame_at(new, 4, rows, cursor), 3000, true);
+        assert_eq!(f.revealing.len(), 1);
+        let changed = &f.revealing[0];
+        assert_eq!(changed.pos, CellPos::new(0, 0));
+        assert_eq!(changed.change_ms, 3000.0);
     }
 
     #[test]
