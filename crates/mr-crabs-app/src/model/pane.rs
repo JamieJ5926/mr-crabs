@@ -862,6 +862,8 @@ pub struct PaneModel {
     latest_dock: Option<Arc<super::input_dock::InputDockSnapshot>>,
     pub preferred_mode: SurfaceMode,
     transcript: Vec<super::presentation::ConversationEvent>,
+    /// Conservative PtyTranscript grid projection, rebuilt on frame publish.
+    cached_grid_projection: Option<Arc<super::presentation::ConversationEvent>>,
     apc_scanner: apc::Scanner,
     apc_handler: apc::Handler,
     osc_tap: Osc1337Tap,
@@ -923,6 +925,7 @@ impl PaneModel {
             latest_dock: None,
             preferred_mode: SurfaceMode::Terminal,
             transcript: Vec::new(),
+            cached_grid_projection: None,
             apc_scanner: apc::Scanner::new(),
             apc_handler: apc::Handler::new(),
             osc_tap: Osc1337Tap::new(),
@@ -1038,6 +1041,7 @@ impl PaneModel {
                 self.latch_osc133();
                 self.latest_dock =
                     Some(Arc::new(super::input_dock::derive_input_dock(self, false)));
+                self.refresh_conversation_cache();
             }
             Err(err) => {
                 self.core.release_frame(frame);
@@ -1711,9 +1715,22 @@ impl PaneModel {
         if !eligible || mode != SurfaceMode::Chat || !events.is_empty() {
             return events;
         }
+        if let Some(cached) = self.cached_grid_projection.as_ref() {
+            events.push((**cached).clone());
+        }
+        events
+    }
 
+    fn refresh_conversation_cache(&mut self) {
+        self.cached_grid_projection = self.project_grid_transcript().map(Arc::new);
+    }
+
+    fn project_grid_transcript(&self) -> Option<super::presentation::ConversationEvent> {
         let snapshot = self.core.terminal_snapshot();
         let cols = usize::from(snapshot.size.cols);
+        if cols == 0 {
+            return None;
+        }
         let mut lines = Vec::new();
         for cells in snapshot.cells.chunks(cols) {
             let mut line = String::new();
@@ -1729,15 +1746,15 @@ impl PaneModel {
                 lines.push(line);
             }
         }
-        if !lines.is_empty() {
-            events.push(super::presentation::ConversationEvent::new(
-                self.latest_frame.as_ref().map_or(0, |frame| frame.sequence),
-                super::presentation::ConversationKind::Output,
-                lines.join("\n"),
-                super::presentation::ConversationSource::PtyTranscript,
-            ));
+        if lines.is_empty() {
+            return None;
         }
-        events
+        Some(super::presentation::ConversationEvent::new(
+            self.latest_frame.as_ref().map_or(0, |frame| frame.sequence),
+            super::presentation::ConversationKind::Output,
+            lines.join("\n"),
+            super::presentation::ConversationSource::PtyTranscript,
+        ))
     }
 
     pub fn push_transcript_event(&mut self, event: super::presentation::ConversationEvent) {

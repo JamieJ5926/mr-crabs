@@ -50,7 +50,8 @@ use mr_crabs_terminal::FrameDelta;
 use crate::model::app_model::AppModel;
 use crate::model::geometry::{PaddingPx, SurfaceGeometry};
 use crate::model::input_dock::{
-    InputDockLayout, InputDockSnapshot, InputDockState, PointF, hit_test_dock, remap_pointer,
+    CHROME_TOTAL, InputDockLayout, InputDockSnapshot, InputDockState, PointF, hit_test_dock,
+    remap_pointer,
 };
 use crate::model::presentation::{ConversationEvent, SurfaceMode};
 use crate::model::split::{GridRect, PaneId};
@@ -435,6 +436,7 @@ impl Render for WindowView {
                 bundle.pane_geometry.content.height,
             )
         });
+        let dock_chrome_active = focused_dock.is_some();
 
         let key_model = self.model.clone();
         let key_shell = self.shell.clone();
@@ -697,7 +699,8 @@ impl Render for WindowView {
                     let overlay_scroll_model = self.model.clone();
                     let overlay_scroll_pane = pane_id;
                     let overlay_scroll_geometry = pane_geometry;
-                    let overlay_scroll_layout = layout;
+                    let overlay_scroll_left = left;
+                    let overlay_scroll_top = top;
                     let overlay_model = self.model.clone();
                     let overlay_pane = pane_id;
                     let overlay_geometry = pane_geometry;
@@ -772,30 +775,13 @@ impl Render for WindowView {
                             );
                         })
                         .on_scroll_wheel(move |event, _, cx| {
-                            // Scroll on dock: pass through to viewport when not remapped, else handle via route_dock_mouse remap
-                            let delta = match event.delta {
-                                gpui::ScrollDelta::Pixels(d) => {
-                                    f32::from(d.y) / overlay_scroll_geometry.metrics.height.max(1.0)
-                                }
-                                gpui::ScrollDelta::Lines(d) => d.y,
-                            };
-                            if delta == 0.0 {
-                                return;
-                            }
-                            // Use same hit logic: if over dock cells, scroll viewport via remapped coords not needed; just passthrough scroll handling on pane
-                            route_dock_mouse(
+                            route_scroll(
                                 &overlay_scroll_model,
-                                DockMouseRoute {
-                                    pane_id: overlay_scroll_pane,
-                                    geometry: overlay_scroll_geometry,
-                                    layout: overlay_scroll_layout,
-                                    window_x: f32::from(event.position.x),
-                                    window_y: f32::from(event.position.y),
-                                    button: None,
-                                    action: InputMouseAction::Press,
-                                    modifiers: event.modifiers,
-                                    click_count: 0,
-                                },
+                                overlay_scroll_pane,
+                                overlay_scroll_geometry,
+                                overlay_scroll_left,
+                                overlay_scroll_top,
+                                event,
                                 cx,
                             );
                         }),
@@ -835,7 +821,7 @@ impl Render for WindowView {
                     left,
                     top,
                     width,
-                    height,
+                    chat_overlay_height(height, dock_chrome_active),
                 ));
             }
         }
@@ -1237,6 +1223,15 @@ fn route_drop_paths(
         model.focus_pane(pane_id);
         model.write_to_pane(pane_id, &bytes);
     });
+}
+
+fn chat_overlay_height(pane_height: f32, dock_chrome_active: bool) -> f32 {
+    let reserved = if dock_chrome_active {
+        CHROME_TOTAL
+    } else {
+        0.0
+    };
+    (pane_height - reserved).max(0.0)
 }
 
 fn chat_overlay(
@@ -1850,6 +1845,18 @@ mod tests {
             None
         );
     }
+
+    #[test]
+    fn chat_overlay_reserves_dock_chrome_below_transcript() {
+        let pane_height = 480.0;
+        let reserved = chat_overlay_height(pane_height, true);
+        let unreserved = chat_overlay_height(pane_height, false);
+        assert_eq!(unreserved, pane_height);
+        assert_eq!(reserved, pane_height - CHROME_TOTAL);
+        assert!(reserved + CHROME_TOTAL <= pane_height);
+        assert_eq!(chat_overlay_height(50.0, true), 0.0);
+    }
+
     #[gpui::test]
     fn palette_printable_keys_do_not_leak_to_pty_writer(cx: &mut gpui::TestAppContext) {
         use crate::model::app_model::AppModel;
