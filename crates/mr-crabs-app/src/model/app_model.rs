@@ -398,7 +398,9 @@ impl AppModel {
             pane.set_startup_command(Some(settings.startup_fetch_command.clone()));
         }
         if !settings.fetch_gif_path.is_empty() {
-            pane.set_fetch_gif_path(Some(std::path::PathBuf::from(settings.fetch_gif_path.clone())));
+            pane.set_fetch_gif_path(Some(std::path::PathBuf::from(
+                settings.fetch_gif_path.clone(),
+            )));
         }
         let pane_id = pane.id;
         let mut window = WindowModel::new(window_id, tab_id, pane_id, size).ok()?;
@@ -427,7 +429,9 @@ impl AppModel {
             pane.set_startup_command(Some(settings.startup_fetch_command.clone()));
         }
         if !settings.fetch_gif_path.is_empty() {
-            pane.set_fetch_gif_path(Some(std::path::PathBuf::from(settings.fetch_gif_path.clone())));
+            pane.set_fetch_gif_path(Some(std::path::PathBuf::from(
+                settings.fetch_gif_path.clone(),
+            )));
         }
         let pane_id = pane.id;
         let mut window = WindowModel::new(window_id, tab_id, pane_id, size).ok()?;

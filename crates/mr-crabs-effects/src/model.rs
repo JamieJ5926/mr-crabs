@@ -230,7 +230,9 @@ impl EffectsModel {
                         for rd in &frame.rows {
                             if rd.row == target {
                                 if let Some(region) = anim_region {
-                                    if rd.row >= region.row && rd.row < region.row + region.size.rows {
+                                    if rd.row >= region.row
+                                        && rd.row < region.row + region.size.rows
+                                    {
                                         break;
                                     }
                                 }

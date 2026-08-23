@@ -20,8 +20,7 @@ pub use compress::{compress_page, decompress_page};
 pub use delta::{
     AnimationRegion, CursorShape, CursorState, FrameDelta, FrameHyperlink, FramePoint, FrameRange,
     FrameSearchMatch, ImageDeltaPlaceholder, RowDelta, Run, SelectionKind, SelectionState,
-    TerminalViewport,
-    batch_runs,
+    TerminalViewport, batch_runs,
 };
 pub use frame_pool::{FramePool, frame_pool_default};
 pub use side_tables::{
@@ -735,14 +734,27 @@ impl Terminal {
         self.storage.config()
     }
 
-    pub fn blit_region(&mut self, row: u16, col: u16, size: GridSize, cells: &[Cell], styles: &[Style]) -> Result<(), TerminalError> {
+    pub fn blit_region(
+        &mut self,
+        row: u16,
+        col: u16,
+        size: GridSize,
+        cells: &[Cell],
+        styles: &[Style],
+    ) -> Result<(), TerminalError> {
         if size.cols == 0 || size.rows == 0 {
             return Err(TerminalError::InvalidRegion);
         }
-        if row.checked_add(size.rows).is_none_or(|end| end > self.size.rows) {
+        if row
+            .checked_add(size.rows)
+            .is_none_or(|end| end > self.size.rows)
+        {
             return Err(TerminalError::InvalidRegion);
         }
-        if col.checked_add(size.cols).is_none_or(|end| end > self.size.cols) {
+        if col
+            .checked_add(size.cols)
+            .is_none_or(|end| end > self.size.cols)
+        {
             return Err(TerminalError::InvalidRegion);
         }
         if cells.len() != usize::from(size.cols) * usize::from(size.rows) {
@@ -768,7 +780,10 @@ impl Terminal {
             return Err(TerminalError::StyleOverflow);
         }
         let snapshot_cursor = self.protocol.engine().cursor();
-        let result = self.protocol.engine_mut().blit_region(row, col, size, cells, styles);
+        let result = self
+            .protocol
+            .engine_mut()
+            .blit_region(row, col, size, cells, styles);
         if result.is_ok() {
             let _ = self.protocol.engine_mut().restore_cursor(snapshot_cursor);
         }

@@ -31,8 +31,8 @@ use mr_crabs_terminal::{
 };
 use parking_lot::Mutex;
 
-use crate::AppCore;
 use super::fetch_animation::FetchDriver;
+use crate::AppCore;
 
 use super::geometry::SurfaceGeometry;
 use super::pane_sink::{PaneProtocolSink, PaneSinkEvent};
@@ -1044,7 +1044,8 @@ impl PaneModel {
                 self.frame_hyperlinks(&mut frame.hyperlinks);
                 if let Some(driver) = &self.fetch_driver {
                     if let Some((row, col, size)) = driver.animation_region() {
-                        frame.animation_region = Some(mr_crabs_terminal::AnimationRegion { row, col, size });
+                        frame.animation_region =
+                            Some(mr_crabs_terminal::AnimationRegion { row, col, size });
                     }
                 }
                 self.latest_frame = Some(Arc::new(frame));
@@ -1696,7 +1697,11 @@ impl PaneModel {
             return false;
         };
         let history = self.core.terminal.history_len();
-        if self.core.blit_region(row, col, size, cells, styles).is_err() {
+        if self
+            .core
+            .blit_region(row, col, size, cells, styles)
+            .is_err()
+        {
             driver.invalidate();
             return false;
         }
@@ -1939,7 +1944,12 @@ mod tests {
         pane.session = PaneSession::from_receivers(size, Some(receiver), None);
         pane.set_fetch_driver_for_test(FetchDriver::new(Some(test_fetch_animation())));
         pane.rebuild_frame();
-        assert!(pane.frame().expect("fetch frame").animation_region.is_some());
+        assert!(
+            pane.frame()
+                .expect("fetch frame")
+                .animation_region
+                .is_some()
+        );
 
         sender.send(b"x".to_vec()).expect("PTY output");
         let stats = pane.pump(1);

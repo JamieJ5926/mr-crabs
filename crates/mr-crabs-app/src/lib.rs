@@ -189,7 +189,14 @@ impl AppCore {
         self.frame_pool.release(frame);
     }
 
-    pub fn blit_region(&mut self, row: u16, col: u16, size: GridSize, cells: &[mr_crabs_terminal::Cell], styles: &[mr_crabs_terminal::Style]) -> Result<(), TerminalError> {
+    pub fn blit_region(
+        &mut self,
+        row: u16,
+        col: u16,
+        size: GridSize,
+        cells: &[mr_crabs_terminal::Cell],
+        styles: &[mr_crabs_terminal::Style],
+    ) -> Result<(), TerminalError> {
         self.terminal.blit_region(row, col, size, cells, styles)
     }
 

@@ -1,7 +1,7 @@
 use std::path::Path;
 
-use image::codecs::gif::GifDecoder;
 use image::AnimationDecoder;
+use image::codecs::gif::GifDecoder;
 
 use mr_crabs_terminal::{Cell, GridSize, NormalizedColor, Style};
 
@@ -64,8 +64,8 @@ fn validate_bytes(bytes: &[u8]) -> Result<(), String> {
 
 pub fn decode_gif_bytes(bytes: &[u8], grid: GridSize) -> Result<FetchAnimation, String> {
     validate_bytes(bytes)?;
-    let decoder = GifDecoder::new(std::io::Cursor::new(bytes))
-        .map_err(|e| format!("gif decode: {e}"))?;
+    let decoder =
+        GifDecoder::new(std::io::Cursor::new(bytes)).map_err(|e| format!("gif decode: {e}"))?;
     let frames = decoder
         .into_frames()
         .collect_frames()
@@ -115,7 +115,11 @@ pub fn decode_gif_bytes(bytes: &[u8], grid: GridSize) -> Result<FetchAnimation, 
                 let bot_y = (row as u32 * 2 + 1) * fh / (target_h as u32 * 2);
                 let bot_y = bot_y.min(fh - 1);
                 let top = buf.get_pixel(src_x, top_y);
-                let bot = if fh > 1 { buf.get_pixel(src_x, bot_y) } else { top };
+                let bot = if fh > 1 {
+                    buf.get_pixel(src_x, bot_y)
+                } else {
+                    top
+                };
                 let top_a = top[3];
                 let bot_a = bot[3];
                 let (ch, style) = if top_a < 128 && bot_a < 128 {
@@ -125,7 +129,9 @@ pub fn decode_gif_bytes(bytes: &[u8], grid: GridSize) -> Result<FetchAnimation, 
                         '\u{2580}',
                         Style {
                             foreground: NormalizedColor::Rgb([top[0], top[1], top[2]]),
-                            background: NormalizedColor::Named(mr_crabs_terminal::NamedColorValue::Background),
+                            background: NormalizedColor::Named(
+                                mr_crabs_terminal::NamedColorValue::Background,
+                            ),
                             underline: None,
                         },
                     )
@@ -134,7 +140,9 @@ pub fn decode_gif_bytes(bytes: &[u8], grid: GridSize) -> Result<FetchAnimation, 
                         '\u{2584}',
                         Style {
                             foreground: NormalizedColor::Rgb([bot[0], bot[1], bot[2]]),
-                            background: NormalizedColor::Named(mr_crabs_terminal::NamedColorValue::Background),
+                            background: NormalizedColor::Named(
+                                mr_crabs_terminal::NamedColorValue::Background,
+                            ),
                             underline: None,
                         },
                     )
@@ -192,11 +200,13 @@ pub fn load_fetch_animation(path: &Path, grid: GridSize) -> Option<FetchAnimatio
 impl FetchDriver {
     pub fn new(animation: Option<FetchAnimation>) -> Self {
         let playing = animation.as_ref().is_some_and(|a| a.frames.len() > 1);
-        let remaining = animation.as_ref().and_then(|animation| match animation.loop_policy {
-            LoopPolicy::Forever => None,
-            LoopPolicy::Once => Some(1),
-            LoopPolicy::Count(count) => Some(count),
-        });
+        let remaining = animation
+            .as_ref()
+            .and_then(|animation| match animation.loop_policy {
+                LoopPolicy::Forever => None,
+                LoopPolicy::Once => Some(1),
+                LoopPolicy::Count(count) => Some(count),
+            });
         let next_deadline = animation
             .as_ref()
             .filter(|_| playing)
@@ -275,14 +285,18 @@ impl FetchDriver {
                 let new_size = GridSize::new(new_cols, new_rows);
                 let mut new_frames = Vec::new();
                 for f in anim.frames {
-                    let mut cells = Vec::with_capacity(usize::from(new_cols) * usize::from(new_rows));
+                    let mut cells =
+                        Vec::with_capacity(usize::from(new_cols) * usize::from(new_rows));
                     for r in 0..new_rows {
                         for c in 0..new_cols {
                             let idx = r as usize * anim.size.cols as usize + c as usize;
                             cells.push(f.cells.get(idx).copied().unwrap_or_default());
                         }
                     }
-                    new_frames.push(FetchFrame { delay_ms: f.delay_ms, cells });
+                    new_frames.push(FetchFrame {
+                        delay_ms: f.delay_ms,
+                        cells,
+                    });
                 }
                 self.animation = Some(FetchAnimation {
                     size: new_size,
@@ -291,13 +305,15 @@ impl FetchDriver {
                     styles: anim.styles,
                 });
                 self.index = 0;
-                self.next_deadline = self.now_ms + self.animation.as_ref().unwrap().frames[0].delay_ms;
+                self.next_deadline =
+                    self.now_ms + self.animation.as_ref().unwrap().frames[0].delay_ms;
                 return;
             }
             if let Some(rerastered) = load_fetch_animation(path, grid) {
                 self.animation = Some(rerastered);
                 self.index = 0;
-                self.next_deadline = self.now_ms + self.animation.as_ref().unwrap().frames[0].delay_ms;
+                self.next_deadline =
+                    self.now_ms + self.animation.as_ref().unwrap().frames[0].delay_ms;
                 return;
             }
         }
@@ -442,8 +458,7 @@ mod tests {
 
     #[test]
     fn once_loop_completion_removes_deadline() {
-        let mut animation =
-            decode_gif_bytes(&tiny_gif_bytes(), GridSize::new(80, 24)).unwrap();
+        let mut animation = decode_gif_bytes(&tiny_gif_bytes(), GridSize::new(80, 24)).unwrap();
         animation.loop_policy = LoopPolicy::Once;
         let mut driver = FetchDriver::new(Some(animation));
 
@@ -464,8 +479,7 @@ mod tests {
 
     #[test]
     fn resize_can_move_the_next_deadline_earlier() {
-        let mut animation =
-            decode_gif_bytes(&tiny_gif_bytes(), GridSize::new(80, 24)).unwrap();
+        let mut animation = decode_gif_bytes(&tiny_gif_bytes(), GridSize::new(80, 24)).unwrap();
         animation.frames[0].delay_ms = 16;
         animation.frames[1].delay_ms = 5000;
         let mut driver = FetchDriver::new(Some(animation));
