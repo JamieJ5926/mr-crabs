@@ -1856,7 +1856,6 @@ mod tests {
         assert!(reserved + CHROME_TOTAL <= pane_height);
         assert_eq!(chat_overlay_height(50.0, true), 0.0);
     }
-
     #[gpui::test]
     fn palette_printable_keys_do_not_leak_to_pty_writer(cx: &mut gpui::TestAppContext) {
         use crate::model::app_model::AppModel;
