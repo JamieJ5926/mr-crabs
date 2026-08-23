@@ -582,13 +582,14 @@ impl Render for WindowView {
                 );
             });
             let scroll_model = self.model.clone();
+            let scroll_shell = self.shell.clone();
             let surface = surface.on_scroll_wheel(move |event, _, cx| {
                 route_scroll(
                     &scroll_model,
+                    &scroll_shell,
                     mouse_pane_id,
                     mouse_geometry,
-                    left,
-                    top,
+                    PointF { x: left, y: top },
                     event,
                     cx,
                 );
@@ -633,6 +634,8 @@ impl Render for WindowView {
                     let dock_layout = layout;
                     let mask_move_model = self.model.clone();
                     let mask_up_model = self.model.clone();
+                    let mask_scroll_model = self.model.clone();
+                    let mask_scroll_shell = self.shell.clone();
                     root = root.child(
                         input_dock_mask(layout, tokens)
                             .on_any_mouse_down(move |event, _, cx| {
@@ -685,9 +688,34 @@ impl Render for WindowView {
                                     },
                                     cx,
                                 );
+                            })
+                            .on_scroll_wheel(move |event, _, cx| {
+                                route_scroll(
+                                    &mask_scroll_model,
+                                    &mask_scroll_shell,
+                                    dock_pane,
+                                    dock_geometry,
+                                    PointF { x: left, y: top },
+                                    event,
+                                    cx,
+                                );
                             }),
                     );
-                    root = root.child(input_dock_separator(layout, tokens));
+                    let sep_scroll_model = self.model.clone();
+                    let sep_scroll_shell = self.shell.clone();
+                    root = root.child(input_dock_separator(layout, tokens).on_scroll_wheel(
+                        move |event, _, cx| {
+                            route_scroll(
+                                &sep_scroll_model,
+                                &sep_scroll_shell,
+                                dock_pane,
+                                dock_geometry,
+                                PointF { x: left, y: top },
+                                event,
+                                cx,
+                            );
+                        },
+                    ));
                     let overlay_move_model = self.model.clone();
                     let overlay_move_pane = pane_id;
                     let overlay_move_geometry = pane_geometry;
@@ -697,6 +725,7 @@ impl Render for WindowView {
                     let overlay_up_geometry = pane_geometry;
                     let overlay_up_layout = layout;
                     let overlay_scroll_model = self.model.clone();
+                    let overlay_scroll_shell = self.shell.clone();
                     let overlay_scroll_pane = pane_id;
                     let overlay_scroll_geometry = pane_geometry;
                     let overlay_scroll_left = left;
@@ -777,16 +806,33 @@ impl Render for WindowView {
                         .on_scroll_wheel(move |event, _, cx| {
                             route_scroll(
                                 &overlay_scroll_model,
+                                &overlay_scroll_shell,
                                 overlay_scroll_pane,
                                 overlay_scroll_geometry,
-                                overlay_scroll_left,
-                                overlay_scroll_top,
+                                PointF {
+                                    x: overlay_scroll_left,
+                                    y: overlay_scroll_top,
+                                },
                                 event,
                                 cx,
                             );
                         }),
                     );
-                    root = root.child(input_dock_footer(&snap, layout, tokens));
+                    let footer_scroll_model = self.model.clone();
+                    let footer_scroll_shell = self.shell.clone();
+                    root = root.child(input_dock_footer(&snap, layout, tokens).on_scroll_wheel(
+                        move |event, _, cx| {
+                            route_scroll(
+                                &footer_scroll_model,
+                                &footer_scroll_shell,
+                                dock_pane,
+                                dock_geometry,
+                                PointF { x: left, y: top },
+                                event,
+                                cx,
+                            );
+                        },
+                    ));
                 }
             }
         }
@@ -1131,10 +1177,10 @@ fn route_mouse_move(
 
 fn route_scroll(
     model: &Entity<AppModel>,
+    shell: &WeakEntity<AppShell>,
     pane_id: PaneId,
     geometry: SurfaceGeometry,
-    left: f32,
-    top: f32,
+    origin: PointF,
     event: &ScrollWheelEvent,
     cx: &mut App,
 ) {
@@ -1154,16 +1200,16 @@ fn route_scroll(
     let mouse = MouseRoute {
         pane_id,
         geometry,
-        local_x: f32::from(event.position.x) - left,
-        local_y: f32::from(event.position.y) - top,
+        local_x: f32::from(event.position.x) - origin.x,
+        local_y: f32::from(event.position.y) - origin.y,
         button: Some(button),
         action: InputMouseAction::Press,
         modifiers: event.modifiers,
         click_count: 0,
     };
-    model.update(cx, |model, _| {
+    let offset_changed = model.update(cx, |model, _| {
         let Some((window_id, tab_id)) = model.locate_pane(pane_id) else {
-            return;
+            return false;
         };
         let bytes = model
             .window(window_id)
@@ -1187,21 +1233,26 @@ fn route_scroll(
             .unwrap_or_default();
         if !bytes.is_empty() {
             model.write_to_pane(pane_id, &bytes);
-            return;
+            return false;
         }
         let Some(pane) = model
             .window_mut(window_id)
             .and_then(|window| window.tabs.get_mut(&tab_id))
             .and_then(|tab| tab.pane_mut(pane_id))
         else {
-            return;
+            return false;
         };
+        let before = pane.viewport_offset();
         if delta > 0.0 {
             pane.scroll_viewport_up(lines);
         } else {
             pane.scroll_viewport_down(lines);
         }
+        pane.viewport_offset() != before
     });
+    if offset_changed {
+        let _ = shell.update(cx, |shell, cx| shell.refresh_windows(cx));
+    }
 }
 
 fn route_drop_paths(
@@ -1253,30 +1304,23 @@ fn chat_overlay(
     } else {
         gpui::rgb(0xe5e5e5).into()
     };
-    let border: gpui::Hsla = if is_light {
-        gpui::rgba(0x2020_2033).into()
-    } else {
-        gpui::rgba(0xe5e5_e533).into()
-    };
     let mut list = gpui::div()
         .absolute()
-        .left(gpui::px(pane_left + 8.0))
-        .top(gpui::px(pane_top + 8.0))
-        .w(gpui::px((pane_width - 16.0).max(0.0)))
-        .h(gpui::px((pane_height - 16.0).max(0.0)))
+        .left(gpui::px(pane_left))
+        .top(gpui::px(pane_top))
+        .w(gpui::px(pane_width.max(0.0)))
+        .h(gpui::px(pane_height.max(0.0)))
         .flex()
         .flex_col()
         .gap(gpui::px(6.0))
-        .p(gpui::px(10.0))
-        .rounded(gpui::px(8.0))
-        .border_1()
-        .border_color(border)
+        .p(gpui::px(18.0))
         .bg(panel)
         .text_color(foreground)
         .id(gpui::ElementId::Name(gpui::SharedString::from(
             "chat-overlay",
         )))
-        .role(gpui::Role::Region);
+        .role(gpui::Role::Region)
+        .occlude();
     for ev in events {
         list = list.child(
             gpui::div()
@@ -1375,8 +1419,8 @@ fn handle_key_event(
         && !event.keystroke.modifiers.alt
         && !event.keystroke.modifiers.platform)
         .then_some(match event.keystroke.key.as_str() {
-            "pageup" => Some(true),
-            "pagedown" => Some(false),
+            "pageup" | "up" => Some(true),
+            "pagedown" | "down" => Some(false),
             _ => None,
         })
         .flatten();
@@ -1410,6 +1454,7 @@ fn handle_key_event(
             copied_text = shell_model
                 .focused_pane_mut()
                 .and_then(crate::model::pane::PaneModel::selected_text);
+            model_cx.stop_propagation();
             return;
         }
         if let Some(up) = page_scroll {
@@ -1422,6 +1467,7 @@ fn handle_key_event(
                 }
             }
             refresh_immediately = true;
+            model_cx.stop_propagation();
             return;
         }
         if is_paste {
@@ -1441,6 +1487,7 @@ fn handle_key_event(
                     shell_model.write_to_pane(pane_id, &bytes);
                 }
             }
+            model_cx.stop_propagation();
             return;
         }
         let keystroke = shell_keystroke(&event.keystroke);
@@ -1458,6 +1505,7 @@ fn handle_key_event(
         if let Some(pane_id) = shell_model.focused_pane_id() {
             if let Some(bytes) = command_backspace_bytes(&event.keystroke, action) {
                 write_terminal_bytes(shell_model, pane_id, bytes);
+                model_cx.stop_propagation();
                 return;
             }
             if let Some(input) = to_input_key_event(&event.keystroke, action) {
@@ -1466,6 +1514,9 @@ fn handle_key_event(
                     .map(|pane| encode_live_key(&pane.core, &input))
                     .unwrap_or_default();
                 write_terminal_bytes(shell_model, pane_id, &bytes);
+                if !bytes.is_empty() {
+                    model_cx.stop_propagation();
+                }
             }
         }
     });
@@ -1505,6 +1556,7 @@ fn handle_key_release(model: &Entity<AppModel>, event: &KeyUpEvent, cx: &mut App
             .unwrap_or_default();
         if !bytes.is_empty() {
             shell_model.write_to_pane(pane_id, &bytes);
+            cx.stop_propagation();
         }
     });
 }
@@ -2196,14 +2248,14 @@ mod tests {
         );
     }
 
-    fn attach_fake_writer(
-        cx: &mut gpui::App,
-    ) -> (
+    type FakeWriterFixture = (
         gpui::Entity<AppModel>,
         gpui::Entity<AppShell>,
         std::sync::mpsc::Receiver<Vec<u8>>,
         std::sync::mpsc::SyncSender<Vec<u8>>,
-    ) {
+    );
+
+    fn attach_fake_writer(cx: &mut gpui::App) -> FakeWriterFixture {
         use crate::model::app_model::AppModel;
         use crate::model::pane::PaneSession;
         use crate::ui::shell::AppShell;
@@ -2332,8 +2384,7 @@ mod tests {
         });
 
         assert_eq!(
-            bytes,
-            expected,
+            bytes, expected,
             "Cmd+V must write exactly one bracketed payload and no second IME copy, got {bytes:?}"
         );
         assert_eq!(
@@ -2360,8 +2411,9 @@ mod tests {
                 let pane = model.focused_pane_mut().expect("pane");
                 pane.feed_test_output(b"\x1b]133;A\x07$ \x1b]133;B\x07")
                     .expect("prompt");
-                for i in 0..40 {
-                    pane.feed_test_output(format!("line-{i:02}\r\n").as_bytes())
+                let line_count = usize::from(pane.last_size.rows) + 32;
+                for i in 0..line_count {
+                    pane.feed_test_output(format!("line-{i:03}\r\n").as_bytes())
                         .expect("history");
                 }
                 pane.feed_test_output(b"\x1b]133;A\x07$ \x1b]133;B\x07")
@@ -2432,9 +2484,14 @@ mod tests {
         });
         draw_window(cx, handle);
 
+        let dock_y = cx
+            .update_window(handle, |_, window, _| {
+                window.viewport_size().height - gpui::px(40.0)
+            })
+            .unwrap();
         let mut visual = gpui::VisualTestContext::from_window(handle, cx);
         visual.simulate_event(ScrollWheelEvent {
-            position: gpui::point(gpui::px(40.0), gpui::px(520.0)),
+            position: gpui::point(gpui::px(40.0), dock_y),
             delta: ScrollDelta::Lines(gpui::point(0.0, 3.0)),
             modifiers: GpuiModifiers::default(),
             touch_phase: gpui::TouchPhase::Moved,
@@ -2467,9 +2524,7 @@ mod tests {
     }
 
     #[gpui::test]
-    fn shifted_pageup_and_shift_up_fn_alias_scroll_without_pty_csi(
-        cx: &mut gpui::TestAppContext,
-    ) {
+    fn shifted_pageup_and_shift_up_fn_alias_scroll_without_pty_csi(cx: &mut gpui::TestAppContext) {
         let (model, shell, writer_rx, _reader_tx) = cx.update(attach_fake_writer);
         let _keep_shell = shell;
         let handle = cx.windows().into_iter().next().expect("one window");
@@ -2478,8 +2533,9 @@ mod tests {
         cx.update(|cx| {
             model.update(cx, |model, _| {
                 let pane = model.focused_pane_mut().expect("pane");
-                for i in 0..40 {
-                    pane.feed_test_output(format!("hist-{i:02}\r\n").as_bytes())
+                let line_count = usize::from(pane.last_size.rows) + 32;
+                for i in 0..line_count {
+                    pane.feed_test_output(format!("hist-{i:03}\r\n").as_bytes())
                         .expect("history");
                 }
             });
@@ -2488,8 +2544,13 @@ mod tests {
 
         cx.dispatch_keystroke(handle, Keystroke::parse("shift-pageup").unwrap());
         draw_window(cx, handle);
-        let page_offset =
-            cx.update(|cx| model.read(cx).focused_pane().expect("pane").viewport_offset());
+        let page_offset = cx.update(|cx| {
+            model
+                .read(cx)
+                .focused_pane()
+                .expect("pane")
+                .viewport_offset()
+        });
         assert!(
             page_offset > 0,
             "Shift+PageUp must scroll the viewport, offset={page_offset}"
@@ -2511,8 +2572,13 @@ mod tests {
 
         cx.dispatch_keystroke(handle, Keystroke::parse("shift-up").unwrap());
         draw_window(cx, handle);
-        let up_offset =
-            cx.update(|cx| model.read(cx).focused_pane().expect("pane").viewport_offset());
+        let up_offset = cx.update(|cx| {
+            model
+                .read(cx)
+                .focused_pane()
+                .expect("pane")
+                .viewport_offset()
+        });
         let up_bytes = drain_writer(&writer_rx);
         assert!(
             up_offset > 0,
@@ -2542,8 +2608,13 @@ mod tests {
         });
         cx.dispatch_keystroke(handle, Keystroke::parse("shift-fn-up").unwrap());
         draw_window(cx, handle);
-        let fn_offset =
-            cx.update(|cx| model.read(cx).focused_pane().expect("pane").viewport_offset());
+        let fn_offset = cx.update(|cx| {
+            model
+                .read(cx)
+                .focused_pane()
+                .expect("pane")
+                .viewport_offset()
+        });
         let fn_bytes = drain_writer(&writer_rx);
         assert!(
             fn_offset > 0,
@@ -2565,12 +2636,39 @@ mod tests {
         cx.update(|cx| {
             model.update(cx, |model, _| {
                 let pane = model.focused_pane_mut().expect("pane");
-                for i in 0..20 {
-                    pane.feed_test_output(format!("pri-{i:02}\r\n").as_bytes())
+                let line_count = usize::from(pane.last_size.rows) + 32;
+                for i in 0..line_count {
+                    pane.feed_test_output(format!("pri-{i:03}\r\n").as_bytes())
                         .expect("primary");
                 }
-                pane.feed_test_output(b"\x1b[?1049hALT")
-                    .expect("alternate");
+            });
+        });
+        draw_window(cx, handle);
+
+        let mut visual = gpui::VisualTestContext::from_window(handle, cx);
+        visual.simulate_event(ScrollWheelEvent {
+            position: gpui::point(gpui::px(40.0), gpui::px(40.0)),
+            delta: ScrollDelta::Lines(gpui::point(0.0, 5.0)),
+            modifiers: GpuiModifiers::default(),
+            touch_phase: gpui::TouchPhase::Moved,
+        });
+        drop(visual);
+        draw_window(cx, handle);
+        assert!(
+            cx.update(|cx| model
+                .read(cx)
+                .focused_pane()
+                .expect("pane")
+                .viewport_offset())
+                > 0,
+            "the primary-screen wheel must reach route_scroll before testing fallback"
+        );
+
+        cx.update(|cx| {
+            model.update(cx, |model, _| {
+                let pane = model.focused_pane_mut().expect("pane");
+                pane.scroll_viewport_down(usize::MAX);
+                pane.feed_test_output(b"\x1b[?1049hALT").expect("alternate");
             });
         });
         draw_window(cx, handle);
@@ -2658,16 +2756,13 @@ mod tests {
             .map(|event| event.text.as_str())
             .collect::<Vec<_>>()
             .join("\n");
+        let countdown: Vec<&str> = joined.lines().filter(|line| !line.is_empty()).collect();
+        assert_eq!(countdown.last(), Some(&"200"), "got {countdown:?}");
         assert!(
-            joined.contains("1") && joined.contains("200"),
-            "seq fixture must keep countdown 1 and 200, got {joined:?}"
-        );
-        assert!(
-            !joined.contains("j 200")
-                && !joined.contains("Chat:")
-                && !joined.contains("[chat]")
-                && !joined.contains("assistant:"),
-            "countdown rows must have no synthetic prefix, got {joined:?}"
+            countdown
+                .iter()
+                .all(|line| line.bytes().all(|byte| byte.is_ascii_digit())),
+            "countdown rows must contain only the PTY digits, got {countdown:?}"
         );
 
         cx.dispatch_keystroke(handle, Keystroke::parse("cmd-shift-j").unwrap());
@@ -2714,5 +2809,4 @@ mod tests {
             "second Cmd+Shift+J must remove the Chat overlay exactly once"
         );
     }
-
 }

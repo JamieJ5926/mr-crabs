@@ -210,12 +210,17 @@ pub fn derive_input_dock(pane: &PaneModel, palette_open: bool) -> InputDockSnaps
     if semantic
         .input_start_row
         .is_some_and(|start_row| start_row != cursor.row)
-        || cursor.wrap_pending
     {
         return hidden(fallback_span, fallback_cursor, semantic.prompt_kind);
     }
 
-    let source = project_source_span(semantic, cursor.col, cursor.row, cursor.wrap_pending);
+    let source = project_source_span(
+        semantic,
+        &snapshot,
+        cursor.col,
+        cursor.row,
+        cursor.wrap_pending,
+    );
     let projection = extract_span_cells(&snapshot, source);
     InputDockSnapshot {
         state: InputDockState::ShellInputActive,
@@ -240,18 +245,21 @@ pub fn derive_input_dock(pane: &PaneModel, palette_open: bool) -> InputDockSnaps
 }
 
 /// Fish/A-only: whole cursor row from col 0. zsh after B: `input_start_col`.
+/// The source row spans to the grid edge so the caret never truncates live input.
 pub fn project_source_span(
     semantic: &SemanticPromptState,
+    snapshot: &NormalizedSnapshot,
     cursor_col: u16,
     cursor_row: u16,
     wrap_pending: bool,
 ) -> DockSourceSpan {
     let row = semantic.input_start_row.unwrap_or(cursor_row);
     let start_col = semantic.input_start_col.unwrap_or(0);
-    let mut end_col = cursor_col.max(start_col.saturating_add(1));
-    if wrap_pending {
-        end_col = end_col.saturating_add(1);
-    }
+    let end_col = snapshot
+        .size
+        .cols
+        .max(cursor_col.saturating_add(u16::from(wrap_pending)))
+        .max(start_col.saturating_add(1));
     DockSourceSpan {
         row,
         start_col,
@@ -698,13 +706,13 @@ mod tests {
         semantic.content = SemanticContent::Input;
         semantic.input_start_col = Some(4);
         semantic.input_start_row = Some(2);
-        let span = project_source_span(&semantic, 7, 2, false);
+        let span = project_source_span(&semantic, &empty_snapshot(80, 3, 7, 2), 7, 2, false);
         assert_eq!(
             span,
             DockSourceSpan {
                 row: 2,
                 start_col: 4,
-                end_col: 7,
+                end_col: 80,
             }
         );
     }
@@ -754,23 +762,29 @@ mod tests {
         let mut pane = PaneModel::detached(PaneId::new(1), GridSize::new(80, 24)).expect("pane");
         pane.feed_test_output(b"\x1b]133;A\x07$ \x1b]133;B\x07old")
             .expect("first prompt");
-        pane.feed_test_output(b"\r\n\x1b]133;P;k=i\x07(reverse-i-search)`': \x1b]133;B\x07")
-            .expect("ctrl-r shaped redraw");
+        pane.feed_test_output(b"\r\n\x1b]133;P;k=i\x07(reverse-i-search)`': ")
+            .expect("prompt redraw");
 
         let semantic = pane.core.semantic_state();
-        let snapshot = pane.core.terminal_snapshot();
-        let snap = derive_input_dock(&pane, false);
+        let cursor = pane.core.terminal_snapshot().cursor;
+        assert_eq!(semantic.input_start_row, None);
+        assert_eq!(semantic.input_start_col, None);
+        assert_eq!(semantic.content, SemanticContent::Prompt);
         assert_eq!(
-            snap.state,
+            derive_input_dock(&pane, false).state,
             InputDockState::ShellInputActive,
-            "stale input_start coordinates must not hide the current prompt dock; input_start_row={:?} cursor_row={} content={:?} row={:?}",
-            semantic.input_start_row,
-            snapshot.cursor.row,
-            semantic.content,
-            semantic.row
+            "PromptStart must not retain the previous input row"
+        );
+
+        pane.feed_test_output(b"\x1b]133;B\x07")
+            .expect("start current input");
+        let semantic = pane.core.semantic_state();
+        assert_eq!(semantic.input_start_row, Some(cursor.row));
+        assert_eq!(
+            derive_input_dock(&pane, false).state,
+            InputDockState::ShellInputActive
         );
     }
-
 
     #[test]
     fn extract_span_never_splits_wide_pair() {

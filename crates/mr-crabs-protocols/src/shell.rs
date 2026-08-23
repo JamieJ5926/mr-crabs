@@ -238,18 +238,22 @@ impl SemanticPromptState {
                 } else {
                     self.prompt_kind = None;
                 }
+                self.input_start_col = None;
+                self.input_start_row = None;
                 self.content = SemanticContent::Prompt;
                 self.row = RowSemantic::Prompt;
                 vec![SemanticAction::MarkPrompt]
             }
             Action::EndPromptStartInput => {
                 self.content = SemanticContent::Input;
+                self.row = RowSemantic::Input;
                 self.input_start_col = Some(cursor_col);
                 self.input_start_row = Some(cursor_row);
                 vec![SemanticAction::MarkInput]
             }
             Action::EndPromptStartInputTerminateEol => {
                 self.content = SemanticContent::Input;
+                self.row = RowSemantic::Input;
                 self.input_start_col = Some(cursor_col);
                 self.input_start_row = Some(cursor_row);
                 vec![SemanticAction::ClearInputEol]
@@ -391,6 +395,7 @@ mod tests {
         // B: input starts
         s.apply(&sp(Action::EndPromptStartInput, ""), 2, 1);
         assert_eq!(s.content, SemanticContent::Input);
+        assert_eq!(s.row, RowSemantic::Input);
         assert_eq!(s.input_start_col, Some(2));
         assert_eq!(s.input_start_row, Some(1));
         assert!(s.cursor_is_at_prompt());
@@ -463,5 +468,4 @@ mod tests {
         assert_eq!(s.input_start_row, Some(5));
         assert!(s.cursor_is_at_prompt());
     }
-
 }

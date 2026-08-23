@@ -956,6 +956,11 @@ impl AppModel {
         };
         let eligible = pane.is_chat_eligible(self.palette.is_open(), false);
         if !eligible {
+            if pane.preferred_mode == crate::model::presentation::SurfaceMode::Chat {
+                pane.preferred_mode = crate::model::presentation::SurfaceMode::Terminal;
+                self.generation += 1;
+                return ActionResult::performed("chat hidden");
+            }
             return ActionResult::ignored("chat not eligible on this pane");
         }
         let next = match pane.preferred_mode {
@@ -1774,6 +1779,52 @@ mod tests {
                 .expect("focused frame")
                 .sequence,
             sequence_before
+        );
+    }
+
+    #[test]
+    fn chat_toggle_exits_preferred_chat_while_terminal_fallback_is_active() {
+        let mut model = headless();
+        model
+            .focused_pane_mut()
+            .expect("pane")
+            .feed_test_output(b"\x1b]133;A\x07")
+            .expect("semantic prompt");
+        assert!(model.dispatch(AppAction::ToggleChatPresentation).performed);
+        assert_eq!(
+            model.focused_pane().expect("pane").preferred_mode,
+            crate::model::presentation::SurfaceMode::Chat
+        );
+
+        model
+            .focused_pane_mut()
+            .expect("pane")
+            .feed_test_output(b"\x1b[?1049h")
+            .expect("alternate screen");
+        assert_eq!(
+            model
+                .focused_pane()
+                .expect("pane")
+                .effective_mode(false, false),
+            crate::model::presentation::SurfaceMode::Terminal
+        );
+        assert!(model.dispatch(AppAction::ToggleChatPresentation).performed);
+        assert_eq!(
+            model.focused_pane().expect("pane").preferred_mode,
+            crate::model::presentation::SurfaceMode::Terminal
+        );
+
+        model
+            .focused_pane_mut()
+            .expect("pane")
+            .feed_test_output(b"\x1b[?1049l")
+            .expect("primary screen");
+        assert_eq!(
+            model
+                .focused_pane()
+                .expect("pane")
+                .effective_mode(false, false),
+            crate::model::presentation::SurfaceMode::Terminal
         );
     }
 
