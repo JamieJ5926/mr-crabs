@@ -249,7 +249,9 @@ impl EffectsModel {
                                 break;
                             }
                         }
-                    } else if is_full && !can_translate {
+                    } else if (is_full && !can_translate)
+                        || self.config.text_animation == TextAnimation::Typewriter
+                    {
                         for target_row in 0..self.size.rows {
                             let Some(rd) = frame.rows.iter().find(|rd| rd.row == target_row) else {
                                 continue;
@@ -259,13 +261,23 @@ impl EffectsModel {
                                     continue;
                                 }
                             }
-                            tracker.reconcile_full_row(
-                                rd.row,
-                                rd.generation,
-                                &rd.cells,
-                                now,
-                                &mut self.schedule,
-                            );
+                            if is_full && !can_translate {
+                                tracker.reconcile_full_row(
+                                    rd.row,
+                                    rd.generation,
+                                    &rd.cells,
+                                    now,
+                                    &mut self.schedule,
+                                );
+                            } else {
+                                tracker.update_row(
+                                    rd.row,
+                                    rd.generation,
+                                    &rd.cells,
+                                    now,
+                                    &mut self.schedule,
+                                );
+                            }
                         }
                     } else {
                         for rd in &frame.rows {
@@ -861,6 +873,42 @@ mod tests {
         };
         assert_eq!(timestamps(1), vec![2000.0; 3]);
         assert_eq!(timestamps(2), vec![2015.0; 4]);
+    }
+
+    #[test]
+    fn typewriter_partial_frame_stamps_rows_in_visual_order() {
+        let size = GridSize::new(4, 3);
+        let mut m = model(TextAnimation::Typewriter, 4, 3);
+        let cursor = CursorState::default();
+        let mut baseline = frame_at(
+            size,
+            1,
+            vec![
+                row(0, 1, &[32, 32, 32, 32]),
+                row(1, 1, &[32, 32, 32, 32]),
+                row(2, 1, &[32, 32, 32, 32]),
+            ],
+            cursor,
+        );
+        baseline.damage = DamageKind::Full;
+        let _ = m.apply_frame(&baseline, 1000, true);
+
+        let output_and_prompt = frame_at(
+            size,
+            2,
+            vec![row(2, 2, &[80, 82, 79, 77]), row(1, 2, &[69, 82, 82, 32])],
+            cursor,
+        );
+        let frame = m.apply_frame(&output_and_prompt, 2000, true);
+
+        assert!(
+            frame.revealing.iter().any(|reveal| reveal.pos.row == 1),
+            "the earlier output row must reveal first"
+        );
+        assert!(
+            frame.pending.iter().all(|pos| pos.row == 2),
+            "the following prompt row must remain pending"
+        );
     }
 
     #[test]

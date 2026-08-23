@@ -2531,7 +2531,7 @@ mod tests {
         .expect("pane fixture feed should succeed");
         cache.apply_frame(&pane.frame().expect("frame before clear"));
 
-        pane.feed_test_output(b"\x1b[H\x1b[2J\x1b[3Jprompt> ")
+        pane.feed_test_output(b"\x1b[3J\x1b[H\x1b[2Jprompt> ")
             .expect("clear sequence should succeed");
         let clear_frame = pane.frame().expect("frame after clear");
         cache.apply_frame(&clear_frame);

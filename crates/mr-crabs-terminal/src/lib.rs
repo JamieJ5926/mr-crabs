@@ -629,6 +629,7 @@ impl Terminal {
     fn sync_saved_history_clear(&mut self) {
         if self.protocol.take_saved_history_cleared() {
             self.storage.clear();
+            let _ = self.protocol.engine_mut().take_scrolled_rows();
         }
     }
 
