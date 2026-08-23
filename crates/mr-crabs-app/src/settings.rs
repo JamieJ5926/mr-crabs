@@ -1246,12 +1246,10 @@ mod tests {
         let defaults = AppSettings::default();
         assert!(defaults.startup_fetch);
         assert_eq!(defaults.startup_fetch_command, "rustfetch");
-        assert_eq!(defaults.fetch_gif_path, "fetch/default.gif");
 
         let effective = defaults.effective_config();
         assert!(effective.startup_fetch);
         assert_eq!(effective.startup_fetch_command, "rustfetch");
-        assert_eq!(effective.fetch_gif_path, "fetch/default.gif");
     }
 
     fn unique_stamp() -> u128 {

@@ -31,7 +31,7 @@ use crate::palette::{CommandRegistry, PaletteState};
 use crate::platform::PlatformCapabilities;
 use crate::quick_terminal::QuickTerminalState;
 use crate::restore::{RestoreError, RestoreStore, ShellStateV1};
-use mr_crabs_config::{ConfigOverlay, SettingKey};
+use mr_crabs_config::SettingKey;
 
 use crate::secure_input::SecureInputState;
 use crate::settings::{SettingsError, SettingsStore};
@@ -42,28 +42,6 @@ use super::pane::{PaneModel, PtySpawnConfig, SearchApply};
 use super::split::{PaneId, SplitAxis, SplitDirection};
 use super::tab::{ClosePaneOutcome, TabId, TabModel};
 use super::window::{TabCloseOutcome, WindowId, WindowModel, WindowPumpStats};
-fn resolve_fetch_gif_path(configured: &str) -> PathBuf {
-    let configured = PathBuf::from(configured);
-    if configured.is_absolute() {
-        return configured;
-    }
-    if let Ok(executable) = std::env::current_exe()
-        && let Some(binary_dir) = executable.parent()
-    {
-        let packaged = binary_dir.join("../Resources").join(&configured);
-        if packaged.is_file() {
-            return packaged;
-        }
-    }
-    let checkout = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../resources")
-        .join(&configured);
-    if checkout.is_file() {
-        return checkout;
-    }
-    configured
-}
-
 /// The result of dispatching one action.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ActionResult {
@@ -182,22 +160,9 @@ impl AppModel {
 
     /// A fully headless shell: detached panes only, no platform services.
     pub fn headless() -> Self {
-        let mut runtime = ConfigOverlay::default();
-        runtime
-            .set(SettingKey::FetchGifPath, "")
-            .expect("empty GIF path is valid");
-        let settings = SettingsStore::from_layers(
-            ConfigOverlay::default(),
-            ConfigOverlay::default(),
-            runtime,
-            None,
-            None,
-            crate::settings::SettingsSource::Json("{}".to_string()),
-            None,
-        );
         Self::with_platform_settings_and_output_wake(
             PlatformCapabilities::headless(),
-            settings,
+            SettingsStore::new(),
             None,
         )
     }
@@ -433,7 +398,9 @@ impl AppModel {
             pane.set_startup_command(Some(settings.startup_fetch_command.clone()));
         }
         if !settings.fetch_gif_path.is_empty() {
-            pane.set_fetch_gif_path(Some(resolve_fetch_gif_path(&settings.fetch_gif_path)));
+            pane.set_fetch_gif_path(Some(std::path::PathBuf::from(
+                settings.fetch_gif_path.clone(),
+            )));
         }
         let pane_id = pane.id;
         let mut window = WindowModel::new(window_id, tab_id, pane_id, size).ok()?;
@@ -462,7 +429,9 @@ impl AppModel {
             pane.set_startup_command(Some(settings.startup_fetch_command.clone()));
         }
         if !settings.fetch_gif_path.is_empty() {
-            pane.set_fetch_gif_path(Some(resolve_fetch_gif_path(&settings.fetch_gif_path)));
+            pane.set_fetch_gif_path(Some(std::path::PathBuf::from(
+                settings.fetch_gif_path.clone(),
+            )));
         }
         let pane_id = pane.id;
         let mut window = WindowModel::new(window_id, tab_id, pane_id, size).ok()?;
@@ -2193,17 +2162,6 @@ mod tests {
             before,
             "removed trace must not receive events"
         );
-    }
-
-    #[test]
-    fn default_fetch_gif_resolves_and_decodes() {
-        let configured = mr_crabs_config::DEFAULT_FETCH_GIF_PATH;
-        let resolved = resolve_fetch_gif_path(configured);
-        assert!(resolved.is_file(), "default GIF must be packaged");
-        let driver =
-            crate::model::fetch_animation::FetchDriver::from_path(&resolved, GridSize::new(80, 24));
-        assert!(driver.size().is_some(), "default GIF must decode");
-        assert!(driver.needs_frame(), "default GIF must animate");
     }
 
     #[test]
