@@ -4,6 +4,11 @@ on:
   push:
     branches:
       - fix/issue-19-text-animation-render-dedup
+  pull_request:
+    paths:
+      - crates/mr-crabs-effects/**
+      - Cargo.toml
+      - Cargo.lock
 
 permissions:
   contents: read
