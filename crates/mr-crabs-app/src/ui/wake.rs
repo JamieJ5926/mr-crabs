@@ -100,6 +100,15 @@ fn pump_now(cx: &mut App) -> bool {
     PUMPING.with(|flag| flag.set(true));
     let changed = pump_now_inner(cx);
     PUMPING.with(|flag| flag.set(false));
+    let dirty = WAKE.with(|slot| {
+        slot.borrow()
+            .as_ref()
+            .map(|state| state.dirty.load(Ordering::Acquire))
+            .unwrap_or(false)
+    });
+    if dirty {
+        schedule_main_pump();
+    }
     changed
 }
 
@@ -130,9 +139,7 @@ fn pump_now_inner(cx: &mut App) -> bool {
         )
     });
     if changed && let Some(shell) = shell.upgrade() {
-        cx.defer(move |cx| {
-            shell.update(cx, |shell, cx| shell.refresh_windows(cx));
-        });
+        shell.update(cx, |shell, cx| shell.refresh_windows(cx));
     }
     if should_quit {
         cx.quit();

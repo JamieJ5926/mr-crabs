@@ -210,12 +210,11 @@ pub fn derive_input_dock(pane: &PaneModel, palette_open: bool) -> InputDockSnaps
     if semantic
         .input_start_row
         .is_some_and(|start_row| start_row != cursor.row)
-        || cursor.wrap_pending
     {
         return hidden(fallback_span, fallback_cursor, semantic.prompt_kind);
     }
 
-    let source = project_source_span(semantic, cursor.col, cursor.row, cursor.wrap_pending);
+    let source = project_source_span(semantic, snapshot.size.cols, cursor.row);
     let projection = extract_span_cells(&snapshot, source);
     InputDockSnapshot {
         state: InputDockState::ShellInputActive,
@@ -240,22 +239,18 @@ pub fn derive_input_dock(pane: &PaneModel, palette_open: bool) -> InputDockSnaps
 }
 
 /// Fish/A-only: whole cursor row from col 0. zsh after B: `input_start_col`.
+/// The source row spans to the grid edge so the caret never truncates live input.
 pub fn project_source_span(
     semantic: &SemanticPromptState,
-    cursor_col: u16,
+    cols: u16,
     cursor_row: u16,
-    wrap_pending: bool,
 ) -> DockSourceSpan {
     let row = semantic.input_start_row.unwrap_or(cursor_row);
     let start_col = semantic.input_start_col.unwrap_or(0);
-    let mut end_col = cursor_col.max(start_col.saturating_add(1));
-    if wrap_pending {
-        end_col = end_col.saturating_add(1);
-    }
     DockSourceSpan {
         row,
         start_col,
-        end_col,
+        end_col: cols.max(start_col.saturating_add(1)),
     }
 }
 
@@ -698,14 +693,83 @@ mod tests {
         semantic.content = SemanticContent::Input;
         semantic.input_start_col = Some(4);
         semantic.input_start_row = Some(2);
-        let span = project_source_span(&semantic, 7, 2, false);
+        let span = project_source_span(&semantic, 80, 2);
         assert_eq!(
             span,
             DockSourceSpan {
                 row: 2,
                 start_col: 4,
-                end_col: 7,
+                end_col: 80,
             }
+        );
+    }
+
+    #[test]
+    fn text_right_of_moved_cursor_stays_in_snapshot_and_synthetic_frame() {
+        let mut pane = PaneModel::detached(PaneId::new(1), GridSize::new(80, 24)).expect("pane");
+        pane.feed_test_output(b"\x1b]133;A\x07$ \x1b]133;B\x07hello")
+            .expect("feed");
+        pane.feed_test_output(b"\x1b[3D")
+            .expect("move cursor left into hello");
+
+        let snap = derive_input_dock(&pane, false);
+        assert_eq!(snap.state, InputDockState::ShellInputActive);
+        let text: String = snap
+            .cells
+            .iter()
+            .filter_map(|cell| char::from_u32(cell.content).filter(|ch| *ch != '\0'))
+            .collect();
+        assert!(
+            text.contains("hello"),
+            "text to the right of the moved cursor must remain in InputDockSnapshot, got {text:?} span={:?} cursor={:?}",
+            snap.source,
+            snap.cursor
+        );
+        assert!(
+            snap.source.end_col > snap.cursor.source_col,
+            "span must extend past the moved cursor so trailing text remains, span={:?} cursor={:?}",
+            snap.source,
+            snap.cursor
+        );
+
+        let frame = synthetic_dock_frame(&snap);
+        let frame_text: String = frame.rows[0]
+            .cells
+            .iter()
+            .filter_map(|cell| char::from_u32(cell.content).filter(|ch| *ch != '\0'))
+            .collect();
+        assert!(
+            frame_text.contains("hello"),
+            "synthetic frame must keep text to the right of the moved cursor, got {frame_text:?}"
+        );
+    }
+
+    #[test]
+    fn osc133_prompt_redraw_does_not_hide_current_prompt_on_stale_input_start() {
+        let mut pane = PaneModel::detached(PaneId::new(1), GridSize::new(80, 24)).expect("pane");
+        pane.feed_test_output(b"\x1b]133;A\x07$ \x1b]133;B\x07old")
+            .expect("first prompt");
+        pane.feed_test_output(b"\r\n\x1b]133;P;k=i\x07(reverse-i-search)`': ")
+            .expect("prompt redraw");
+
+        let semantic = pane.core.semantic_state();
+        let cursor = pane.core.terminal_snapshot().cursor;
+        assert_eq!(semantic.input_start_row, None);
+        assert_eq!(semantic.input_start_col, None);
+        assert_eq!(semantic.content, SemanticContent::Prompt);
+        assert_eq!(
+            derive_input_dock(&pane, false).state,
+            InputDockState::ShellInputActive,
+            "PromptStart must not retain the previous input row"
+        );
+
+        pane.feed_test_output(b"\x1b]133;B\x07")
+            .expect("start current input");
+        let semantic = pane.core.semantic_state();
+        assert_eq!(semantic.input_start_row, Some(cursor.row));
+        assert_eq!(
+            derive_input_dock(&pane, false).state,
+            InputDockState::ShellInputActive
         );
     }
 

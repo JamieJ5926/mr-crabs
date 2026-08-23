@@ -26,8 +26,8 @@ use mr_crabs_pty::{
     CommandBuilder, ExitStatus, OutputWake, PtyConfig, PtyError, PtySession, PtySize, WriteError,
 };
 use mr_crabs_terminal::{
-    Cell, FrameDelta, FrameHyperlink, FramePoint, FrameRange, FrameSearchMatch, GridSize,
-    ScrollbackConfig, SelectionKind, SelectionState, TerminalError,
+    Cell, CellWidth, FrameDelta, FrameHyperlink, FramePoint, FrameRange, FrameSearchMatch,
+    GridSize, ScrollbackConfig, SelectionKind, SelectionState, TerminalError,
 };
 use parking_lot::Mutex;
 
@@ -1735,6 +1735,12 @@ impl PaneModel {
         for cells in snapshot.cells.chunks(cols) {
             let mut line = String::new();
             for cell in cells {
+                if matches!(
+                    cell.width(),
+                    CellWidth::WideSpacer | CellWidth::LeadingWideSpacer
+                ) {
+                    continue;
+                }
                 if let Some(ch) = char::from_u32(cell.content)
                     && ch != '\0'
                 {
