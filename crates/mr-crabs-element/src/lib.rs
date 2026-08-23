@@ -20,6 +20,7 @@ mod geometry;
 mod paint_diagnostics;
 mod palette;
 mod selection;
+pub mod phase;
 
 pub use cache::{CacheAction, Capacities, RectBatch, RenderCache, RowBatch, RunBatch};
 pub use cursor::{

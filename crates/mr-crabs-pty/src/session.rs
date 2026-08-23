@@ -593,6 +593,8 @@ fn reader_loop(
             Err(err) => match err.kind() {
                 io::ErrorKind::Interrupted => continue,
                 io::ErrorKind::WouldBlock => {
+                    #[cfg(feature = "phase-timing")]
+                    let _phase_guard = crate::phase::Guard::new("pty_poll_wait");
                     if !wait_until_ready(&reader_master, libc::POLLIN) {
                         break;
                     }
@@ -620,6 +622,12 @@ fn reader_loop(
                         break 'outer;
                     }
                     data = pending;
+                    #[cfg(feature = "phase-timing")]
+                    {
+                        let _g = crate::phase::Guard::new("pty_queue_full_wait");
+                        thread::sleep(BACKPRESSURE_SLEEP);
+                    }
+                    #[cfg(not(feature = "phase-timing"))]
                     thread::sleep(BACKPRESSURE_SLEEP);
                 }
                 Err(TrySendError::Disconnected(_)) => {

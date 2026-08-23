@@ -1,25 +1,25 @@
 {
   "schema_version": 1,
   "suite": "release",
-  "bench_binary": "/Users/jamie/Documents/Projects/active/mr-crabs-rust/target/release/mr-crabs-bench",
-  "baseline": "/Users/jamie/Documents/Projects/active/mr-crabs-rust/verification/baselines/oracle-baseline.json",
-  "corpus": "/Users/jamie/Documents/Projects/active/mr-crabs-rust/verification/corpus/replay/payloads.json",
+  "bench_binary": "/Users/jamie/.cargo-target/release/mr-crabs-bench",
+  "baseline": "verification/baselines/oracle-baseline.json",
+  "corpus": "verification/corpus/replay/payloads.json",
   "warmup_runs": 1,
   "repetitions": 5,
   "provenance": {
-    "source_commit": "51c5299292950611d2062b2cbd5934c65cbe71d4",
+    "source_commit": "e5a4b26bdf708c33f77ae584f1b6d963ff579896",
     "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14) (Homebrew)\nbinary: rustc\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\ncommit-date: 2026-07-14\nhost: aarch64-apple-darwin\nrelease: 1.97.1\nLLVM version: 22.1.8",
     "cargo": "cargo 1.97.1 (c980f4866 2026-06-30) (Homebrew)",
     "platform": "macOS-26.5-arm64-arm-64bit-Mach-O",
     "machine": "arm64",
     "processor": "arm",
     "logical_cpus": 12,
-    "bench_sha256": "148070dac49de84ecf35eb48c9c2ac48ac97052412b30c4d191aabd9dbd1c094"
+    "bench_sha256": "fc592cce2de44a7236c89b50f9b6ac538914781681490b52126ab82550da0f96"
   },
   "workloads": {
     "ascii_10mb": {
-      "verdict": "FAIL",
-      "status": "failed",
+      "verdict": "PASS",
+      "status": "unknown",
       "runs": [
         {
           "status": "measured",
@@ -49,60 +49,58 @@
       ],
       "aggregate": {
         "allocated_bytes": {
-          "median": 1952208
+          "median": 208
         },
         "allocations": {
-          "median": 1004
+          "median": 3
         },
         "current_rss_bytes": {
-          "median": 8962048
+          "median": 7667712
         },
         "max_rss_bytes": {
-          "median": 8962048
+          "median": 7667712
         },
         "payload_bytes": {
           "median": 10485760
         },
         "peak_footprint_bytes": {
-          "median": 4047184
+          "median": 2769256
         },
         "throughput_mib_s": {
-          "median": 196.91904014334446
+          "median": 473.29250617516567
         },
         "wall_ns": {
-          "median": 50782291,
-          "p50": 50782291,
-          "p95": 51647083,
-          "p99": 51647083
+          "median": 21128583,
+          "p50": 21128583,
+          "p95": 22350875,
+          "p99": 22350875
         }
       },
       "oracle": {
         "compared": true,
         "checks": {
           "throughput_mib_s": {
-            "ok": false,
-            "ours": 196.91904014334446,
-            "baseline": 316.5571247116362,
-            "reason": "196.91904014334446 is not >= oracle 316.5571247116362"
+            "ok": true,
+            "ours": 473.29250617516567,
+            "baseline": 316.5571247116362
           },
           "max_rss_bytes": {
             "ok": true,
-            "ours": 8962048,
+            "ours": 7667712,
             "baseline": 10092544
           },
           "peak_footprint_bytes": {
             "ok": true,
-            "ours": 4047184,
+            "ours": 2769256,
             "baseline": 8634800
           }
         },
         "ineligible_reason": null
-      },
-      "reason": "oracle comparison failed closed: throughput_mib_s: 196.91904014334446 is not >= oracle 316.5571247116362"
+      }
     },
     "unicode_10mb": {
-      "verdict": "FAIL",
-      "status": "failed",
+      "verdict": "PASS",
+      "status": "unknown",
       "runs": [
         {
           "status": "measured",
@@ -132,56 +130,54 @@
       ],
       "aggregate": {
         "allocated_bytes": {
-          "median": 1952208
+          "median": 208
         },
         "allocations": {
-          "median": 1004
+          "median": 3
         },
         "current_rss_bytes": {
-          "median": 9011200
+          "median": 7766016
         },
         "max_rss_bytes": {
-          "median": 9011200
+          "median": 7766016
         },
         "payload_bytes": {
           "median": 10485760
         },
         "peak_footprint_bytes": {
-          "median": 4096336
+          "median": 2818408
         },
         "throughput_mib_s": {
-          "median": 200.56660064682728
+          "median": 240.48361254482765
         },
         "wall_ns": {
-          "median": 49858750,
-          "p50": 49858750,
-          "p95": 50252625,
-          "p99": 50252625
+          "median": 41582875,
+          "p50": 41582875,
+          "p95": 42242208,
+          "p99": 42242208
         }
       },
       "oracle": {
         "compared": true,
         "checks": {
           "throughput_mib_s": {
-            "ok": false,
-            "ours": 200.56660064682728,
-            "baseline": 230.08185944428052,
-            "reason": "200.56660064682728 is not >= oracle 230.08185944428052"
+            "ok": true,
+            "ours": 240.48361254482765,
+            "baseline": 230.08185944428052
           },
           "max_rss_bytes": {
             "ok": true,
-            "ours": 9011200,
+            "ours": 7766016,
             "baseline": 10125312
           },
           "peak_footprint_bytes": {
             "ok": true,
-            "ours": 4096336,
+            "ours": 2818408,
             "baseline": 8651184
           }
         },
         "ineligible_reason": null
-      },
-      "reason": "oracle comparison failed closed: throughput_mib_s: 200.56660064682728 is not >= oracle 230.08185944428052"
+      }
     },
     "scrollback_1m": {
       "verdict": "FAIL",
@@ -215,16 +211,16 @@
       ],
       "aggregate": {
         "allocated_bytes": {
-          "median": 812965916
+          "median": 108299167
         },
         "allocations": {
-          "median": 25674
+          "median": 21909
         },
         "compressed_bytes": {
-          "median": 8276
+          "median": 5732
         },
         "current_rss_bytes": {
-          "median": 15400960
+          "median": 8896512
         },
         "hot_resident_bytes": {
           "median": 0
@@ -233,22 +229,22 @@
           "median": 1000000
         },
         "max_rss_bytes": {
-          "median": 15400960
+          "median": 8896512
         },
         "payload_bytes": {
           "median": 5000000
         },
         "peak_footprint_bytes": {
-          "median": 10502528
+          "median": 3998080
         },
         "throughput_mib_s": {
-          "median": 13.69618736454401
+          "median": 119.54950952245572
         },
         "wall_ns": {
-          "median": 348153209,
-          "p50": 348153209,
-          "p95": 349910708,
-          "p99": 349910708
+          "median": 39886166,
+          "p50": 39886166,
+          "p95": 44416000,
+          "p99": 44416000
         }
       },
       "oracle": {
@@ -256,26 +252,24 @@
         "checks": {
           "throughput_mib_s": {
             "ok": false,
-            "ours": 13.69618736454401,
+            "ours": 119.54950952245572,
             "baseline": 123.93710271594871,
-            "reason": "13.69618736454401 is not >= oracle 123.93710271594871"
+            "reason": "119.54950952245572 is not >= oracle 123.93710271594871"
           },
           "max_rss_bytes": {
-            "ok": false,
-            "ours": 15400960,
-            "baseline": 10059776,
-            "reason": "15400960 is not <= oracle 10059776"
+            "ok": true,
+            "ours": 8896512,
+            "baseline": 10059776
           },
           "peak_footprint_bytes": {
-            "ok": false,
-            "ours": 10502528,
-            "baseline": 8618416,
-            "reason": "10502528 is not <= oracle 8618416"
+            "ok": true,
+            "ours": 3998080,
+            "baseline": 8618416
           }
         },
         "ineligible_reason": null
       },
-      "reason": "oracle comparison failed closed: throughput_mib_s: 13.69618736454401 is not >= oracle 123.93710271594871; max_rss_bytes: 15400960 is not <= oracle 10059776; peak_footprint_bytes: 10502528 is not <= oracle 8618416"
+      "reason": "oracle comparison failed closed: throughput_mib_s: 119.54950952245572 is not >= oracle 123.93710271594871"
     },
     "resize_storm": {
       "verdict": "PASS",
@@ -309,13 +303,13 @@
       ],
       "aggregate": {
         "allocated_bytes": {
-          "median": 1066067919
+          "median": 203317549
         },
         "allocations": {
-          "median": 402359
+          "median": 258964
         },
         "current_rss_bytes": {
-          "median": 56279040
+          "median": 117276672
         },
         "dirty_rows": {
           "median": 24
@@ -324,10 +318,10 @@
           "median": 1
         },
         "max_rss_bytes": {
-          "median": 56279040
+          "median": 117276672
         },
         "peak_footprint_bytes": {
-          "median": 51282328
+          "median": 112329184
         },
         "redraw_requests": {
           "median": 1
@@ -336,10 +330,10 @@
           "median": 256
         },
         "wall_ns": {
-          "median": 106182000,
-          "p50": 106182000,
-          "p95": 108291834,
-          "p99": 108291834
+          "median": 52423958,
+          "p50": 52423958,
+          "p95": 53706666,
+          "p99": 53706666
         }
       }
     },
@@ -375,58 +369,58 @@
       ],
       "aggregate": {
         "allocated_bytes": {
-          "median": 82605025
+          "median": 452951253
         },
         "allocations": {
-          "median": 57224
+          "median": 161079
         },
         "current_rss_bytes": {
-          "median": 27623424
+          "median": 382468096
         },
         "dirty_rows": {
           "median": 16741
         },
         "frame_build_mean_ns": {
-          "median": 80716,
-          "p50": 80716,
-          "p95": 81431,
-          "p99": 81431
+          "median": 9827,
+          "p50": 9827,
+          "p95": 10128,
+          "p99": 10128
         },
         "frame_build_p50_ns": {
-          "median": 53083,
-          "p50": 53083,
-          "p95": 53417,
-          "p99": 53417
+          "median": 6583,
+          "p50": 6583,
+          "p95": 6625,
+          "p99": 6625
         },
         "frame_build_p95_ns": {
-          "median": 220791,
-          "p50": 220791,
-          "p95": 223292,
-          "p99": 223292
+          "median": 25541,
+          "p50": 25541,
+          "p95": 27042,
+          "p99": 27042
         },
         "frame_build_p99_ns": {
-          "median": 232333,
-          "p50": 232333,
-          "p95": 245375,
-          "p99": 245375
+          "median": 28750,
+          "p50": 28750,
+          "p95": 34584,
+          "p99": 34584
         },
         "frames_built": {
           "median": 512
         },
         "max_rss_bytes": {
-          "median": 27623424
+          "median": 382468096
         },
         "peak_footprint_bytes": {
-          "median": 22643072
+          "median": 377717480
         },
         "redraw_requests": {
           "median": 512
         },
         "wall_ns": {
-          "median": 111135292,
-          "p50": 111135292,
-          "p95": 111538959,
-          "p99": 111538959
+          "median": 96697125,
+          "p50": 96697125,
+          "p95": 97022458,
+          "p99": 97022458
         }
       }
     },
@@ -462,31 +456,31 @@
       ],
       "aggregate": {
         "allocated_bytes": {
-          "median": 25044169
+          "median": 9982183112
         },
         "allocations": {
-          "median": 2114
+          "median": 158840
         },
         "current_rss_bytes": {
-          "median": 10764288
+          "median": 370262016
         },
         "engines": {
           "median": 1
         },
         "max_rss_bytes": {
-          "median": 10764288
+          "median": 370262016
         },
         "payload_bytes": {
           "median": 1048576
         },
         "peak_footprint_bytes": {
-          "median": 5882216
+          "median": 185041616
         },
         "wall_ns": {
-          "median": 12276333,
-          "p50": 12276333,
-          "p95": 12421167,
-          "p99": 12421167
+          "median": 454937375,
+          "p50": 454937375,
+          "p95": 462630417,
+          "p99": 462630417
         }
       }
     },
@@ -522,31 +516,31 @@
       ],
       "aggregate": {
         "allocated_bytes": {
-          "median": 250441690
+          "median": 99821831120
         },
         "allocations": {
-          "median": 21131
+          "median": 1588391
         },
         "current_rss_bytes": {
-          "median": 36405248
+          "median": 3266871296
         },
         "engines": {
           "median": 10
         },
         "max_rss_bytes": {
-          "median": 36405248
+          "median": 3266871296
         },
         "payload_bytes": {
           "median": 1048576
         },
         "peak_footprint_bytes": {
-          "median": 31556016
+          "median": 1118604336
         },
         "wall_ns": {
-          "median": 119951833,
-          "p50": 119951833,
-          "p95": 122940667,
-          "p99": 122940667
+          "median": 4763408875,
+          "p50": 4763408875,
+          "p95": 4814881625,
+          "p99": 4814881625
         }
       }
     },
@@ -582,31 +576,31 @@
       ],
       "aggregate": {
         "allocated_bytes": {
-          "median": 1252212354
+          "median": 499109159504
         },
         "allocations": {
-          "median": 105658
+          "median": 7941958
         },
         "current_rss_bytes": {
-          "median": 150274048
+          "median": 13017546752
         },
         "engines": {
           "median": 50
         },
         "max_rss_bytes": {
-          "median": 150274048
+          "median": 15157542912
         },
         "payload_bytes": {
           "median": 1048576
         },
         "peak_footprint_bytes": {
-          "median": 145588872
+          "median": 6181549352
         },
         "wall_ns": {
-          "median": 601800042,
-          "p50": 601800042,
-          "p95": 603781334,
-          "p99": 603781334
+          "median": 25532070208,
+          "p50": 25532070208,
+          "p95": 26279060000,
+          "p99": 26279060000
         }
       }
     },
@@ -642,10 +636,10 @@
       ],
       "aggregate": {
         "allocated_bytes": {
-          "median": 7385082
+          "median": 93452846
         },
         "allocations": {
-          "median": 7182
+          "median": 24658
         },
         "cache_ok": {
           "median": true
@@ -654,7 +648,7 @@
           "median": 0
         },
         "current_rss_bytes": {
-          "median": 9732096
+          "median": 85442560
         },
         "frames_built": {
           "median": 601
@@ -666,19 +660,19 @@
           "median": 0
         },
         "max_rss_bytes": {
-          "median": 9732096
+          "median": 85442560
         },
         "peak_footprint_bytes": {
-          "median": 4800872
+          "median": 80593328
         },
         "redraw_requests": {
           "median": 501
         },
         "wall_ns": {
-          "median": 4133042,
-          "p50": 4133042,
-          "p95": 4324541,
-          "p99": 4324541
+          "median": 5366749,
+          "p50": 5366749,
+          "p95": 5458667,
+          "p99": 5458667
         }
       }
     },
@@ -726,7 +720,7 @@
           "median": 0
         },
         "current_rss_bytes": {
-          "median": 6111232
+          "median": 6176768
         },
         "frames_built": {
           "median": 2
@@ -738,16 +732,16 @@
           "median": 0
         },
         "max_rss_bytes": {
-          "median": 6111232
+          "median": 6176768
         },
         "peak_footprint_bytes": {
-          "median": 1524048
+          "median": 1556840
         },
         "wall_ns": {
-          "median": 4542,
-          "p50": 4542,
-          "p95": 5250,
-          "p99": 5250
+          "median": 6084,
+          "p50": 6084,
+          "p95": 7416,
+          "p99": 7416
         }
       }
     },
@@ -783,10 +777,10 @@
       ],
       "aggregate": {
         "allocated_bytes": {
-          "median": 8936
+          "median": 8917
         },
         "allocations": {
-          "median": 14
+          "median": 13
         },
         "child_alive_after_reap": {
           "median": false
@@ -795,31 +789,31 @@
           "median": true
         },
         "current_rss_bytes": {
-          "median": 6422528
+          "median": 6455296
         },
         "exit_code": {
           "median": 1
         },
         "launch_to_prompt_ns": {
-          "median": 6440125,
-          "p50": 6440125,
-          "p95": 6805541,
-          "p99": 6805541
+          "median": 6267292,
+          "p50": 6267292,
+          "p95": 6761042,
+          "p99": 6761042
         },
         "max_rss_bytes": {
-          "median": 6471680
+          "median": 6488064
         },
         "peak_footprint_bytes": {
-          "median": 1605968
+          "median": 1638760
         },
         "prompt_bytes": {
           "median": 138
         },
         "wall_ns": {
-          "median": 18065292,
-          "p50": 18065292,
-          "p95": 19371833,
-          "p99": 19371833
+          "median": 17680125,
+          "p50": 17680125,
+          "p95": 18857000,
+          "p99": 18857000
         }
       }
     },
@@ -858,7 +852,7 @@
           "median": 8388896
         },
         "allocations": {
-          "median": 5429
+          "median": 5407
         },
         "child_alive_after_reap": {
           "median": false
@@ -873,19 +867,19 @@
           "median": 4194304
         },
         "echo_mib_s": {
-          "median": 18.30636386415305
+          "median": 18.405656058106654
         },
         "max_rss_bytes": {
-          "median": 11059200
+          "median": 11042816
         },
         "peak_footprint_bytes": {
-          "median": 6209896
+          "median": 6226304
         },
         "wall_ns": {
-          "median": 218503250,
-          "p50": 218503250,
-          "p95": 227257291,
-          "p99": 227257291
+          "median": 217324500,
+          "p50": 217324500,
+          "p95": 218628667,
+          "p99": 218628667
         }
       }
     },
@@ -927,10 +921,10 @@
           "median": 26638
         },
         "current_rss_bytes": {
-          "median": 6766592
+          "median": 6733824
         },
         "decode_mib_s": {
-          "median": 2459.71639248702
+          "median": 2488.6901548993415
         },
         "decoded_bytes": {
           "median": 31181664
@@ -939,16 +933,16 @@
           "median": 2049
         },
         "max_rss_bytes": {
-          "median": 6766592
+          "median": 6733824
         },
         "peak_footprint_bytes": {
-          "median": 1966416
+          "median": 1982824
         },
         "wall_ns": {
-          "median": 12089667,
-          "p50": 12089667,
-          "p95": 12250542,
-          "p99": 12250542
+          "median": 11948917,
+          "p50": 11948917,
+          "p95": 12040792,
+          "p99": 12040792
         }
       }
     },
@@ -984,13 +978,13 @@
       ],
       "aggregate": {
         "allocated_bytes": {
-          "median": 6348920
+          "median": 53348841
         },
         "allocations": {
-          "median": 5770
+          "median": 17410
         },
         "current_rss_bytes": {
-          "median": 10158080
+          "median": 54149120
         },
         "effects_disabled_retained_capacity": {
           "median": 0
@@ -1002,28 +996,28 @@
           "median": 95520
         },
         "frame_build_mean_ns": {
-          "median": 31332,
-          "p50": 31332,
-          "p95": 32497,
-          "p99": 32497
+          "median": 31249,
+          "p50": 31249,
+          "p95": 31559,
+          "p99": 31559
         },
         "frame_build_p50_ns": {
-          "median": 30542,
-          "p50": 30542,
-          "p95": 31083,
-          "p99": 31083
+          "median": 30708,
+          "p50": 30708,
+          "p95": 31125,
+          "p99": 31125
         },
         "frame_build_p95_ns": {
-          "median": 35333,
-          "p50": 35333,
-          "p95": 39583,
-          "p99": 39583
+          "median": 34250,
+          "p50": 34250,
+          "p95": 34875,
+          "p99": 34875
         },
         "frame_build_p99_ns": {
-          "median": 39875,
-          "p50": 39875,
-          "p95": 49625,
-          "p99": 49625
+          "median": 38833,
+          "p50": 38833,
+          "p95": 41250,
+          "p99": 41250
         },
         "frames_after_expiry": {
           "median": 0
@@ -1035,19 +1029,19 @@
           "median": 0
         },
         "max_rss_bytes": {
-          "median": 10158080
+          "median": 54149120
         },
         "peak_footprint_bytes": {
-          "median": 5161320
+          "median": 49152408
         },
         "redraw_requests": {
           "median": 64
         },
         "wall_ns": {
-          "median": 12996875,
-          "p50": 12996875,
-          "p95": 13073833,
-          "p99": 13073833
+          "median": 12969709,
+          "p50": 12969709,
+          "p95": 13236458,
+          "p99": 13236458
         }
       }
     },
@@ -1083,19 +1077,19 @@
       ],
       "aggregate": {
         "allocated_bytes": {
-          "median": 465764022
+          "median": 466010790
         },
         "allocations": {
           "median": 6000469
         },
         "current_rss_bytes": {
-          "median": 12828672
+          "median": 184991744
         },
         "max_rss_bytes": {
-          "median": 12845056
+          "median": 185024512
         },
         "peak_footprint_bytes": {
-          "median": 7766400
+          "median": 54215232
         },
         "search_lines_scanned": {
           "median": 200000
@@ -1104,10 +1098,10 @@
           "median": 201
         },
         "wall_ns": {
-          "median": 377255084,
-          "p50": 377255084,
-          "p95": 380538625,
-          "p99": 380538625
+          "median": 607715750,
+          "p50": 607715750,
+          "p95": 611460875,
+          "p99": 611460875
         },
         "worker_cancelled": {
           "median": true
@@ -1116,7 +1110,7 @@
           "median": 201
         },
         "worker_round_trip_ns": {
-          "median": 190386250
+          "median": 307103958
         }
       }
     },
@@ -1251,8 +1245,8 @@
   },
   "overall": "FAIL",
   "summary": {
-    "pass": 12,
-    "fail": 3,
+    "pass": 14,
+    "fail": 1,
     "blocked": 4
   },
   "reason": "one or more workloads failed"

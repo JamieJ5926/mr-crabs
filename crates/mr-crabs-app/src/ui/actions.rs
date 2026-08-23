@@ -36,6 +36,10 @@ gpui::actions!(
         SearchNext,
         SearchPrevious,
         Quit,
+        SetTextAnimationNone,
+        SetTextAnimationStreaming,
+        SetTextAnimationTypewriter,
+        ToggleCursorTrail,
     ]
 );
 
@@ -65,6 +69,10 @@ pub fn gpui_action_name(action: AppAction) -> &'static str {
         AppAction::SearchNext => "mr_crabs::SearchNext",
         AppAction::SearchPrevious => "mr_crabs::SearchPrevious",
         AppAction::Quit => "mr_crabs::Quit",
+        AppAction::SetTextAnimationNone => "mr_crabs::SetTextAnimationNone",
+        AppAction::SetTextAnimationStreaming => "mr_crabs::SetTextAnimationStreaming",
+        AppAction::SetTextAnimationTypewriter => "mr_crabs::SetTextAnimationTypewriter",
+        AppAction::ToggleCursorTrail => "mr_crabs::ToggleCursorTrail",
     }
 }
 
@@ -108,6 +116,10 @@ pub fn action_struct(action: AppAction) -> Box<dyn Action> {
         AppAction::SearchNext => Box::new(SearchNext),
         AppAction::SearchPrevious => Box::new(SearchPrevious),
         AppAction::Quit => Box::new(Quit),
+        AppAction::SetTextAnimationNone => Box::new(SetTextAnimationNone),
+        AppAction::SetTextAnimationStreaming => Box::new(SetTextAnimationStreaming),
+        AppAction::SetTextAnimationTypewriter => Box::new(SetTextAnimationTypewriter),
+        AppAction::ToggleCursorTrail => Box::new(ToggleCursorTrail),
     }
 }
 
@@ -157,6 +169,10 @@ fn binding_for(keys: &str, action: AppAction) -> KeyBinding {
         AppAction::SearchNext => KeyBinding::new(keys, SearchNext, None),
         AppAction::SearchPrevious => KeyBinding::new(keys, SearchPrevious, None),
         AppAction::Quit => KeyBinding::new(keys, Quit, None),
+        AppAction::SetTextAnimationNone => KeyBinding::new(keys, SetTextAnimationNone, None),
+        AppAction::SetTextAnimationStreaming => KeyBinding::new(keys, SetTextAnimationStreaming, None),
+        AppAction::SetTextAnimationTypewriter => KeyBinding::new(keys, SetTextAnimationTypewriter, None),
+        AppAction::ToggleCursorTrail => KeyBinding::new(keys, ToggleCursorTrail, None),
     }
 }
 

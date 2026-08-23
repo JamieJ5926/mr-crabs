@@ -5,10 +5,20 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
+[features]
+phase-timing = [
+    "mr-crabs-pty/phase-timing",
+    "mr-crabs-terminal/phase-timing",
+    "mr-crabs-element/phase-timing",
+]
 
 [[bin]]
 name = "mr-crabs"
 path = "src/bin/mr-crabs.rs"
+
+[[bin]]
+name = "phase-runner"
+path = "src/bin/phase_runner.rs"
 
 [dependencies]
 futures.workspace = true

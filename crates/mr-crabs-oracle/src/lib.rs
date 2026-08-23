@@ -275,14 +275,19 @@ fn feed_chunks(
     let mut terminal = Terminal::new(size)
         .map_err(|error| OracleError::new(format!("invalid terminal size: {error}")))?;
     let mut offset: usize = 0;
-    for &length in lengths {
+    for (index, &length) in lengths.iter().enumerate() {
         let end = offset
             .checked_add(length)
             .ok_or_else(|| OracleError::new("chunk overflow"))?;
         if end > input.len() {
             return Err(OracleError::new("chunk plan exceeds input length"));
         }
-        terminal.feed(&input[offset..end]);
+        terminal.feed(&input[offset..end]).map_err(|error| {
+            OracleError::new(format!(
+                "terminal feed failed at chunk {index} offset {offset} len {length} (input {} bytes): {error}",
+                input.len()
+            ))
+        })?;
         offset = end;
     }
     if offset != input.len() {
@@ -292,15 +297,19 @@ fn feed_chunks(
     }
     Ok(terminal.snapshot())
 }
-
 fn feed_slices<'a>(
     size: GridSize,
     chunks: impl IntoIterator<Item = &'a [u8]>,
 ) -> Result<NormalizedSnapshot, OracleError> {
     let mut terminal = Terminal::new(size)
         .map_err(|error| OracleError::new(format!("invalid terminal size: {error}")))?;
-    for chunk in chunks {
-        terminal.feed(chunk);
+    for (index, chunk) in chunks.into_iter().enumerate() {
+        terminal.feed(chunk).map_err(|error| {
+            OracleError::new(format!(
+                "terminal feed failed at chunk {index} len {} bytes: {error}",
+                chunk.len()
+            ))
+        })?;
     }
     Ok(terminal.snapshot())
 }

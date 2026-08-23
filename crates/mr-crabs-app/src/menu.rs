@@ -232,8 +232,23 @@ mod tests {
         assert!(model.find("File").is_some());
         assert!(model.find("View").is_some());
         assert!(model.find("Window").is_some());
+        // The four live animation controls are palette-only runtime controls
+        // and intentionally absent from production menus.
+        const PALETTE_ONLY: [AppAction; 4] = [
+            AppAction::SetTextAnimationNone,
+            AppAction::SetTextAnimationStreaming,
+            AppAction::SetTextAnimationTypewriter,
+            AppAction::ToggleCursorTrail,
+        ];
         for action in AppAction::ALL {
-            assert!(model.contains_action(action), "menu must expose {action:?}");
+            if PALETTE_ONLY.contains(&action) {
+                assert!(
+                    !model.contains_action(action),
+                    "palette-only action {action:?} must not appear in production menus"
+                );
+            } else {
+                assert!(model.contains_action(action), "menu must expose {action:?}");
+            }
         }
     }
 

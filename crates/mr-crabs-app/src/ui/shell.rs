@@ -203,6 +203,10 @@ impl AppShell {
             SearchNext => SearchNext,
             SearchPrevious => SearchPrevious,
             Quit => Quit,
+            SetTextAnimationNone => SetTextAnimationNone,
+            SetTextAnimationStreaming => SetTextAnimationStreaming,
+            SetTextAnimationTypewriter => SetTextAnimationTypewriter,
+            ToggleCursorTrail => ToggleCursorTrail,
         );
     }
 

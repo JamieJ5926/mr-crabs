@@ -45,8 +45,7 @@ impl BlinkState {
         let changed = self.last_sequence != Some(frame.sequence)
             || self.last_cursor.as_ref() != Some(&frame.cursor);
         if changed {
-            self.last_sequence = Some(frame.sequence);
-            self.last_cursor = Some(frame.cursor.clone());
+            self.last_cursor = Some(frame.cursor);
             self.epoch = Some(now);
         }
         let epoch = *self.epoch.get_or_insert(now);
