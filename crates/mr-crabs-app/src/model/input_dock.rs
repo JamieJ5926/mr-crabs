@@ -214,13 +214,7 @@ pub fn derive_input_dock(pane: &PaneModel, palette_open: bool) -> InputDockSnaps
         return hidden(fallback_span, fallback_cursor, semantic.prompt_kind);
     }
 
-    let source = project_source_span(
-        semantic,
-        &snapshot,
-        cursor.col,
-        cursor.row,
-        cursor.wrap_pending,
-    );
+    let source = project_source_span(semantic, snapshot.size.cols, cursor.row);
     let projection = extract_span_cells(&snapshot, source);
     InputDockSnapshot {
         state: InputDockState::ShellInputActive,
@@ -248,22 +242,15 @@ pub fn derive_input_dock(pane: &PaneModel, palette_open: bool) -> InputDockSnaps
 /// The source row spans to the grid edge so the caret never truncates live input.
 pub fn project_source_span(
     semantic: &SemanticPromptState,
-    snapshot: &NormalizedSnapshot,
-    cursor_col: u16,
+    cols: u16,
     cursor_row: u16,
-    wrap_pending: bool,
 ) -> DockSourceSpan {
     let row = semantic.input_start_row.unwrap_or(cursor_row);
     let start_col = semantic.input_start_col.unwrap_or(0);
-    let end_col = snapshot
-        .size
-        .cols
-        .max(cursor_col.saturating_add(u16::from(wrap_pending)))
-        .max(start_col.saturating_add(1));
     DockSourceSpan {
         row,
         start_col,
-        end_col,
+        end_col: cols.max(start_col.saturating_add(1)),
     }
 }
 
@@ -706,7 +693,7 @@ mod tests {
         semantic.content = SemanticContent::Input;
         semantic.input_start_col = Some(4);
         semantic.input_start_row = Some(2);
-        let span = project_source_span(&semantic, &empty_snapshot(80, 3, 7, 2), 7, 2, false);
+        let span = project_source_span(&semantic, 80, 2);
         assert_eq!(
             span,
             DockSourceSpan {
