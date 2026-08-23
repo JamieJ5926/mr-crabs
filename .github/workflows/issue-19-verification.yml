@@ -8,7 +8,7 @@ permissions:
   contents: write
 
 jobs:
-  implement-and-verify-bypass-fix:
+  align-resize-contract-and-verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,180 +17,70 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-      - name: Implement retained reveal synchronization
+      - name: Align resize regression with coordinate invalidation
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
 
-          key_path = Path("crates/mr-crabs-effects/src/key.rs")
-          key_source = key_path.read_text()
-          if "pub fn sync_rows_without_stamping" not in key_source:
-              marker = "    pub fn adopt_rows(&mut self, rows: &[RowDelta]) {\n"
-              insert = '''    /// Synchronize bypassed rows without assigning fresh reveal stamps.
-              ///
-              /// Existing timestamps survive where the final render key is
-              /// unchanged, so an in-flight reveal can finish across a large or
-              /// Full frame. Cells whose bypassed content changed have their old
-              /// timestamp cleared so stale overlays never conceal replacement
-              /// text. New cells therefore enter the snapshot without animating.
-              pub fn sync_rows_without_stamping(&mut self, rows: &[RowDelta]) {
-                  let mut timestamps_changed = false;
-                  for row in rows {
-                      let row_index = usize::from(row.row);
-                      if row_index >= self.rows {
-                          continue;
-                      }
-                      self.row_generations[row_index] = row.generation;
-                      let base = row_index * self.cols;
-                      let len = row
-                          .cells
-                          .len()
-                          .min(self.cols)
-                          .min(self.cap.saturating_sub(base));
-                      for (col, cell) in row.cells.iter().take(len).enumerate() {
-                          let index = base + col;
-                          let key = cell_render_key(*cell);
-                          if self.snapshot[index] == key {
-                              continue;
-                          }
-                          self.snapshot[index] = key;
-                          if self.change_times[index] != NEVER_BITS {
-                              self.change_times[index] = NEVER_BITS;
-                              self.change_ms[index] = NEVER_MS;
-                              timestamps_changed = true;
-                          }
-                      }
-                  }
-                  if timestamps_changed {
-                      self.last_change_ms = self
-                          .change_ms
-                          .iter()
-                          .copied()
-                          .filter(|value| *value != NEVER_MS)
-                          .fold(NEVER_MS, f64::max);
-                      self.upload_dirty = true;
-                      self.repack();
-                  }
-              }
+          path = Path("crates/mr-crabs-effects/src/model.rs")
+          source = path.read_text()
+          start_marker = "    #[test]\n    fn resize_reveals_new_cells_and_preserves_prefix()"
+          end_marker = "    #[test]\n    fn change_texture_flows_through_model()"
+          if start_marker in source:
+              start = source.index(start_marker)
+              end = source.index(end_marker, start)
+              replacement = '''    #[test]
+              fn resize_bypasses_reveal_and_adopts_new_snapshot() {
+                  let mut m = model(TextAnimation::Streaming, 2, 1);
+                  let cursor = CursorState::default();
+                  let old = GridSize::new(2, 1);
+                  let rows = vec![row(0, 1, &[65, 66])];
+                  let f = m.apply_frame(&frame_at(old, 1, rows, cursor), 1000, true);
+                  assert_eq!(f.revealing.len(), 2);
+                  assert!(f.revealing.iter().all(|r| r.change_ms == 1000.0));
 
-              /// Clear every retained reveal timestamp while preserving cell
-              /// snapshots and row generations. Used when a resize or alternate
-              /// screen transition invalidates the old cell coordinate space.
-              pub fn clear_changes(&mut self) {
-                  self.change_times.fill(NEVER_BITS);
-                  self.change_ms.fill(NEVER_MS);
-                  self.last_change_ms = NEVER_MS;
-                  self.upload_dirty = true;
-                  self.repack();
+                  // A resize changes the cell coordinate space. The model must
+                  // discard old timestamps, bypass animation for the resize
+                  // frame, and adopt its final cells as the new snapshot.
+                  let new = GridSize::new(3, 2);
+                  let resized_rows = vec![row(0, 2, &[65, 66, 67]), row(1, 1, &[88, 32, 32])];
+                  let f = m.apply_frame(&frame_at(new, 2, resized_rows.clone(), cursor), 1500, true);
+                  assert!(!f.text_reveal_allowed);
+                  assert!(!f.needs_frame);
+                  assert!(f.revealing.is_empty());
+                  assert!(f.pending.is_empty());
+
+                  // Repainting the adopted generations does not restart an
+                  // effect, which also proves the resized snapshot was stored.
+                  let f = m.apply_frame(&frame_at(new, 3, resized_rows, cursor), 1600, true);
+                  assert!(f.is_idle());
+
+                  // A subsequent real key change still receives one fresh
+                  // timestamp, without reanimating the adopted cells.
+                  let rows = vec![row(0, 3, &[90, 66, 67])];
+                  let f = m.apply_frame(&frame_at(new, 4, rows, cursor), 3000, true);
+                  assert_eq!(f.revealing.len(), 1);
+                  let changed = &f.revealing[0];
+                  assert_eq!(changed.pos, CellPos::new(0, 0));
+                  assert_eq!(changed.change_ms, 3000.0);
               }
 
           '''
-              if marker not in key_source:
-                  raise SystemExit("key.rs adopt_rows marker not found")
-              key_path.write_text(key_source.replace(marker, insert + marker, 1))
-
-          model_path = Path("crates/mr-crabs-effects/src/model.rs")
-          model_source = model_path.read_text()
-          if "let frame_reveal_eligible" not in model_source:
-              start_marker = "            let process_rows = !is_full || can_translate;\n"
-              end_marker = "            if tracker.last_change_ms() != NEVER_MS {\n"
-              start = model_source.index(start_marker)
-              end = model_source.index(end_marker, start)
-              replacement = '''            let process_rows = !is_full || can_translate;
-              let mut translated = false;
-              let mut bottom_only = false;
-              if is_full && can_translate {
-                  tracker.translate_up_one();
-                  translated = true;
-                  bottom_only = true;
-              }
-              let frame_reveal_eligible =
-                  !is_alt && !size_changed && (translated || (!is_full && !is_large));
-              out.text_reveal_allowed = frame_reveal_eligible;
-
-              if is_full && !can_translate {
-                  if is_alt || size_changed {
-                      tracker.clear_changes();
-                      tracker.adopt_rows(&frame.rows);
-                  } else {
-                      tracker.sync_rows_without_stamping(&frame.rows);
-                  }
-                  self.schedule = TypewriterSchedule::new(
-                      if self.config.text_animation == TextAnimation::Typewriter {
-                          duration_ms / 8.0
-                      } else {
-                          0.0
-                      },
-                  );
-              } else if process_rows {
-                  if frame_reveal_eligible {
-                      self.schedule.begin_build(now, duration_ms);
-                      if bottom_only {
-                          let target = self.size.rows.saturating_sub(1);
-                          for rd in &frame.rows {
-                              if rd.row == target {
-                                  tracker.update_row(
-                                      rd.row,
-                                      rd.generation,
-                                      &rd.cells,
-                                      now,
-                                      &mut self.schedule,
-                                  );
-                                  break;
-                              }
-                          }
-                      } else {
-                          for rd in &frame.rows {
-                              tracker.update_row(
-                                  rd.row,
-                                  rd.generation,
-                                  &rd.cells,
-                                  now,
-                                  &mut self.schedule,
-                              );
-                          }
-                      }
-                  } else if is_alt || size_changed {
-                      tracker.clear_changes();
-                      tracker.adopt_rows(&frame.rows);
-                  } else {
-                      tracker.sync_rows_without_stamping(&frame.rows);
-                  }
-              }
-          '''
-              model_source = model_source[:start] + replacement + model_source[end:]
-              collect = '''            collect_reveals(tracker, self.config.text_animation, duration_ms, now, out);
-          '''
-              retained = '''            collect_reveals(tracker, self.config.text_animation, duration_ms, now, out);
-              if !out.text_reveal_allowed
-                  && !is_alt
-                  && !size_changed
-                  && (!out.revealing.is_empty() || !out.pending.is_empty())
-              {
-                  // The current frame bypassed new reveal stamping, but
-                  // unchanged cells from an earlier eligible frame are still
-                  // active. Keep painting and scheduling only those retained
-                  // timestamps until their bounded reveal window expires.
-                  out.text_reveal_allowed = true;
-              }
-          '''
-              if collect not in model_source:
-                  raise SystemExit("model.rs collect_reveals marker not found")
-              model_path.write_text(model_source.replace(collect, retained, 1))
+              path.write_text(source[:start] + replacement + source[end:])
           PY
       - name: Format changes
         run: cargo fmt --all
-      - name: Commit implementation
+      - name: Commit regression update
         shell: bash
         run: |
           if git diff --quiet; then
-            echo "Implementation already present"
+            echo "Resize regression already aligned"
           else
             git config user.name github-actions[bot]
             git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-            git add crates/mr-crabs-effects/src/key.rs crates/mr-crabs-effects/src/model.rs
-            git commit -m "fix: preserve active reveals through burst bypass"
+            git add crates/mr-crabs-effects/src/model.rs
+            git commit -m "test: align resize reveal invalidation"
             git push origin HEAD:fix/issue-19-text-animation-render-dedup
           fi
       - name: Check formatting
