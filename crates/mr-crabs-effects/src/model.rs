@@ -528,91 +528,59 @@ mod tests {
         let mut m = model(TextAnimation::Typewriter, 4, 1);
         let cursor = CursorState::default();
 
-        // Rebuild 1 at t=1000 writes 'A' (fresh tracker: every rebuilt
-        // cell consumes a schedule slot, spaces included).
         let rows = vec![row(0, 1, &[65, 32, 32, 32])];
         let f = m.apply_frame(&frame_at(size, 1, rows, cursor), 1000, true);
+        assert_eq!(f.revealing.len(), 1);
         assert_eq!(f.revealing[0].change_ms, 1000.0);
-        assert_eq!(f.pending.len(), 3); // slots 1015/1030/1045 not yet due
+        assert!(f.pending.is_empty());
 
-        // Rebuild 2 at t=1016 writes 'B' (burst continues): the next slot
-        // (1060) is still in the future, so (0,1) stays fully concealed
-        // and pending — the corpus `typewriter-across-rebuilds` behavior.
         let rows = vec![row(0, 2, &[65, 66, 32, 32])];
         let f = m.apply_frame(&frame_at(size, 2, rows, cursor), 1016, true);
-        assert!(f.pending.iter().any(|p| *p == CellPos::new(0, 1)));
-        assert!(f.revealing.iter().all(|r| r.pos != CellPos::new(0, 1)));
-        // `f`'s borrow of `m` ends here; the model's stamp is then
-        // observable without aliasing.
-        assert_eq!(m.last_change_ms(), Some(1060.0));
-
-        // Rebuild 3 at t=1032 writes 'C' -> the following slot (1075),
-        // likewise still pending at this instant.
-        let rows = vec![row(0, 3, &[65, 66, 67, 32])];
-        let f = m.apply_frame(&frame_at(size, 3, rows, cursor), 1032, true);
-        assert!(f.pending.iter().any(|p| *p == CellPos::new(0, 2)));
-        assert!(f.revealing.iter().all(|r| r.pos != CellPos::new(0, 2)));
-        assert_eq!(m.last_change_ms(), Some(1075.0));
-
-        // Once the cascade's slots arrive, the staggered cells reveal.
-        let f = m.apply_frame(&frame_at(size, 4, Vec::new(), cursor), 1075, true);
         let b = f
             .revealing
             .iter()
-            .find(|r| r.pos == CellPos::new(0, 1))
-            .unwrap();
-        assert_eq!(b.change_ms, 1060.0);
+            .find(|reveal| reveal.pos == CellPos::new(0, 1))
+            .expect("new glyph reveals without a per-cell backlog");
+        assert_eq!(b.change_ms, 1015.0);
+        assert!(f.pending.is_empty());
+
+        let rows = vec![row(0, 3, &[65, 66, 67, 32])];
+        let f = m.apply_frame(&frame_at(size, 3, rows, cursor), 1032, true);
         let c = f
             .revealing
             .iter()
-            .find(|r| r.pos == CellPos::new(0, 2))
-            .unwrap();
-        assert_eq!(c.change_ms, 1075.0);
+            .find(|reveal| reveal.pos == CellPos::new(0, 2))
+            .expect("next rebuilt row advances by one slot");
+        assert_eq!(c.change_ms, 1030.0);
+        assert!(f.pending.is_empty());
+        assert_eq!(m.last_change_ms(), Some(1030.0));
 
-        // Long after the cascade completes, a fresh burst starts at now.
         let rows = vec![row(0, 4, &[90, 66, 67, 32])];
-        let f = m.apply_frame(&frame_at(size, 5, rows, cursor), 2000, true);
+        let f = m.apply_frame(&frame_at(size, 4, rows, cursor), 2000, true);
         let z = f
             .revealing
             .iter()
-            .find(|r| r.pos == CellPos::new(0, 0))
-            .unwrap();
+            .find(|reveal| reveal.pos == CellPos::new(0, 0))
+            .expect("fresh burst starts at the current time");
         assert_eq!(z.change_ms, 2000.0);
 
-        // Expiry: last stamp (2000) + 120 = 2120.
-        let f = m.apply_frame(&frame_at(size, 6, Vec::new(), cursor), 2120, true);
+        let f = m.apply_frame(&frame_at(size, 5, Vec::new(), cursor), 2120, true);
         assert!(f.is_idle());
     }
 
     #[test]
-    fn typewriter_future_cells_are_pending_and_keep_frames_alive() {
+    fn typewriter_changed_glyphs_in_one_row_reveal_together() {
         let size = GridSize::new(4, 1);
         let mut m = model(TextAnimation::Typewriter, 4, 1);
         let cursor = CursorState::default();
-        // Four cells change on a fresh tracker: stamps 1000/1015/1030/1045.
         let rows = vec![row(0, 1, &[65, 66, 67, 32])];
         let f = m.apply_frame(&frame_at(size, 1, rows, cursor), 1000, true);
-        assert_eq!(f.revealing.len(), 1); // only the first cell animates
-        assert_eq!(
-            f.pending,
-            vec![CellPos::new(0, 1), CellPos::new(0, 2), CellPos::new(0, 3)]
-        );
-        assert!(f.needs_frame);
-        // At t=1016 the second cell's timestamp has arrived; 1030/1045
-        // are still pending.
-        let f = m.apply_frame(&frame_at(size, 2, Vec::new(), cursor), 1016, true);
-        assert_eq!(f.pending, vec![CellPos::new(0, 2), CellPos::new(0, 3)]);
-        assert!(f.needs_frame);
-        // At t=1030 only the final staggered cell is still pending.
-        let f = m.apply_frame(&frame_at(size, 3, Vec::new(), cursor), 1030, true);
-        assert_eq!(f.pending, vec![CellPos::new(0, 3)]);
-        assert!(f.needs_frame);
-        // All timestamps arrived by 1045.
-        let f = m.apply_frame(&frame_at(size, 4, Vec::new(), cursor), 1045, true);
+        assert_eq!(f.revealing.len(), 3);
+        assert!(f.revealing.iter().all(|reveal| reveal.change_ms == 1000.0));
         assert!(f.pending.is_empty());
-        assert_eq!(f.revealing.len(), 4);
-        // Final staggered cell reveals at 1045 + 120.
-        let f = m.apply_frame(&frame_at(size, 5, Vec::new(), cursor), 1165, true);
+        assert!(f.needs_frame);
+
+        let f = m.apply_frame(&frame_at(size, 2, Vec::new(), cursor), 1120, true);
         assert!(f.is_idle());
     }
 
@@ -857,6 +825,42 @@ mod tests {
                 "timestamps must follow visual order for delivery order {permutation:?}"
             );
         }
+    }
+
+    #[test]
+    fn typewriter_partial_frames_advance_once_per_changed_row() {
+        let size = GridSize::new(4, 3);
+        let mut m = model(TextAnimation::Typewriter, 4, 3);
+        let cursor = CursorState::default();
+        let mut baseline = frame_at(
+            size,
+            1,
+            vec![
+                row(0, 1, &[32, 32, 32, 32]),
+                row(1, 1, &[32, 32, 32, 32]),
+                row(2, 1, &[32, 32, 32, 32]),
+            ],
+            cursor,
+        );
+        baseline.damage = DamageKind::Full;
+        let _ = m.apply_frame(&baseline, 1000, true);
+
+        let error = frame_at(size, 2, vec![row(1, 2, &[69, 82, 82, 32])], cursor);
+        let _ = m.apply_frame(&error, 2000, true);
+        let prompt = frame_at(size, 3, vec![row(2, 2, &[80, 82, 79, 77])], cursor);
+        let _ = m.apply_frame(&prompt, 2001, true);
+        let frame = m.apply_frame(&frame_at(size, 4, Vec::new(), cursor), 2045, true);
+
+        let timestamps = |row| {
+            frame
+                .revealing
+                .iter()
+                .filter(|reveal| reveal.pos.row == row)
+                .map(|reveal| reveal.change_ms)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(timestamps(1), vec![2000.0; 3]);
+        assert_eq!(timestamps(2), vec![2015.0; 4]);
     }
 
     #[test]

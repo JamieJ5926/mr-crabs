@@ -139,13 +139,13 @@ fn repeated_identical_partial_frame_starts_a_fresh_typewriter_reveal() {
             .iter()
             .map(|cell| cell.pos)
             .collect::<Vec<_>>(),
-        vec![CellPos::new(0, 0)]
+        vec![CellPos::new(0, 0), CellPos::new(0, 1)]
     );
-    assert_eq!(effect.pending, vec![CellPos::new(0, 1)]);
-    assert_eq!(model.last_change_ms(), Some(2_015.0));
+    assert!(effect.pending.is_empty());
+    assert_eq!(model.last_change_ms(), Some(2_000.0));
 
     let repeated_expired = frame(size, 4, Vec::new());
-    assert!(model.apply_frame(&repeated_expired, 2_135, true).is_idle());
+    assert!(model.apply_frame(&repeated_expired, 2_120, true).is_idle());
 
     let duplicate_generation = frame(size, 5, vec![row(2, &contents)]);
     assert!(
@@ -204,8 +204,8 @@ fn five_cold_sequential_identical_executions_each_start_a_reveal() {
             reveal.pos == CellPos::new(0, 0) && reveal.change_ms == now_ms as f64
         }));
         assert!(
-            effect.pending.contains(&CellPos::new(0, 1)),
-            "execution {execution} must retain a pending second glyph"
+            effect.pending.is_empty(),
+            "execution {execution} must not create a per-cell backlog"
         );
 
         let expiry_ms = model.last_change_ms().unwrap() as u64 + 600;
@@ -238,29 +238,26 @@ fn third_overlapping_identical_execution_preserves_active_and_pending_reveals() 
     assert!(third_effect.revealing.is_empty());
     assert_eq!(
         third_effect.pending,
-        vec![
-            CellPos::new(0, 0),
-            CellPos::new(0, 1),
-            CellPos::new(0, 2),
-            CellPos::new(0, 3),
-        ]
+        vec![CellPos::new(0, 0), CellPos::new(0, 1)]
     );
-    assert_eq!(model.last_change_ms(), Some(1_525.0));
+    assert_eq!(model.last_change_ms(), Some(1_150.0));
 
     let cascade = frame(size, 4, Vec::new());
     let cascade_effect = model.apply_frame(&cascade, 1_450, true);
     assert!(cascade_effect.text_reveal_allowed);
     assert!(cascade_effect.needs_frame);
-    assert!(
+    assert_eq!(
         cascade_effect
             .revealing
             .iter()
-            .any(|reveal| reveal.pos == CellPos::new(0, 0))
+            .map(|reveal| reveal.pos)
+            .collect::<Vec<_>>(),
+        vec![CellPos::new(0, 0), CellPos::new(0, 1)]
     );
-    assert!(cascade_effect.pending.contains(&CellPos::new(0, 1)));
+    assert!(cascade_effect.pending.is_empty());
 
     let expired = frame(size, 5, Vec::new());
-    assert!(model.apply_frame(&expired, 2_125, true).is_idle());
+    assert!(model.apply_frame(&expired, 1_750, true).is_idle());
 }
 
 #[test]
@@ -292,14 +289,9 @@ fn large_partial_bypass_preserves_existing_reveal_and_ignores_new_cells() {
     assert!(effect.needs_frame);
     assert_eq!(
         reveal_positions(effect),
-        vec![
-            CellPos::new(0, 0),
-            CellPos::new(0, 1),
-            CellPos::new(0, 2),
-            CellPos::new(0, 3),
-        ]
+        vec![CellPos::new(0, 0), CellPos::new(0, 1)]
     );
-    assert_eq!(model.last_change_ms(), Some(1_225.0));
+    assert_eq!(model.last_change_ms(), Some(1_000.0));
 }
 
 #[test]
@@ -324,14 +316,9 @@ fn full_bypass_preserves_existing_reveal_for_unchanged_cells() {
     assert!(effect.needs_frame);
     assert_eq!(
         reveal_positions(effect),
-        vec![
-            CellPos::new(0, 0),
-            CellPos::new(0, 1),
-            CellPos::new(0, 2),
-            CellPos::new(0, 3),
-        ]
+        vec![CellPos::new(0, 0), CellPos::new(0, 1)]
     );
-    assert_eq!(model.last_change_ms(), Some(1_225.0));
+    assert_eq!(model.last_change_ms(), Some(1_000.0));
 }
 
 #[test]

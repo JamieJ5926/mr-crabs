@@ -88,6 +88,7 @@ fn cell_paints_glyph(cell: Cell) -> bool {
 enum RowStampPolicy {
     EveryChangedCell,
     DrawableGlyphsPerRow,
+    DrawableGlyphsPerRowAndRepeat,
 }
 
 pub struct ChangeTracker {
@@ -181,14 +182,12 @@ impl ChangeTracker {
     }
 
     /// Diff one rebuilt row against the previous snapshot and timestamp
-    /// changed cells. `anim_ms` is the rebuild time shared by every change
-    /// in streaming mode; when `schedule` is active (typewriter), changed
-    /// cells consume staggered timestamps from the persistent burst
-    /// schedule instead. If a new row generation has no final key changes,
-    /// drawable glyphs are re-timestamped so repeated identical output still
-    /// receives one reveal. Only rebuilt rows are diffed — rows absent from
-    /// the frame are unchanged by definition (oracle
-    /// `textAnimationUpdateRow`).
+    /// changed cells. `anim_ms` is shared by every change in streaming mode.
+    /// Typewriter mode consumes one persistent-burst timestamp per changed
+    /// drawable row, so a long line cannot delay later output by one slot per
+    /// glyph. A new row generation with identical final keys re-timestamps
+    /// drawable glyphs together so repeated output still receives one reveal.
+    /// Rows absent from the frame are unchanged by definition.
     pub fn update_row(
         &mut self,
         row: u16,
@@ -197,14 +196,12 @@ impl ChangeTracker {
         anim_ms: f64,
         schedule: &mut TypewriterSchedule,
     ) {
-        self.update_row_with_policy(
-            row,
-            generation,
-            cells,
-            anim_ms,
-            schedule,
-            RowStampPolicy::EveryChangedCell,
-        );
+        let policy = if schedule.is_active() {
+            RowStampPolicy::DrawableGlyphsPerRowAndRepeat
+        } else {
+            RowStampPolicy::EveryChangedCell
+        };
+        self.update_row_with_policy(row, generation, cells, anim_ms, schedule, policy);
     }
 
     pub(crate) fn reconcile_full_row(
@@ -250,15 +247,17 @@ impl ChangeTracker {
         let Some((base, len)) = self.tracked_row_span(row, cells.len()) else {
             return;
         };
-        let shared_timestamp = (policy == RowStampPolicy::DrawableGlyphsPerRow
-            && cells.iter().take(len).enumerate().any(|(x, cell)| {
-                let key_changed = cell_render_key(*cell) != self.snapshot[base + x];
-                let drawable = cell_paints_glyph(*cell)
-                    || (cell.flags & Cell::WIDE_SPACER != 0
-                        && x > 0
-                        && cells[x - 1].flags & Cell::WIDE != 0);
-                key_changed && drawable
-            }))
+        let shared_timestamp = (matches!(
+            policy,
+            RowStampPolicy::DrawableGlyphsPerRow | RowStampPolicy::DrawableGlyphsPerRowAndRepeat
+        ) && cells.iter().take(len).enumerate().any(|(x, cell)| {
+            let key_changed = cell_render_key(*cell) != self.snapshot[base + x];
+            let drawable = cell_paints_glyph(*cell)
+                || (cell.flags & Cell::WIDE_SPACER != 0
+                    && x > 0
+                    && cells[x - 1].flags & Cell::WIDE != 0);
+            key_changed && drawable
+        }))
         .then(|| {
             if schedule.is_active() {
                 schedule.next_timestamp()
@@ -286,7 +285,10 @@ impl ChangeTracker {
                     self.stamp_change(i, anim_ms, schedule, &mut last);
                     timestamp_changed = true;
                 }
-                RowStampPolicy::DrawableGlyphsPerRow if is_glyph_span => {
+                RowStampPolicy::DrawableGlyphsPerRow
+                | RowStampPolicy::DrawableGlyphsPerRowAndRepeat
+                    if is_glyph_span =>
+                {
                     self.stamp_change_at(
                         i,
                         shared_timestamp.expect("drawable row timestamp"),
@@ -294,7 +296,8 @@ impl ChangeTracker {
                     );
                     timestamp_changed = true;
                 }
-                RowStampPolicy::DrawableGlyphsPerRow => {
+                RowStampPolicy::DrawableGlyphsPerRow
+                | RowStampPolicy::DrawableGlyphsPerRowAndRepeat => {
                     if self.change_ms[i] != NEVER_MS {
                         self.change_times[i] = NEVER_BITS;
                         self.change_ms[i] = NEVER_MS;
@@ -304,17 +307,28 @@ impl ChangeTracker {
             }
         }
 
-        if !key_changed && policy == RowStampPolicy::EveryChangedCell {
+        if !key_changed
+            && matches!(
+                policy,
+                RowStampPolicy::EveryChangedCell | RowStampPolicy::DrawableGlyphsPerRowAndRepeat
+            )
+            && cells.iter().take(len).any(|cell| cell_paints_glyph(*cell))
+        {
+            let timestamp = if schedule.is_active() {
+                schedule.next_timestamp()
+            } else {
+                anim_ms
+            };
             for (x, cell) in cells.iter().take(len).enumerate() {
                 if !cell_paints_glyph(*cell) {
                     continue;
                 }
-                self.stamp_change(base + x, anim_ms, schedule, &mut last);
+                self.stamp_change_at(base + x, timestamp, &mut last);
                 if cell.flags & Cell::WIDE != 0
                     && x + 1 < len
                     && cells[x + 1].flags & Cell::WIDE_SPACER != 0
                 {
-                    self.stamp_change(base + x + 1, anim_ms, schedule, &mut last);
+                    self.stamp_change_at(base + x + 1, timestamp, &mut last);
                 }
                 timestamp_changed = true;
             }
@@ -633,12 +647,10 @@ mod tests {
     }
 
     #[test]
-    fn typewriter_stamps_consume_schedule_slots_in_reading_order() {
+    fn typewriter_stamps_consume_one_schedule_slot_per_row() {
         let mut t = ChangeTracker::new(4, 1, 16);
         let mut sched = TypewriterSchedule::new(15.0);
         sched.begin_build(1000.0, 120.0);
-        // Fresh tracker: every cell of the rebuilt row consumes a slot,
-        // spaces included (oracle never-seen behavior).
         let row = vec![
             cell(65, 0, 0),
             cell(66, 0, 0),
@@ -647,13 +659,11 @@ mod tests {
         ];
         t.update_row(0, 1, &row, 1000.0, &mut sched);
         assert_eq!(t.change_ms_at(0), 1000.0);
-        assert_eq!(t.change_ms_at(1), 1015.0);
-        assert_eq!(t.change_ms_at(2), 1030.0);
-        assert_eq!(t.change_ms_at(3), 1045.0);
-        assert_eq!(t.last_change_ms(), 1045.0);
+        assert_eq!(t.change_ms_at(1), 1000.0);
+        assert_eq!(t.change_ms_at(2), 1000.0);
+        assert_eq!(t.change_ms_at(3), NEVER_MS);
+        assert_eq!(t.last_change_ms(), 1000.0);
 
-        // A later rebuild stamps only genuinely changed cells, one slot
-        // after the last handed-out timestamp.
         let row2 = vec![
             cell(65, 0, 0),
             cell(90, 0, 0),
@@ -661,9 +671,9 @@ mod tests {
             cell(32, 0, 0),
         ];
         t.update_row(0, 2, &row2, 2000.0, &mut sched);
-        assert_eq!(t.change_ms_at(1), 1060.0);
-        assert_eq!(t.change_ms_at(0), 1000.0); // unchanged cells keep stamps
-        assert_eq!(t.last_change_ms(), 1060.0);
+        assert_eq!(t.change_ms_at(1), 1015.0);
+        assert_eq!(t.change_ms_at(0), 1000.0);
+        assert_eq!(t.last_change_ms(), 1015.0);
     }
 
     #[test]
