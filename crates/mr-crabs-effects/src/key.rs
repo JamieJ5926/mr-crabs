@@ -299,6 +299,64 @@ impl ChangeTracker {
         self.repack();
     }
 
+    /// Synchronize bypassed rows without assigning fresh reveal stamps.
+    ///
+    /// Existing timestamps survive where the final render key is
+    /// unchanged, so an in-flight reveal can finish across a large or
+    /// Full frame. Cells whose bypassed content changed have their old
+    /// timestamp cleared so stale overlays never conceal replacement
+    /// text. New cells therefore enter the snapshot without animating.
+    pub fn sync_rows_without_stamping(&mut self, rows: &[RowDelta]) {
+        let mut timestamps_changed = false;
+        for row in rows {
+            let row_index = usize::from(row.row);
+            if row_index >= self.rows {
+                continue;
+            }
+            self.row_generations[row_index] = row.generation;
+            let base = row_index * self.cols;
+            let len = row
+                .cells
+                .len()
+                .min(self.cols)
+                .min(self.cap.saturating_sub(base));
+            for (col, cell) in row.cells.iter().take(len).enumerate() {
+                let index = base + col;
+                let key = cell_render_key(*cell);
+                if self.snapshot[index] == key {
+                    continue;
+                }
+                self.snapshot[index] = key;
+                if self.change_times[index] != NEVER_BITS {
+                    self.change_times[index] = NEVER_BITS;
+                    self.change_ms[index] = NEVER_MS;
+                    timestamps_changed = true;
+                }
+            }
+        }
+        if timestamps_changed {
+            self.last_change_ms = self
+                .change_ms
+                .iter()
+                .copied()
+                .filter(|value| *value != NEVER_MS)
+                .fold(NEVER_MS, f64::max);
+            self.upload_dirty = true;
+            self.repack();
+        }
+    }
+
+    /// Clear every retained reveal timestamp while preserving cell
+    /// snapshots and row generations. Used when a resize or alternate
+    /// screen transition invalidates the old cell coordinate space.
+    pub fn clear_changes(&mut self) {
+        self.change_times.fill(NEVER_BITS);
+        self.change_ms.fill(NEVER_MS);
+        self.last_change_ms = NEVER_MS;
+        self.upload_dirty = true;
+        self.repack();
+    }
+
     pub fn adopt_rows(&mut self, rows: &[RowDelta]) {
         for row in rows {
             let row_index = usize::from(row.row);

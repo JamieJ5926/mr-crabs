@@ -198,30 +198,48 @@ impl EffectsModel {
             let process_rows = !is_full || can_translate;
             let mut translated = false;
             let mut bottom_only = false;
-            if is_full {
-                if can_translate {
-                    tracker.translate_up_one();
-                    translated = true;
-                    bottom_only = true;
-                } else {
-                    tracker.adopt_rows(&frame.rows);
-                    self.schedule = TypewriterSchedule::new(
-                        if self.config.text_animation == TextAnimation::Typewriter {
-                            duration_ms / 8.0
-                        } else {
-                            0.0
-                        },
-                    );
-                }
+            if is_full && can_translate {
+                tracker.translate_up_one();
+                translated = true;
+                bottom_only = true;
             }
-            out.text_reveal_allowed =
+            let frame_reveal_eligible =
                 !is_alt && !size_changed && (translated || (!is_full && !is_large));
-            if process_rows {
-                self.schedule.begin_build(now, duration_ms);
-                if bottom_only {
-                    let target = self.size.rows.saturating_sub(1);
-                    for rd in &frame.rows {
-                        if rd.row == target {
+            out.text_reveal_allowed = frame_reveal_eligible;
+
+            if is_full && !can_translate {
+                if is_alt || size_changed {
+                    tracker.clear_changes();
+                    tracker.adopt_rows(&frame.rows);
+                } else {
+                    tracker.sync_rows_without_stamping(&frame.rows);
+                }
+                self.schedule = TypewriterSchedule::new(
+                    if self.config.text_animation == TextAnimation::Typewriter {
+                        duration_ms / 8.0
+                    } else {
+                        0.0
+                    },
+                );
+            } else if process_rows {
+                if frame_reveal_eligible {
+                    self.schedule.begin_build(now, duration_ms);
+                    if bottom_only {
+                        let target = self.size.rows.saturating_sub(1);
+                        for rd in &frame.rows {
+                            if rd.row == target {
+                                tracker.update_row(
+                                    rd.row,
+                                    rd.generation,
+                                    &rd.cells,
+                                    now,
+                                    &mut self.schedule,
+                                );
+                                break;
+                            }
+                        }
+                    } else {
+                        for rd in &frame.rows {
                             tracker.update_row(
                                 rd.row,
                                 rd.generation,
@@ -229,19 +247,13 @@ impl EffectsModel {
                                 now,
                                 &mut self.schedule,
                             );
-                            break;
                         }
                     }
+                } else if is_alt || size_changed {
+                    tracker.clear_changes();
+                    tracker.adopt_rows(&frame.rows);
                 } else {
-                    for rd in &frame.rows {
-                        tracker.update_row(
-                            rd.row,
-                            rd.generation,
-                            &rd.cells,
-                            now,
-                            &mut self.schedule,
-                        );
-                    }
+                    tracker.sync_rows_without_stamping(&frame.rows);
                 }
             }
             if tracker.last_change_ms() != NEVER_MS {
@@ -249,6 +261,17 @@ impl EffectsModel {
                 needs_text = elapsed < 0.0 || elapsed < duration_ms;
             }
             collect_reveals(tracker, self.config.text_animation, duration_ms, now, out);
+            if !out.text_reveal_allowed
+                && !is_alt
+                && !size_changed
+                && (!out.revealing.is_empty() || !out.pending.is_empty())
+            {
+                // The current frame bypassed new reveal stamping, but
+                // unchanged cells from an earlier eligible frame are still
+                // active. Keep painting and scheduling only those retained
+                // timestamps until their bounded reveal window expires.
+                out.text_reveal_allowed = true;
+            }
         }
 
         out.trail = self.trail.frame(
