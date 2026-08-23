@@ -139,7 +139,7 @@ fn pump_now_inner(cx: &mut App) -> bool {
         )
     });
     if changed && let Some(shell) = shell.upgrade() {
-        shell.update(cx, |shell, cx| shell.refresh_windows(cx));
+        shell.update(cx, |shell, cx| shell.refresh_and_reschedule(cx));
     }
     if should_quit {
         cx.quit();

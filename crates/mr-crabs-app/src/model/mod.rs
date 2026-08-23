@@ -1,6 +1,7 @@
 //! Model module: windows, tabs, recursive splits, panes, and the app model.
 
 pub mod app_model;
+pub mod fetch_animation;
 pub mod geometry;
 pub mod input_dock;
 pub mod pane;

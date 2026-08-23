@@ -140,6 +140,13 @@ pub struct ImageDeltaPlaceholder {
     pub _private: (),
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct AnimationRegion {
+    pub row: u16,
+    pub col: u16,
+    pub size: GridSize,
+}
+
 /// One frame of terminal output, owned by the caller.
 ///
 /// `rows` holds a [`RowDelta`] per changed row: [`DamageKind::Clean`] yields
@@ -163,6 +170,7 @@ pub struct FrameDelta {
     pub viewport: TerminalViewport,
     pub search_matches: Vec<FrameSearchMatch>,
     pub hyperlinks: Vec<FrameHyperlink>,
+    pub animation_region: Option<AnimationRegion>,
     pub(crate) spare_rows: Vec<RowDelta>,
 }
 
@@ -180,6 +188,7 @@ impl PartialEq for FrameDelta {
             && self.viewport == other.viewport
             && self.search_matches == other.search_matches
             && self.hyperlinks == other.hyperlinks
+            && self.animation_region == other.animation_region
     }
 }
 impl Eq for FrameDelta {}
@@ -198,6 +207,7 @@ impl FrameDelta {
             viewport: TerminalViewport::default(),
             search_matches: Vec::new(),
             hyperlinks: Vec::new(),
+            animation_region: None,
             spare_rows: Vec::new(),
         }
     }
@@ -215,6 +225,7 @@ impl FrameDelta {
         self.styles.clear();
         self.search_matches.clear();
         self.hyperlinks.clear();
+        self.animation_region = None;
     }
 
     /// Take an empty row slot, reusing a retired slot's allocations when one
@@ -503,6 +514,7 @@ mod tests {
                 id: None,
                 uri: "https://example.com".to_string(),
             }],
+            animation_region: None,
             spare_rows: Vec::new(),
         };
         let rows_cap = frame.rows.capacity();
@@ -577,6 +589,7 @@ mod tests {
             images: ImageDeltaPlaceholder::default(),
             search_matches: Vec::new(),
             hyperlinks: Vec::new(),
+            animation_region: None,
             spare_rows: vec![RowDelta {
                 row: 99,
                 generation: 42,

@@ -18,8 +18,9 @@ pub mod side_tables;
 pub mod storage;
 pub use compress::{compress_page, decompress_page};
 pub use delta::{
-    CursorShape, CursorState, FrameDelta, FrameHyperlink, FramePoint, FrameRange, FrameSearchMatch,
-    ImageDeltaPlaceholder, RowDelta, Run, SelectionKind, SelectionState, TerminalViewport,
+    AnimationRegion, CursorShape, CursorState, FrameDelta, FrameHyperlink, FramePoint, FrameRange,
+    FrameSearchMatch, ImageDeltaPlaceholder, RowDelta, Run, SelectionKind, SelectionState,
+    TerminalViewport,
     batch_runs,
 };
 pub use frame_pool::{FramePool, frame_pool_default};
@@ -423,6 +424,8 @@ pub struct NormalizedSnapshot {
 pub enum TerminalError {
     ZeroColumns,
     ZeroRows,
+    InvalidRegion,
+    StyleOverflow,
     RestoreSizeMismatch,
     RestoreStyleIndex,
     RestoreStyleTable,
@@ -448,6 +451,8 @@ impl Display for TerminalError {
             ),
             Self::StyleCompactionCorrupt => formatter
                 .write_str("terminal style compaction found corrupt or inconsistent style state"),
+            Self::InvalidRegion => formatter.write_str("terminal region outside grid"),
+            Self::StyleOverflow => formatter.write_str("style table overflow"),
         }
     }
 }
@@ -728,6 +733,46 @@ impl Terminal {
 
     pub fn scrollback_config(&self) -> ScrollbackConfig {
         self.storage.config()
+    }
+
+    pub fn blit_region(&mut self, row: u16, col: u16, size: GridSize, cells: &[Cell], styles: &[Style]) -> Result<(), TerminalError> {
+        if size.cols == 0 || size.rows == 0 {
+            return Err(TerminalError::InvalidRegion);
+        }
+        if row.checked_add(size.rows).is_none_or(|end| end > self.size.rows) {
+            return Err(TerminalError::InvalidRegion);
+        }
+        if col.checked_add(size.cols).is_none_or(|end| end > self.size.cols) {
+            return Err(TerminalError::InvalidRegion);
+        }
+        if cells.len() != usize::from(size.cols) * usize::from(size.rows) {
+            return Err(TerminalError::InvalidRegion);
+        }
+        let mut distinct: std::collections::HashSet<Style> = std::collections::HashSet::new();
+        for style in styles {
+            distinct.insert(style.clone());
+        }
+        for cell in cells {
+            if let Some(style) = styles.get(usize::from(cell.style)) {
+                distinct.insert(style.clone());
+            }
+        }
+        let existing = self.protocol.engine().global_styles().len();
+        let mut new_needed = 0;
+        for style in &distinct {
+            if !self.protocol.engine().global_styles().contains(style) {
+                new_needed += 1;
+            }
+        }
+        if existing + new_needed > 65536 {
+            return Err(TerminalError::StyleOverflow);
+        }
+        let snapshot_cursor = self.protocol.engine().cursor();
+        let result = self.protocol.engine_mut().blit_region(row, col, size, cells, styles);
+        if result.is_ok() {
+            let _ = self.protocol.engine_mut().restore_cursor(snapshot_cursor);
+        }
+        result
     }
 
     pub fn set_scrollback_config(&mut self, config: ScrollbackConfig) {

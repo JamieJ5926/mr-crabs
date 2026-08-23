@@ -7,10 +7,11 @@
 //! other actions refresh/sync, and quit follows model policy only.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::time::{Duration, Instant};
 
 use gpui::{
-    App, AppContext as _, Context, Entity, SharedString, Subscription, TitlebarOptions, WeakEntity,
-    WindowHandle, WindowOptions,
+    App, AppContext as _, Context, Entity, SharedString, Subscription, Task, TitlebarOptions,
+    WeakEntity, WindowHandle, WindowOptions,
 };
 
 use crate::action::AppAction;
@@ -51,11 +52,38 @@ pub fn originating_model_window(
         .find_map(|(mid, gid)| (gid == closed).then_some(mid))
 }
 
+struct FetchSchedule {
+    task: Option<Task<()>>,
+    generation: u64,
+    deadline_ms: Option<u64>,
+    clock: Instant,
+}
+
+impl FetchSchedule {
+    fn new() -> Self {
+        Self {
+            task: None,
+            generation: 0,
+            deadline_ms: None,
+            clock: Instant::now(),
+        }
+    }
+
+    fn now_ms(&self) -> u64 {
+        u64::try_from(self.clock.elapsed().as_millis()).unwrap_or(u64::MAX)
+    }
+}
+
+fn fetch_timer_delay(now_ms: u64, deadline_ms: u64) -> Duration {
+    Duration::from_millis(deadline_ms.saturating_sub(now_ms))
+}
+
 /// Shared shell owning the model and exact native window map.
 pub struct AppShell {
     pub model: Entity<AppModel>,
     windows: BTreeMap<WindowId, WindowHandle<WindowView>>,
     _window_closed: Option<Subscription>,
+    fetch_schedule: FetchSchedule,
 }
 
 impl AppShell {
@@ -64,6 +92,7 @@ impl AppShell {
             model,
             windows: BTreeMap::new(),
             _window_closed: None,
+            fetch_schedule: FetchSchedule::new(),
         }
     }
 
@@ -100,6 +129,7 @@ impl AppShell {
             self.model.update(cx, |model, _| {
                 model.close_window(mid);
             });
+            self.arm_fetch_schedule(cx);
         }
         self.model.read(cx).should_quit()
     }
@@ -121,12 +151,55 @@ impl AppShell {
         for mid in plan.to_open {
             self.open_native_window(mid, weak_shell.clone(), cx);
         }
+        self.arm_fetch_schedule(cx);
     }
 
     pub fn refresh_windows(&self, cx: &mut Context<Self>) {
         for handle in self.windows.values() {
             let _ = handle.update(cx, |_, _, cx| cx.notify());
         }
+    }
+
+    pub fn refresh_and_reschedule(&mut self, cx: &mut Context<Self>) {
+        self.refresh_windows(cx);
+        self.arm_fetch_schedule(cx);
+    }
+
+    fn arm_fetch_schedule(&mut self, cx: &mut Context<Self>) {
+        let deadline_ms = self.model.read(cx).next_fetch_deadline_ms();
+        if self.fetch_schedule.deadline_ms == deadline_ms
+            && (deadline_ms.is_none() || self.fetch_schedule.task.is_some())
+        {
+            return;
+        }
+
+        self.fetch_schedule.generation = self.fetch_schedule.generation.wrapping_add(1);
+        self.fetch_schedule.task = None;
+        self.fetch_schedule.deadline_ms = deadline_ms;
+        let Some(deadline_ms) = deadline_ms else {
+            return;
+        };
+
+        let generation = self.fetch_schedule.generation;
+        let delay = fetch_timer_delay(self.fetch_schedule.now_ms(), deadline_ms);
+        self.fetch_schedule.task = Some(cx.spawn(async move |weak, cx| {
+            cx.background_executor().timer(delay).await;
+            let _ = weak.update(cx, |this, cx| {
+                if this.fetch_schedule.generation != generation {
+                    return;
+                }
+                this.fetch_schedule.task = None;
+                this.fetch_schedule.deadline_ms = None;
+                let now_ms = this.fetch_schedule.now_ms();
+                let changed = this
+                    .model
+                    .update(cx, |model, _| model.tick_fetch_animations(now_ms));
+                if changed {
+                    this.refresh_windows(cx);
+                }
+                this.arm_fetch_schedule(cx);
+            });
+        }));
     }
 
     fn open_native_window(

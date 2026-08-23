@@ -180,6 +180,7 @@ impl EffectsModel {
             }
         }
 
+        let anim_region = frame.animation_region;
         let mut needs_text = false;
         if let Some(tracker) = &mut self.tracker {
             let duration_ms = self.config.text_animation_duration_ms as f64;
@@ -228,6 +229,11 @@ impl EffectsModel {
                         let target = self.size.rows.saturating_sub(1);
                         for rd in &frame.rows {
                             if rd.row == target {
+                                if let Some(region) = anim_region {
+                                    if rd.row >= region.row && rd.row < region.row + region.size.rows {
+                                        break;
+                                    }
+                                }
                                 tracker.update_row(
                                     rd.row,
                                     rd.generation,
@@ -240,6 +246,11 @@ impl EffectsModel {
                         }
                     } else {
                         for rd in &frame.rows {
+                            if let Some(region) = anim_region {
+                                if rd.row >= region.row && rd.row < region.row + region.size.rows {
+                                    continue;
+                                }
+                            }
                             tracker.update_row(
                                 rd.row,
                                 rd.generation,

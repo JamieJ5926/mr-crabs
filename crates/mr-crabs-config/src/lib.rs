@@ -25,6 +25,7 @@ pub const DEFAULT_CURSOR_TRAIL_DURATION_MS: u64 = 250;
 pub const DEFAULT_TEXT_ANIMATION: &str = "streaming";
 pub const DEFAULT_TEXT_ANIMATION_DURATION_MS: u64 = 120;
 pub const DEFAULT_TEXT_ANIMATION_INTENSITY: f32 = 1.0;
+pub const DEFAULT_FETCH_GIF_PATH: &str = "";
 /// Whether new windows auto-run the startup fetch command.
 pub const DEFAULT_STARTUP_FETCH: bool = true;
 /// POSIX command run on the PTY before the interactive shell starts.
@@ -140,10 +141,11 @@ pub enum SettingKey {
     AllowOsc52Read,
     StartupFetch,
     StartupFetchCommand,
+    FetchGifPath,
 }
 
 impl SettingKey {
-    pub const ALL: [Self; 23] = [
+    pub const ALL: [Self; 24] = [
         Self::FontFamily,
         Self::FontSize,
         Self::LineHeightAdjustPercent,
@@ -167,6 +169,7 @@ impl SettingKey {
         Self::AllowOsc52Read,
         Self::StartupFetch,
         Self::StartupFetchCommand,
+        Self::FetchGifPath,
     ];
 
     pub fn flag(self) -> &'static str {
@@ -194,6 +197,7 @@ impl SettingKey {
             Self::AllowOsc52Read => "clipboard-read",
             Self::StartupFetch => "startup-fetch",
             Self::StartupFetchCommand => "startup-fetch-command",
+            Self::FetchGifPath => "fetch-gif-path",
         }
     }
 
@@ -226,6 +230,7 @@ impl SettingKey {
             "clipboard-read" | "allow-osc52-read" => Some(Self::AllowOsc52Read),
             "startup-fetch" => Some(Self::StartupFetch),
             "startup-fetch-command" => Some(Self::StartupFetchCommand),
+            "fetch-gif-path" => Some(Self::FetchGifPath),
             _ => None,
         }
     }
@@ -270,6 +275,7 @@ impl SettingKey {
             Self::StartupFetchCommand => {
                 "POSIX command run on the PTY before the interactive shell starts."
             }
+            Self::FetchGifPath => "Path to a GIF for animated fetch; empty disables animation.",
         }
     }
 }
@@ -300,6 +306,7 @@ pub struct ConfigOverlay {
     pub allow_osc52_read: Option<bool>,
     pub startup_fetch: Option<bool>,
     pub startup_fetch_command: Option<String>,
+    pub fetch_gif_path: Option<String>,
 }
 
 impl ConfigOverlay {
@@ -377,6 +384,9 @@ impl ConfigOverlay {
         if over.startup_fetch_command.is_some() {
             self.startup_fetch_command = over.startup_fetch_command;
         }
+        if over.fetch_gif_path.is_some() {
+            self.fetch_gif_path = over.fetch_gif_path;
+        }
     }
 
     pub fn apply_into(&self, dst: &mut EffectiveConfig) {
@@ -452,6 +462,9 @@ impl ConfigOverlay {
                 dst.startup_fetch = false;
             }
         }
+        if let Some(v) = &self.fetch_gif_path {
+            dst.fetch_gif_path = v.clone();
+        }
     }
 
     pub fn set(&mut self, key: SettingKey, value: &str) -> Result<(), String> {
@@ -495,6 +508,7 @@ impl ConfigOverlay {
             SettingKey::AllowOsc52Read => self.allow_osc52_read = Some(parse_bool(value)?),
             SettingKey::StartupFetch => self.startup_fetch = Some(parse_bool(value)?),
             SettingKey::StartupFetchCommand => self.startup_fetch_command = Some(value.to_string()),
+            SettingKey::FetchGifPath => self.fetch_gif_path = Some(value.to_string()),
         }
         Ok(())
     }
@@ -526,6 +540,7 @@ pub struct EffectiveConfig {
     pub allow_osc52_read: bool,
     pub startup_fetch: bool,
     pub startup_fetch_command: String,
+    pub fetch_gif_path: String,
 }
 
 impl Default for EffectiveConfig {
@@ -560,6 +575,7 @@ impl EffectiveConfig {
             allow_osc52_read: false,
             startup_fetch: DEFAULT_STARTUP_FETCH,
             startup_fetch_command: DEFAULT_STARTUP_FETCH_COMMAND.to_string(),
+            fetch_gif_path: DEFAULT_FETCH_GIF_PATH.to_string(),
         }
     }
 
@@ -610,6 +626,7 @@ impl EffectiveConfig {
             SettingKey::AllowOsc52Read => format!("{}", self.allow_osc52_read),
             SettingKey::StartupFetch => format!("{}", self.startup_fetch),
             SettingKey::StartupFetchCommand => self.startup_fetch_command.clone(),
+            SettingKey::FetchGifPath => self.fetch_gif_path.clone(),
         }
     }
 

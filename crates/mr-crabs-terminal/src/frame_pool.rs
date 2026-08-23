@@ -46,6 +46,7 @@ impl FramePool {
             viewport: TerminalViewport::default(),
             search_matches: Vec::new(),
             hyperlinks: Vec::new(),
+            animation_region: None,
             spare_rows: Vec::new(),
         });
         // Re-stamp identity regardless of prior reuse.
@@ -59,6 +60,7 @@ impl FramePool {
         frame.viewport = TerminalViewport::default();
         frame.search_matches.clear();
         frame.hyperlinks.clear();
+        frame.animation_region = None;
         frame
     }
 
@@ -124,6 +126,7 @@ mod tests {
                 viewport: crate::TerminalViewport::default(),
                 search_matches: Vec::new(),
                 hyperlinks: Vec::new(),
+                animation_region: None,
                 spare_rows: Vec::new(),
             });
         }

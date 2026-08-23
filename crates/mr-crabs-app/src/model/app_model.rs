@@ -120,6 +120,12 @@ pub struct AppModel {
     next_pane: u64,
 }
 
+pub(crate) fn minimum_fetch_deadline(
+    deadlines: impl IntoIterator<Item = Option<u64>>,
+) -> Option<u64> {
+    deadlines.into_iter().flatten().min()
+}
+
 impl AppModel {
     /// A shell on the current platform. Production panes remain pending until
     /// measured geometry commits; headless environments build detached panes.
@@ -391,6 +397,9 @@ impl AppModel {
         if settings.startup_fetch && !settings.startup_fetch_command.is_empty() {
             pane.set_startup_command(Some(settings.startup_fetch_command.clone()));
         }
+        if !settings.fetch_gif_path.is_empty() {
+            pane.set_fetch_gif_path(Some(std::path::PathBuf::from(settings.fetch_gif_path.clone())));
+        }
         let pane_id = pane.id;
         let mut window = WindowModel::new(window_id, tab_id, pane_id, size).ok()?;
         window
@@ -416,6 +425,9 @@ impl AppModel {
         let settings = self.settings.current();
         if settings.startup_fetch && !settings.startup_fetch_command.is_empty() {
             pane.set_startup_command(Some(settings.startup_fetch_command.clone()));
+        }
+        if !settings.fetch_gif_path.is_empty() {
+            pane.set_fetch_gif_path(Some(std::path::PathBuf::from(settings.fetch_gif_path.clone())));
         }
         let pane_id = pane.id;
         let mut window = WindowModel::new(window_id, tab_id, pane_id, size).ok()?;
@@ -626,6 +638,28 @@ impl AppModel {
         stats
     }
 
+    pub fn next_fetch_deadline_ms(&self) -> Option<u64> {
+        minimum_fetch_deadline(self.windows.values().flat_map(|window| {
+            window.tabs.values().flat_map(|tab| {
+                tab.panes
+                    .values()
+                    .map(super::pane::PaneModel::next_fetch_deadline_ms)
+            })
+        }))
+    }
+
+    pub fn tick_fetch_animations(&mut self, now_ms: u64) -> bool {
+        let mut changed = false;
+        for window in self.windows.values_mut() {
+            for tab in window.tabs.values_mut() {
+                for pane in tab.panes.values_mut() {
+                    changed |= pane.tick_fetch_animation(now_ms);
+                }
+            }
+        }
+        changed
+    }
+
     /// Install a bounded diagnostic trace (tests only). Capacity clamped to >=1.
     pub fn install_diagnostic_trace(&mut self, capacity: usize) -> Arc<DiagnosticTrace> {
         let trace = Arc::new(DiagnosticTrace::new(capacity));
@@ -732,6 +766,7 @@ impl AppModel {
             for tab in window.tabs.values_mut() {
                 for pane in tab.panes.values_mut() {
                     pane.set_startup_command(None);
+                    pane.set_fetch_gif_path(None);
                 }
             }
             window.is_quick_terminal = true;
@@ -1304,6 +1339,15 @@ mod tests {
 
     fn headless() -> AppModel {
         AppModel::headless()
+    }
+
+    #[test]
+    fn two_pane_fetch_schedule_selects_minimum_deadline() {
+        assert_eq!(
+            minimum_fetch_deadline([Some(140), None, Some(80)]),
+            Some(80)
+        );
+        assert_eq!(minimum_fetch_deadline([None, None]), None);
     }
 
     #[test]
