@@ -333,3 +333,59 @@ fn full_bypass_preserves_existing_reveal_for_unchanged_cells() {
     );
     assert_eq!(model.last_change_ms(), Some(1_225.0));
 }
+
+#[test]
+fn full_multiline_output_schedules_reveal_instead_of_pop_in() {
+    let size = GridSize::new(4, 3);
+    let mut model = typewriter_model_for(GridSize::new(1, 1), 1_000);
+    let blank = [u32::from(' '); 4];
+
+    let baseline = frame_with_damage(
+        size,
+        1,
+        DamageKind::Full,
+        vec![
+            row_at(0, 1, &blank),
+            row_at(1, 1, &blank),
+            row_at(2, 1, &blank),
+        ],
+    );
+    assert!(model.apply_frame(&baseline, 1_000, true).is_idle());
+
+    let first = [
+        u32::from('A'),
+        u32::from('B'),
+        u32::from('C'),
+        u32::from('D'),
+    ];
+    let second = [
+        u32::from('E'),
+        u32::from('F'),
+        u32::from('G'),
+        u32::from('H'),
+    ];
+    let full = frame_with_damage(
+        size,
+        2,
+        DamageKind::Full,
+        vec![
+            row_at(0, 2, &first),
+            row_at(1, 2, &second),
+            row_at(2, 1, &blank),
+        ],
+    );
+    let effect = model.apply_frame(&full, 2_000, true);
+
+    assert!(
+        effect.text_reveal_allowed,
+        "non-translatable full output must remain reveal-eligible"
+    );
+    assert!(
+        effect.needs_frame,
+        "changed full output must schedule a frame before the 1000ms reveal duration expires"
+    );
+    assert!(
+        !effect.revealing.is_empty() || !effect.pending.is_empty(),
+        "changed full output must retain revealing or pending cells instead of popping in"
+    );
+}

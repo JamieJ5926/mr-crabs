@@ -2321,6 +2321,49 @@ mod tests {
     }
 
     #[gpui::test]
+    fn palette_ime_commit_before_escape_never_reaches_pty(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (model, shell, writer_rx, _reader_tx) = cx.update(attach_fake_writer);
+        let _keep_shell = shell;
+        let handle = cx.windows().into_iter().next().expect("one window");
+        draw_window(cx, handle);
+
+        cx.dispatch_keystroke(handle, Keystroke::parse("cmd-shift-p").unwrap());
+        assert!(
+            cx.update(|cx| model.read(cx).palette.is_open()),
+            "palette should be open before the IME commit"
+        );
+
+        let pane_id = cx.update(|cx| model.read(cx).focused_pane_id().expect("focused pane"));
+        let window = handle
+            .downcast::<WindowView>()
+            .expect("window root should be WindowView");
+        window
+            .update(cx, |view, _, _| {
+                view.ime_tx
+                    .send((pane_id, "蟹".to_owned()))
+                    .expect("IME queue should accept committed text");
+            })
+            .unwrap();
+
+        // This ordering is the regression: Escape closes the palette before
+        // any draw has a chance to drain the queued IME commit.
+        cx.dispatch_keystroke(handle, Keystroke::parse("escape").unwrap());
+        assert!(
+            !cx.update(|cx| model.read(cx).palette.is_open()),
+            "Escape should close the palette before the next draw"
+        );
+        draw_window(cx, handle);
+
+        let bytes = drain_writer(&writer_rx);
+        assert!(
+            bytes.is_empty(),
+            "IME text committed while the palette was open must never reach PTY, got {bytes:?}"
+        );
+    }
+
+    #[gpui::test]
     fn ctrl_c_writes_etx_and_never_printable_c_after_ime_drain(cx: &mut gpui::TestAppContext) {
         let (model, shell, writer_rx, _reader_tx) = cx.update(attach_fake_writer);
         let _keep_shell = shell;
