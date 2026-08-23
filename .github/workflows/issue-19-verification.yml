@@ -5,16 +5,32 @@ on:
     types: [edited]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  verify-effects:
+  format-and-verify-effects:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: fix/issue-19-text-animation-render-dedup
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+      - name: Format changed Rust files
+        run: cargo fmt --all
+      - name: Commit formatting
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "Formatting already clean"
+          else
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git add crates/mr-crabs-effects/src/model.rs crates/mr-crabs-effects/tests/issue_19_repeated_output.rs
+            git commit -m "style: format issue 19 regression coverage"
+            git push origin HEAD:fix/issue-19-text-animation-render-dedup
+          fi
       - name: Check formatting
         run: cargo fmt --all -- --check
       - name: Lint effects crate
