@@ -21,6 +21,27 @@ fn row_at(row: u16, generation: u64, contents: &[u32]) -> RowDelta {
 fn row(generation: u64, contents: &[u32]) -> RowDelta {
     row_at(0, generation, contents)
 }
+fn wide_pair_row(generation: u64) -> RowDelta {
+    RowDelta {
+        row: 0,
+        generation,
+        cells: vec![
+            Cell {
+                content: u32::from('界'),
+                style: 0,
+                flags: Cell::WIDE,
+            },
+            Cell {
+                content: u32::from(' '),
+                style: 0,
+                flags: Cell::WIDE_SPACER,
+            },
+            Cell::default(),
+            Cell::default(),
+        ],
+        runs: Vec::new(),
+    }
+}
 
 fn frame_with_damage(
     size: GridSize,
@@ -61,6 +82,22 @@ fn typewriter_model_for(size: GridSize, duration_ms: u64) -> EffectsModel {
 fn typewriter_model(duration_ms: u64) -> (GridSize, EffectsModel) {
     let size = GridSize::new(4, 1);
     (size, typewriter_model_for(size, duration_ms))
+}
+fn streaming_model(duration_ms: u64) -> (GridSize, EffectsModel) {
+    let size = GridSize::new(4, 1);
+    let config = EffectsConfig::new(
+        TextAnimation::Streaming,
+        duration_ms,
+        1.0,
+        false,
+        0.35,
+        250,
+        usize::from(size.cols) * usize::from(size.rows),
+    );
+    (
+        size,
+        EffectsModel::new(config, size, CellPx::new(10.0, 20.0)),
+    )
 }
 
 fn contents() -> [u32; 4] {
@@ -111,6 +148,37 @@ fn repeated_identical_partial_frame_starts_a_fresh_typewriter_reveal() {
     assert!(model.apply_frame(&repeated_expired, 2_135, true).is_idle());
 
     let duplicate_generation = frame(size, 5, vec![row(2, &contents)]);
+    assert!(
+        model
+            .apply_frame(&duplicate_generation, 3_000, true)
+            .is_idle()
+    );
+}
+
+#[test]
+fn repeated_identical_wide_pair_restamps_full_span() {
+    let (size, mut model) = streaming_model(120);
+
+    let first = frame(size, 1, vec![wide_pair_row(1)]);
+    assert!(model.apply_frame(&first, 1_000, true).needs_frame);
+
+    let expired = frame(size, 2, Vec::new());
+    assert!(model.apply_frame(&expired, 1_120, true).is_idle());
+
+    let repeated = frame(size, 3, vec![wide_pair_row(2)]);
+    let effect = model.apply_frame(&repeated, 2_000, true);
+    let reveals = effect
+        .revealing
+        .iter()
+        .map(|reveal| (reveal.pos, reveal.change_ms))
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        reveals,
+        vec![(CellPos::new(0, 0), 2_000.0), (CellPos::new(0, 1), 2_000.0),]
+    );
+
+    let duplicate_generation = frame(size, 4, vec![wide_pair_row(2)]);
     assert!(
         model
             .apply_frame(&duplicate_generation, 3_000, true)
