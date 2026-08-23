@@ -344,6 +344,9 @@ impl AppModel {
                 settings.shell.as_ref().map(PathBuf::from).as_deref(),
                 settings.cursor_blink,
             );
+            if let Ok(exe) = std::env::current_exe() {
+                env.insert("MR_CRABS_BIN".to_string(), exe.display().to_string());
+            }
             let config = PtySpawnConfig {
                 size,
                 shell: settings.shell.as_ref().map(PathBuf::from),
@@ -1458,7 +1461,7 @@ mod tests {
             .expect("normal pane");
         assert_eq!(
             original_pane.pending_startup_command(),
-            Some("rustfetch"),
+            Some(mr_crabs_config::DEFAULT_STARTUP_FETCH_COMMAND),
             "normal terminals keep the default startup fetch"
         );
 

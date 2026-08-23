@@ -3109,6 +3109,7 @@ dependencies = [
  "futures",
  "gpui",
  "gpui_platform",
+ "libc",
  "mr-crabs-config",
  "mr-crabs-element",
  "mr-crabs-history",
