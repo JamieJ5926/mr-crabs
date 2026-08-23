@@ -254,7 +254,7 @@ impl ChangeTracker {
             }
         }
 
-        if !key_changed {
+        if !key_changed && stamp_changed_blanks {
             for (x, cell) in cells.iter().take(len).enumerate() {
                 if !cell_paints_glyph(*cell) {
                     continue;
