@@ -358,11 +358,16 @@ impl Render for WindowView {
             })
         });
         if let Some(geometry) = geometry {
-            self.model.update(cx, |model, _| {
-                model.commit_geometry(self.window_id, geometry);
+            let changed = self.model.update(cx, |model, _| {
+                model.commit_geometry(self.window_id, geometry)
             });
-            if let Some(shell) = self.shell.upgrade() {
-                shell.update(cx, |shell, cx| shell.reschedule_fetch(cx));
+            if changed {
+                let shell = self.shell.clone();
+                cx.defer(move |cx| {
+                    if let Some(shell) = shell.upgrade() {
+                        shell.update(cx, |shell, cx| shell.reschedule_fetch(cx));
+                    }
+                });
             }
         }
 

@@ -734,7 +734,7 @@ impl AppModel {
 
     /// Commit a measured surface geometry through every split-derived pane.
     /// All pane frame swaps finish before the single generation bump.
-    pub fn commit_geometry(&mut self, window_id: WindowId, geometry: SurfaceGeometry) {
+    pub fn commit_geometry(&mut self, window_id: WindowId, geometry: SurfaceGeometry) -> bool {
         let output_wake = self.output_wake.clone();
         let changed = self
             .windows
@@ -743,6 +743,9 @@ impl AppModel {
             .unwrap_or(0);
         if changed > 0 {
             self.generation += 1;
+            true
+        } else {
+            false
         }
     }
 

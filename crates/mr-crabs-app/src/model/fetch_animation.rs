@@ -94,7 +94,7 @@ pub fn decode_gif_bytes(bytes: &[u8], grid: GridSize) -> Result<FetchAnimation, 
     };
     let target_w = ((w as f32 * scale) as u32).max(1).min(grid_cols) as u16;
     let target_h_px = ((h as f32 * scale) as u32).max(1).min(grid_rows * 2);
-    let target_h = ((target_h_px + 1) / 2) as u16;
+    let target_h = target_h_px.div_ceil(2) as u16;
     let size = GridSize::new(target_w, target_h);
     let mut styles = vec![Style::default()];
     use std::collections::HashMap;
