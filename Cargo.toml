@@ -48,7 +48,4 @@ image = { version = "=0.25.6", default-features = false, features = ["gif"] }
 # NOTE(S4): serde/serde_json are exact-pinned at the minimums required by the
 serde = { version = "=1.0.221", features = ["derive"] }
 serde_json = "=1.0.144"
-vte = { version = "=0.15.0", default-features = false, features = ["std", "ansi"] }
-
-[patch.crates-io]
-vte = { path = "vendor/vte" }
+vte = { version = "=0.15.0", path = "vendor/vte", default-features = false, features = ["std", "ansi"] }
