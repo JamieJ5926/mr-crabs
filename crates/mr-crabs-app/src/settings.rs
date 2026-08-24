@@ -338,6 +338,73 @@ impl Display for SettingsError {
 
 impl std::error::Error for SettingsError {}
 
+/// Named animation preset applied by `--animation`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct AnimationPreset {
+    pub name: &'static str,
+    pub description: &'static str,
+    pub text_animation: Option<&'static str>,
+    pub cursor_trail: Option<bool>,
+}
+
+/// Single source of truth for `--animation` menu text and overlay values.
+pub const ANIMATION_PRESETS: [AnimationPreset; 5] = [
+    AnimationPreset {
+        name: "none",
+        description: "disable all animations",
+        text_animation: Some("none"),
+        cursor_trail: Some(false),
+    },
+    AnimationPreset {
+        name: "streaming",
+        description: "left-to-right reveal of changed cells (default)",
+        text_animation: Some("streaming"),
+        cursor_trail: None,
+    },
+    AnimationPreset {
+        name: "typewriter",
+        description: "row-staggered typewriter reveal",
+        text_animation: Some("typewriter"),
+        cursor_trail: None,
+    },
+    AnimationPreset {
+        name: "cursor-trail",
+        description: "fading glow trail following the cursor (the diagonal cursor animation)",
+        text_animation: None,
+        cursor_trail: Some(true),
+    },
+    AnimationPreset {
+        name: "all",
+        description: "typewriter + cursor trail (streaming and typewriter are mutually exclusive)",
+        text_animation: Some("typewriter"),
+        cursor_trail: Some(true),
+    },
+];
+
+fn animation_preset_names() -> String {
+    ANIMATION_PRESETS
+        .iter()
+        .map(|preset| preset.name)
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn animation_preset(name: &str) -> Option<&'static AnimationPreset> {
+    ANIMATION_PRESETS.iter().find(|preset| preset.name == name)
+}
+
+/// Headless `--animation` / `--animation list` menu, derived from [`ANIMATION_PRESETS`].
+pub fn animation_menu_text() -> String {
+    let mut out = String::from("Available animations:\n");
+    for preset in ANIMATION_PRESETS {
+        out.push_str(&format!("  {}  {}\n", preset.name, preset.description));
+    }
+    out.push('\n');
+    out.push_str("Usage: mr-crabs --animation <name>\n");
+    out.push_str("Cmd+Shift+P toggles them at runtime.\n");
+    out
+}
+
 /// Parsed CLI: optional config file plus explicit field overrides.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct CliOverrides {
@@ -349,6 +416,7 @@ pub struct CliOverrides {
     pub docs: bool,
     pub version: bool,
     pub help: bool,
+    pub animation_menu: bool,
 }
 impl CliOverrides {
     /// Parse Ghostty-style `--flag=value`, `--flag value`, and boolean `--flag`.
@@ -396,7 +464,11 @@ impl CliOverrides {
                 continue;
             }
             if let Some((flag, value)) = split_flag(arg) {
-                apply_cli_flag(&mut cli, flag, Some(value))?;
+                if flag == "animation" {
+                    apply_animation_arg(&mut cli, Some(value))?;
+                } else {
+                    apply_cli_flag(&mut cli, flag, Some(value))?;
+                }
                 index += 1;
                 continue;
             }
@@ -428,6 +500,19 @@ impl CliOverrides {
                     })?;
                     cli.keybindings = Some(parse_keybindings_json(value)?);
                     index += 2;
+                    continue;
+                }
+                if flag == "animation" {
+                    let next = args.get(index + 1).map(String::as_str);
+                    if next
+                        .is_some_and(|value| !value.starts_with('-') && !value.starts_with('+'))
+                    {
+                        apply_animation_arg(&mut cli, next)?;
+                        index += 2;
+                    } else {
+                        apply_animation_arg(&mut cli, None)?;
+                        index += 1;
+                    }
                     continue;
                 }
                 return Err(SettingsError::Invalid(format!("unknown flag --{flag}")));
@@ -469,6 +554,37 @@ fn apply_cli_flag(
         }
     };
     cli.overlay.set(key, value).map_err(SettingsError::Invalid)
+}
+
+fn apply_animation_arg(cli: &mut CliOverrides, value: Option<&str>) -> Result<(), SettingsError> {
+    match value {
+        None | Some("list") => {
+            cli.animation_menu = true;
+            Ok(())
+        }
+        Some(name) => apply_animation_preset(cli, name),
+    }
+}
+
+fn apply_animation_preset(cli: &mut CliOverrides, name: &str) -> Result<(), SettingsError> {
+    let preset = animation_preset(name).ok_or_else(|| {
+        SettingsError::Invalid(format!(
+            "unknown animation {name}; expected one of {}",
+            animation_preset_names()
+        ))
+    })?;
+    if let Some(text_animation) = preset.text_animation {
+        cli.overlay
+            .set(SettingKey::TextAnimation, text_animation)
+            .map_err(SettingsError::Invalid)?;
+    }
+    if let Some(cursor_trail) = preset.cursor_trail {
+        let value = if cursor_trail { "true" } else { "false" };
+        cli.overlay
+            .set(SettingKey::CursorTrail, value)
+            .map_err(SettingsError::Invalid)?;
+    }
+    Ok(())
 }
 
 fn parse_keybindings_json(value: &str) -> Result<Vec<KeyBindingDef>, SettingsError> {
@@ -1232,6 +1348,120 @@ mod tests {
             assert!(cli.keybindings.is_none(), "{flag} leaves keybindings none");
             assert!(cli.overlay.is_empty(), "{flag} leaves overlay empty");
         }
+    }
+
+    #[test]
+    fn cli_animation_bare_sets_menu() {
+        let cli = CliOverrides::parse(&["--animation".into()]).expect("parse");
+        assert!(cli.animation_menu);
+        assert!(cli.overlay.is_empty());
+    }
+
+    #[test]
+    fn cli_animation_list_sets_menu() {
+        let cli = CliOverrides::parse(&["--animation".into(), "list".into()]).expect("parse");
+        assert!(cli.animation_menu);
+        assert!(cli.overlay.is_empty());
+
+        let equals = CliOverrides::parse(&["--animation=list".into()]).expect("parse equals");
+        assert!(equals.animation_menu);
+        assert!(equals.overlay.is_empty());
+    }
+
+    #[test]
+    fn cli_animation_typewriter_sets_text_animation() {
+        let cli = CliOverrides::parse(&["--animation".into(), "typewriter".into()]).expect("parse");
+        assert!(!cli.animation_menu);
+        assert_eq!(cli.overlay.text_animation.as_deref(), Some("typewriter"));
+        assert_eq!(cli.overlay.cursor_trail, None);
+    }
+
+    #[test]
+    fn cli_animation_all_sets_typewriter_and_cursor_trail() {
+        let cli = CliOverrides::parse(&["--animation".into(), "all".into()]).expect("parse");
+        assert_eq!(cli.overlay.text_animation.as_deref(), Some("typewriter"));
+        assert_eq!(cli.overlay.cursor_trail, Some(true));
+    }
+
+    #[test]
+    fn cli_animation_cursor_trail_sets_trail_only() {
+        let cli =
+            CliOverrides::parse(&["--animation".into(), "cursor-trail".into()]).expect("parse");
+        assert_eq!(cli.overlay.text_animation, None);
+        assert_eq!(cli.overlay.cursor_trail, Some(true));
+    }
+
+    #[test]
+    fn cli_animation_unknown_name_lists_valid_names() {
+        let err = CliOverrides::parse(&["--animation".into(), "wiggle".into()])
+            .expect_err("unknown preset");
+        let msg = err.to_string();
+        assert!(msg.contains("wiggle"), "unexpected error: {msg}");
+        for preset in ANIMATION_PRESETS {
+            assert!(
+                msg.contains(preset.name),
+                "error must list {}: {msg}",
+                preset.name
+            );
+        }
+    }
+
+    #[test]
+    fn cli_animation_explicit_text_animation_wins() {
+        let cli = CliOverrides::parse(&[
+            "--animation".into(),
+            "typewriter".into(),
+            "--text-animation".into(),
+            "none".into(),
+        ])
+        .expect("parse");
+        assert_eq!(cli.overlay.text_animation.as_deref(), Some("none"));
+    }
+
+    #[test]
+    fn cli_animation_equals_form_applies_preset() {
+        let cli = CliOverrides::parse(&["--animation=streaming".into()]).expect("parse");
+        assert!(!cli.animation_menu);
+        assert_eq!(cli.overlay.text_animation.as_deref(), Some("streaming"));
+    }
+
+    #[test]
+    fn cli_animation_bare_before_other_flag_sets_menu() {
+        let cli = CliOverrides::parse(&["--animation".into(), "--version".into()]).expect("parse");
+        assert!(cli.animation_menu);
+        assert!(cli.version);
+        assert!(cli.overlay.is_empty());
+    }
+
+    #[test]
+    fn cli_animation_bare_before_plus_show_config_sets_menu() {
+        let cli =
+            CliOverrides::parse(&["--animation".into(), "+show-config".into()]).expect("parse");
+        assert!(cli.animation_menu);
+        assert!(cli.show_config);
+        assert!(cli.overlay.is_empty());
+    }
+
+    #[test]
+    fn cli_animation_all_then_cursor_trail_false_wins() {
+        let cli = CliOverrides::parse(&[
+            "--animation".into(),
+            "all".into(),
+            "--cursor-trail=false".into(),
+        ])
+        .expect("parse");
+        assert_eq!(cli.overlay.cursor_trail, Some(false));
+    }
+
+    #[test]
+    fn cli_cursor_trail_false_then_animation_all_enables_trail() {
+        let cli = CliOverrides::parse(&[
+            "--cursor-trail=false".into(),
+            "--animation".into(),
+            "all".into(),
+        ])
+        .expect("parse");
+        assert_eq!(cli.overlay.cursor_trail, Some(true));
     }
 
     #[test]

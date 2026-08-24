@@ -23,7 +23,10 @@ use gpui_platform::application;
 use mr_crabs_app::action::AppAction;
 use mr_crabs_app::animated_fetch;
 use mr_crabs_app::model::app_model::AppModel;
-use mr_crabs_app::settings::{CliOverrides, SettingsError, SettingsStore, load_effective_from_cli};
+use mr_crabs_app::settings::{
+    animation_menu_text, ANIMATION_PRESETS, CliOverrides, SettingsError, SettingsStore,
+    load_effective_from_cli,
+};
 use mr_crabs_app::ui::{self, AppShell};
 use mr_crabs_config::{EffectiveConfig, SettingKey};
 
@@ -53,6 +56,16 @@ fn help_text() -> String {
     out.push_str("  --keybindings <JSON>\n");
     out.push('\n');
     out.push_str("Animation testing:\n");
+    out.push_str("  --animation [list|<name>]\n");
+    out.push_str("  --animation=<name>\n");
+    out.push_str(&format!(
+        "    Bare --animation and --animation list print the menu. Named presets: {}.\n",
+        ANIMATION_PRESETS
+            .iter()
+            .map(|preset| preset.name)
+            .collect::<Vec<_>>()
+            .join(", ")
+    ));
     out.push_str("  Inside Mr Crabs, press Cmd+Shift+P and run:\n");
     out.push_str(&format!(
         "    {}\n",
@@ -96,6 +109,9 @@ fn cli_output(args: &[String]) -> Result<Option<String>, SettingsError> {
     }
     if cli.version {
         return Ok(Some(format!("Mr Crabs {}", env!("CARGO_PKG_VERSION"))));
+    }
+    if cli.animation_menu {
+        return Ok(Some(animation_menu_text()));
     }
     if !cli.show_config {
         return Ok(None);
@@ -342,4 +358,52 @@ mod tests {
         let msg = err.to_string();
         assert!(msg.contains("unknown flag"), "unexpected error: {msg}");
     }
+
+    #[test]
+    fn animation_flag_prints_menu_with_every_preset() {
+        let menu = cli_output(&["--animation".to_string()])
+            .expect("parse")
+            .expect("menu");
+        for preset in ANIMATION_PRESETS {
+            assert!(
+                menu.contains(preset.name),
+                "menu missing {}: {menu}",
+                preset.name
+            );
+            assert!(
+                menu.contains(preset.description),
+                "menu missing description for {}: {menu}",
+                preset.name
+            );
+        }
+        assert!(menu.contains("mr-crabs --animation <name>"));
+        assert!(menu.contains("Cmd+Shift+P"));
+    }
+
+    #[test]
+    fn help_contains_animation_flag() {
+        let help = cli_output(&["--help".to_string()])
+            .expect("parse")
+            .expect("help");
+        assert!(
+            help.contains("--animation [list|<name>]"),
+            "help missing space form: {help}"
+        );
+        assert!(
+            help.contains("--animation=<name>"),
+            "help missing equals form: {help}"
+        );
+        assert!(
+            help.contains("Bare --animation and --animation list print the menu."),
+            "help missing bare/list menu behavior: {help}"
+        );
+        for preset in ANIMATION_PRESETS {
+            assert!(
+                help.contains(preset.name),
+                "help missing preset {}: {help}",
+                preset.name
+            );
+        }
+    }
+
 }

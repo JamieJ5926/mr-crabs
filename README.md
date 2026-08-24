@@ -49,6 +49,19 @@ The file is JSON. A minimal example:
 Reload with `Cmd+Shift+R` or View → Reload Configuration. CLI flags beat the
 file. A missing `--config-file` path is a startup error.
 
+## Animations
+
+`--animation` prints a preset menu and exits, or launches with a named overlay.
+
+```bash
+./target/release/mr-crabs --animation
+./target/release/mr-crabs --animation typewriter
+```
+
+Presets: `none` (off), `streaming` (left-to-right reveal, default), `typewriter` (row-staggered reveal), `cursor-trail` (fading cursor glow), `all` (typewriter plus trail).
+
+`Cmd+Shift+P` toggles animations at runtime. `--animation` is plain `--text-animation`/`--cursor-trail` shorthand; the later flag wins.
+
 ## License
 
 MIT for original Mr Crabs code. Vendored Alacritty terminal sources, VTE, GPUI,
