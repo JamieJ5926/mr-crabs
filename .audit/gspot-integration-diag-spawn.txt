@@ -1,0 +1,7 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.38s
+     Running `/Users/jamie/.cargo-target/debug/examples/diag_spawn`
+child pid = 41776
+[82 total] read 82 bytes: "%                                                                              \r \r"
+[119 total] read 37 bytes: "\rjamie@Jamies-MacBook-Pro mr-crabs % "
+[127 total] read 8 bytes: "\u{1b}[?2004h"
+TOTAL BYTES = 127

@@ -1,0 +1,2 @@
+verify_resources PASS
+SELF-TEST PASS (JSON artifacts, contracts, aggregation, and payload pins)
