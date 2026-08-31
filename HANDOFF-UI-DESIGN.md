@@ -15,7 +15,7 @@ Do not copy historical files wholesale. Compare symbol by symbol. Mark shell-adj
 
 ## What happened
 
-Interactive terminal animations landed on public `main` as `db58a632b811a92fbfd6c844885ed98b99954b08` (`db58a63`) `feat: add interactive terminal animations` and were pushed to `origin/main`. Current `main` and `origin/main` are that commit.
+Interactive terminal animations landed on public `main` as `db58a632b811a92fbfd6c844885ed98b99954b08` (`db58a63`) `feat: add interactive terminal animations` and were pushed to `origin/main`. That commit is the animation implementation base. Current published `main` later includes documentation corrections (`aadbed4`, `5241471` as the pre-correction docs HEAD). Do not treat `db58a63` as live HEAD. Inspect live Git for the exact HEAD; a later corrective commit will change it.
 
 The PTY-backed TUI can drive animation controls in session. It cannot Save persistent animation config. PTY output is not a trusted host channel. Until a trusted host channel exists, there is no Save.
 
@@ -34,7 +34,7 @@ Still open from 2026-08-23 and not closed by this land: S0 oracle hash refresh, 
 ## What is on GitHub
 
 - Repo `https://github.com/JamieJ5926/mr-crabs`
-- `main` / `origin/main` at `db58a632b811a92fbfd6c844885ed98b99954b08`
+- `main` / `origin/main` include the animation implementation plus later handoff documentation commits. Inspect live Git for the exact HEAD. Do not treat `db58a63` as current HEAD.
 
 ## What remains untracked / local
 
