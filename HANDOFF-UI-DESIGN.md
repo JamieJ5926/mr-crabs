@@ -8,7 +8,7 @@ This handoff did not inspect the historical animations worktree. That tree is go
 
 1. Read this file.
 2. Inspect live Git at `/Users/jamie/Documents/Projects/active/mr-crabs` and the vault current-state / decision log.
-3. Run a read-only comparison of tags `feature-terminal-animation-polish` (`6bc20c0d`) and `feature-animated-rustfetch` (`9f548eb7`) against `db58a63`.
+3. Run a read-only comparison of tags `feature-terminal-animation-polish` (`9f548eb7`) and `feature-animated-rustfetch` (`6bc20c0d`) against `db58a63`.
 4. Only then write UI code.
 
 Do not copy historical files wholesale. Compare symbol by symbol. Mark shell-adjacent historical diffs as unsafe to port.
@@ -101,8 +101,8 @@ Absent on disk:
 
 Recoverable refs are evidence only. They were not inspected as a live tree in this session:
 
-- `feature-terminal-animation-polish` → `6bc20c0d`
-- `feature-animated-rustfetch` → `9f548eb7`
+- `feature-terminal-animation-polish` → `9f548eb7`
+- `feature-animated-rustfetch` → `6bc20c0d`
 
 Vault characterization of that work (not a live checkout): renderer, cursor-trail, runtime-animation, input-regression, plus product-shell-adjacent dirt. Shell-adjacent historical changes are unsafe to port.
 
