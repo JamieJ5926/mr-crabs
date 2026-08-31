@@ -5,9 +5,9 @@
     "source_commit": "d2c70a8c7b9b6893c13640c02d7b6f9a1624f3f0",
     "fixture_format": "mr-crabs-effects-v1",
     "provenance": [
-      "src/renderer/shaders/streaming-text.glsl:9-21 (streaming semantics: per-cell change texture, never-changed sentinel passes through)",
+      "src/renderer/shaders/streaming-text.glsl:9-21 (streaming semantics: per-cell change times, never-changed sentinel passes through)",
       "src/renderer/shaders/streaming-text.glsl:40-81 (reveal math: elapsed window, left-to-right boundary, intensity*smoothstep conceal)",
-      "crates/mr-crabs-effects/src/key.rs (typewriter semantics: one stagger timestamp per changed drawable character unit, with a wide glyph and its spacer sharing one timestamp; retained per-cell reveal texture)",
+      "crates/mr-crabs-effects/src/key.rs (typewriter semantics: one stagger timestamp per changed drawable character unit, with a wide glyph and its spacer sharing one timestamp)",
       "src/renderer/shaders/typewriter-text.glsl:44-91 (typewriter math: future cells fully concealed, strike over first quarter, hold until window end)",
       "src/renderer/shaders/cursor-trail.glsl:11-27 (defaults: opacity 0.35, duration 0.25)",
       "src/renderer/shaders/cursor-trail.glsl:53-88 (trail math: linear fade, exp(-d/radius) glow, segment between centers, focus/visibility guards)",
@@ -313,7 +313,7 @@
               "elapsed_ms": 0.0,
               "radius": 0.0,
               "segment": null,
-              "glow": null
+              "leftover": null
             }
           }
         },
@@ -483,7 +483,7 @@
               "elapsed_ms": 0.0,
               "radius": 0.0,
               "segment": null,
-              "glow": null
+              "leftover": null
             }
           }
         },
@@ -653,7 +653,7 @@
               "elapsed_ms": 0.0,
               "radius": 0.0,
               "segment": null,
-              "glow": null
+              "leftover": null
             }
           }
         },
@@ -823,7 +823,7 @@
               "elapsed_ms": 0.0,
               "radius": 0.0,
               "segment": null,
-              "glow": null
+              "leftover": null
             }
           }
         },
@@ -993,7 +993,7 @@
               "elapsed_ms": 0.0,
               "radius": 0.0,
               "segment": null,
-              "glow": null
+              "leftover": null
             }
           }
         },
@@ -1018,7 +1018,7 @@
               "elapsed_ms": 0.0,
               "radius": 0.0,
               "segment": null,
-              "glow": null
+              "leftover": null
             }
           }
         },
@@ -1043,7 +1043,7 @@
               "elapsed_ms": 0.0,
               "radius": 0.0,
               "segment": null,
-              "glow": null
+              "leftover": null
             }
           }
         }
@@ -1093,7 +1093,7 @@
               "elapsed_ms": 0.0,
               "radius": 0.0,
               "segment": null,
-              "glow": null
+              "leftover": null
             }
           }
         },
@@ -1118,7 +1118,7 @@
               "elapsed_ms": 0.0,
               "radius": 0.0,
               "segment": null,
-              "glow": null
+              "leftover": null
             }
           }
         },
@@ -1143,12 +1143,11 @@
               "elapsed_ms": 0.0,
               "radius": 0.0,
               "segment": null,
-              "glow": null
+              "leftover": null
             }
           }
         }
-      ],
-      "expected_texture_len": 96
+      ]
     },
     {
       "id": "typewriter-stagger-burst",
@@ -1240,7 +1239,7 @@
               "elapsed_ms": 0,
               "radius": 0,
               "segment": null,
-              "glow": null
+              "leftover": null
             }
           }
         },
@@ -1284,7 +1283,7 @@
               "elapsed_ms": 0,
               "radius": 0,
               "segment": null,
-              "glow": null
+              "leftover": null
             }
           }
         },
@@ -1333,7 +1332,7 @@
               "elapsed_ms": 0,
               "radius": 0,
               "segment": null,
-              "glow": null
+              "leftover": null
             }
           }
         },
@@ -1386,7 +1385,7 @@
               "elapsed_ms": 0,
               "radius": 0,
               "segment": null,
-              "glow": null
+              "leftover": null
             }
           }
         },
@@ -1439,7 +1438,7 @@
               "elapsed_ms": 0,
               "radius": 0,
               "segment": null,
-              "glow": null
+              "leftover": null
             }
           }
         },
@@ -1464,7 +1463,7 @@
               "elapsed_ms": 0,
               "radius": 0,
               "segment": null,
-              "glow": null
+              "leftover": null
             }
           }
         }
@@ -1551,7 +1550,7 @@
               "elapsed_ms": 0,
               "radius": 0,
               "segment": null,
-              "glow": null
+              "leftover": null
             }
           }
         },
@@ -1622,7 +1621,7 @@
               "elapsed_ms": 0,
               "radius": 0,
               "segment": null,
-              "glow": null
+              "leftover": null
             }
           }
         },
@@ -1702,7 +1701,7 @@
               "elapsed_ms": 0,
               "radius": 0,
               "segment": null,
-              "glow": null
+              "leftover": null
             }
           }
         },
@@ -1764,7 +1763,7 @@
               "elapsed_ms": 0,
               "radius": 0,
               "segment": null,
-              "glow": null
+              "leftover": null
             }
           }
         }
@@ -2494,7 +2493,7 @@
               "elapsed_ms": 0,
               "radius": 0,
               "segment": null,
-              "glow": null
+              "leftover": null
             }
           }
         },
@@ -3229,7 +3228,7 @@
               "elapsed_ms": 0,
               "radius": 0,
               "segment": null,
-              "glow": null
+              "leftover": null
             }
           }
         }
@@ -3270,21 +3269,16 @@
             "visible": true
           },
           "expected": {
-            "needs_frame": true,
+            "needs_frame": false,
             "revealing": [],
             "pending": [],
             "trail": {
-              "active": true,
-              "alpha": 0.35,
+              "active": false,
+              "alpha": 0.0,
               "elapsed_ms": 0.0,
-              "radius": 10.0,
+              "radius": 0.0,
               "segment": null,
-              "glow": [
-                0.0,
-                0.0,
-                10.0,
-                20.0
-              ]
+              "leftover": null
             }
           }
         },
@@ -3318,8 +3312,8 @@
                   10.0
                 ]
               ],
-              "glow": [
-                50.0,
+              "leftover": [
+                0.0,
                 0.0,
                 10.0,
                 20.0
@@ -3357,8 +3351,8 @@
                   10.0
                 ]
               ],
-              "glow": [
-                50.0,
+              "leftover": [
+                0.0,
                 0.0,
                 10.0,
                 20.0
@@ -3387,7 +3381,7 @@
               "elapsed_ms": 0.0,
               "radius": 0.0,
               "segment": null,
-              "glow": null
+              "leftover": null
             }
           }
         }
@@ -3428,21 +3422,16 @@
             "visible": true
           },
           "expected": {
-            "needs_frame": true,
+            "needs_frame": false,
             "revealing": [],
             "pending": [],
             "trail": {
-              "active": true,
-              "alpha": 0.35,
+              "active": false,
+              "alpha": 0.0,
               "elapsed_ms": 0.0,
-              "radius": 10.0,
+              "radius": 0.0,
               "segment": null,
-              "glow": [
-                0.0,
-                0.0,
-                10.0,
-                20.0
-              ]
+              "leftover": null
             }
           }
         },
@@ -3467,7 +3456,7 @@
               "elapsed_ms": 0.0,
               "radius": 0.0,
               "segment": null,
-              "glow": null
+              "leftover": null
             }
           }
         },
@@ -3501,8 +3490,8 @@
                   10.0
                 ]
               ],
-              "glow": [
-                50.0,
+              "leftover": [
+                0.0,
                 0.0,
                 10.0,
                 20.0
@@ -3531,7 +3520,7 @@
               "elapsed_ms": 0.0,
               "radius": 0.0,
               "segment": null,
-              "glow": null
+              "leftover": null
             }
           }
         }
@@ -3628,7 +3617,7 @@
               "elapsed_ms": 0.0,
               "radius": 0.0,
               "segment": null,
-              "glow": null
+              "leftover": null
             }
           }
         },
@@ -3653,7 +3642,7 @@
               "elapsed_ms": 0.0,
               "radius": 0.0,
               "segment": null,
-              "glow": null
+              "leftover": null
             }
           }
         }
@@ -3794,12 +3783,11 @@
               "elapsed_ms": 0.0,
               "radius": 0.0,
               "segment": null,
-              "glow": null
+              "leftover": null
             }
           }
         }
-      ],
-      "expected_texture_len": 16
+      ]
     },
     {
       "id": "top-down-cell-metrics",

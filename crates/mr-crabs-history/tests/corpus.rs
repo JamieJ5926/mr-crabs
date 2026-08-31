@@ -7,8 +7,8 @@
 
 use mr_crabs_history::{
     ExtractOptions, HistoryFile, PersistConfig, PersistError, ReplayLog, SearchDirection,
-    SearchRequest, SearchStart, Selection, SelectionGesture, SelectionPoint, TerminalSnapshot,
-    row_text, search_sync, selection_text, viewport_row, visible_rows,
+    SearchPattern, SearchRequest, SearchStart, Selection, SelectionGesture, SelectionPoint,
+    TerminalSnapshot, row_text, search_sync, selection_text, viewport_row, visible_rows,
 };
 use mr_crabs_terminal::{GridSize, ScrollbackConfig, Terminal};
 use serde_json::{Value, json};
@@ -84,6 +84,7 @@ fn run_search_case(case: &Value) {
     };
     let mut request = SearchRequest {
         needle,
+        pattern: SearchPattern::Literal,
         direction,
         start,
         limit: req_value["limit"].as_u64().expect("limit") as usize,

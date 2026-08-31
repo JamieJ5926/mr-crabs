@@ -21,14 +21,15 @@ pub struct RunBatch {
     /// Raw terminal attribute flags shared by every cell in this run.
     pub flags: u16,
     pub text: SharedString,
-    /// Terminal-cell width consumed by each text character in `text`
+    /// Terminal-cell width consumed by each painted cluster in `text`
     /// (1 for ordinary cells, 2 for wide glyphs whose spacer cell is
-    /// consumed). Parallel to `text` in character order, so the paint pass
-    /// can anchor every shaped glyph to its terminal cell origin
-    /// (`col + prefix sum of widths`) instead of the shaper's natural
-    /// advance.
+    /// consumed). Parallel to `cluster_starts`, not to Unicode scalars.
     pub glyph_widths: Vec<u16>,
+    /// Byte offset in `text` where each painted cluster begins. Combining
+    /// extras share the base cell's start and width.
+    pub cluster_starts: Vec<u32>,
 }
+
 
 /// A paint-ready background rectangle covering `len` cells at `col` with
 /// `style`. Derived directly from the frame's style runs, so adjacent cells
@@ -287,14 +288,22 @@ fn fill_batch(batch: &mut RowBatch, rd: &RowDelta) {
         let last = segment_start + last_offset;
         let mut text = String::new();
         let mut glyph_widths = Vec::new();
-        for cell in &cells[first..=last] {
+        let mut cluster_starts = Vec::new();
+        for (offset, cell) in cells[first..=last].iter().enumerate() {
             if cell.flags & Cell::WIDE_SPACER != 0 {
                 // The wide character's own cell accounts for both columns;
                 // the spacer contributes no text and no extra width.
                 continue;
             }
             if let Some(ch) = char::from_u32(cell.content) {
+                cluster_starts.push(text.len() as u32);
                 text.push(if ch == '\0' { ' ' } else { ch });
+                let col = (first + offset) as u16;
+                for extra in rd.extras_at(col) {
+                    if let Some(mark) = char::from_u32(*extra) {
+                        text.push(mark);
+                    }
+                }
                 glyph_widths.push(if cell.flags & Cell::WIDE != 0 { 2 } else { 1 });
             }
         }
@@ -305,10 +314,28 @@ fn fill_batch(batch: &mut RowBatch, rd: &RowDelta) {
             flags,
             text: text.into(),
             glyph_widths,
+            cluster_starts,
         });
         segment_start = segment_end;
     }
 }
+
+/// Terminal column for a shaped glyph whose cluster starts at `byte` in
+/// `run.text`. Combining scalars share the base cluster's start, so they
+/// do not consume a later cell's width.
+pub fn cell_col_for_glyph_byte(run: &RunBatch, byte: usize) -> u16 {
+    let mut col = run.col;
+    let mut matched = run.col;
+    for (i, &start) in run.cluster_starts.iter().enumerate() {
+        if (start as usize) > byte {
+            break;
+        }
+        matched = col;
+        col = col.saturating_add(run.glyph_widths.get(i).copied().unwrap_or(1));
+    }
+    matched
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -346,6 +373,7 @@ mod tests {
             generation: 1,
             cells,
             runs,
+            combining: Vec::new(),
         }
     }
 
@@ -634,10 +662,66 @@ mod tests {
         // Cell widths parallel the text characters: the wide glyph consumes
         // two terminal cells (its spacer is not in the text), 'a' one.
         assert_eq!(batch.runs[0].glyph_widths, vec![2, 1]);
+        assert_eq!(batch.runs[0].cluster_starts, vec![0, "界".len() as u32]);
         // Backgrounds still cover every cell.
         assert_eq!(batch.backgrounds.len(), 1);
         assert_eq!(batch.backgrounds[0].len, 4);
     }
+
+    #[test]
+    fn combining_cluster_shapes_full_text_with_one_width() {
+        let cell = Cell {
+            content: u32::from('e'),
+            style: 0,
+            flags: Cell::COMBINING,
+        };
+        let mut row = row_cells(&[cell]);
+        row.combining = vec![(0, vec![0x0301])];
+        let mut cache = RenderCache::new();
+        cache.apply_frame(&frame(
+            1,
+            DamageKind::Partial,
+            vec![row],
+            cursor(false),
+        ));
+        let batch = &cache.batches()[0];
+        assert_eq!(batch.runs.len(), 1);
+        assert_eq!(batch.runs[0].text.as_ref(), "e\u{0301}");
+        assert_eq!(batch.runs[0].glyph_widths, vec![1]);
+        assert_eq!(batch.runs[0].cluster_starts, vec![0]);
+    }
+
+    #[test]
+    fn combining_then_next_cell_maps_to_immediate_next_column() {
+        let acute = Cell {
+            content: u32::from('e'),
+            style: 0,
+            flags: Cell::COMBINING,
+        };
+        let x = Cell {
+            content: u32::from('x'),
+            style: 0,
+            flags: 0,
+        };
+        let mut row = row_cells(&[acute, x]);
+        row.combining = vec![(0, vec![0x0301])];
+        let mut cache = RenderCache::new();
+        cache.apply_frame(&frame(
+            1,
+            DamageKind::Partial,
+            vec![row],
+            cursor(false),
+        ));
+        let run = &cache.batches()[0].runs[0];
+        assert_eq!(run.text.as_ref(), "e\u{0301}x");
+        assert_eq!(run.glyph_widths, vec![1, 1]);
+        let x_byte = "e\u{0301}".len();
+        assert_eq!(run.cluster_starts, vec![0, x_byte as u32]);
+        assert_eq!(cell_col_for_glyph_byte(run, 0), 0);
+        assert_eq!(cell_col_for_glyph_byte(run, 1), 0);
+        assert_eq!(cell_col_for_glyph_byte(run, x_byte), 1);
+    }
+
 
     #[test]
     fn style_boundaries_split_runs() {

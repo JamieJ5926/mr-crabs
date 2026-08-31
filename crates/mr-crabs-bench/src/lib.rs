@@ -333,6 +333,7 @@ pub fn headless_cache_smoke() -> bool {
             len: 4,
             style: 0,
         }],
+        combining: Vec::new(),
     });
 
     let mut cache = RenderCache::new();

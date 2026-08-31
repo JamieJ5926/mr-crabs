@@ -84,6 +84,9 @@ fn default_grid() -> GridSize {
 fn default_opacity() -> f32 {
     mr_crabs_config::DEFAULT_BACKGROUND_OPACITY
 }
+fn default_blur() -> u16 {
+    mr_crabs_config::DEFAULT_BACKGROUND_BLUR
+}
 fn default_padding() -> f32 {
     DEFAULT_PADDING_PX
 }
@@ -137,6 +140,9 @@ pub struct AppSettings {
     /// Window background opacity in `0.0..=1.0`.
     #[serde(default = "default_opacity")]
     pub background_opacity: f32,
+    /// Window background blur intensity. 0 is off.
+    #[serde(default = "default_blur")]
+    pub background_blur: u16,
     /// Horizontal padding in logical pixels on each side.
     #[serde(default = "default_padding")]
     pub padding_x: f32,
@@ -226,6 +232,7 @@ impl AppSettings {
             line_height_adjust_percent: effective.line_height_adjust_percent,
             theme: effective.theme.clone(),
             background_opacity: effective.background_opacity,
+            background_blur: effective.background_blur,
             padding_x: effective.padding_x,
             padding_y: effective.padding_y,
             cursor_blink: effective.cursor_blink,
@@ -270,6 +277,7 @@ impl AppSettings {
             line_height_adjust_percent: self.line_height_adjust_percent,
             theme: self.theme.clone(),
             background_opacity: self.background_opacity,
+            background_blur: self.background_blur,
             padding_x: self.padding_x,
             padding_y: self.padding_y,
             cursor_blink: self.cursor_blink,
@@ -661,6 +669,7 @@ struct PartialAppSettings {
     line_height_adjust_percent: Option<f32>,
     theme: Option<String>,
     background_opacity: Option<f32>,
+    background_blur: Option<u16>,
     padding_x: Option<f32>,
     padding_y: Option<f32>,
     cursor_blink: Option<bool>,
@@ -685,13 +694,14 @@ struct PartialAppSettings {
 }
 
 impl PartialAppSettings {
-    fn into_layers(self) -> (ConfigOverlay, Option<Vec<KeyBindingDef>>) {
-        let overlay = ConfigOverlay {
+    fn into_layers(self) -> Result<(ConfigOverlay, Option<Vec<KeyBindingDef>>), SettingsError> {
+        let mut overlay = ConfigOverlay {
             font_family: self.font_family,
             font_size: self.font_size,
             line_height_adjust_percent: self.line_height_adjust_percent,
-            theme: self.theme,
+            theme: None,
             background_opacity: self.background_opacity,
+            background_blur: self.background_blur,
             padding_x: self.padding_x,
             padding_y: self.padding_y,
             cursor_blink: self.cursor_blink,
@@ -713,7 +723,12 @@ impl PartialAppSettings {
             startup_animation: self.startup_animation,
             fetch_gif_path: self.fetch_gif_path,
         };
-        (overlay, self.keybindings)
+        if let Some(theme) = self.theme.as_deref() {
+            overlay
+                .set(SettingKey::Theme, theme)
+                .map_err(SettingsError::Invalid)?;
+        }
+        Ok((overlay, self.keybindings))
     }
 }
 
@@ -722,7 +737,7 @@ fn parse_file_overlay(
 ) -> Result<(ConfigOverlay, Option<Vec<KeyBindingDef>>), SettingsError> {
     let parsed: PartialAppSettings =
         serde_json::from_str(json).map_err(|error| SettingsError::Json(error.to_string()))?;
-    Ok(parsed.into_layers())
+    parsed.into_layers()
 }
 
 fn resolve_keybindings(
@@ -1165,14 +1180,14 @@ mod tests {
         .expect("cli");
         let mut store = SettingsStore::from_cli(&cli).expect("store");
         assert_eq!(store.current().font_size, 16.0, "cli beats file");
-        assert_eq!(store.current().theme, "dark");
+        assert_eq!(store.current().theme, "ink");
         assert!(store.current().cursor_blink);
         assert_eq!(store.current().padding_x, 3.0);
 
         store
             .apply_runtime_value(SettingKey::Theme, "light")
             .expect("runtime");
-        assert_eq!(store.current().theme, "light");
+        assert_eq!(store.current().theme, "paper");
         assert_eq!(store.current().font_size, 16.0);
         let _ = std::fs::remove_dir_all(dir);
     }
@@ -1181,7 +1196,7 @@ mod tests {
     fn malformed_reload_rolls_back_and_keeps_runtime() {
         let mut store = SettingsStore::new();
         store
-            .reload_json(r#"{"theme":"ok","font_size":12.0}"#, "good")
+            .reload_json(r#"{"theme":"ink","font_size":12.0}"#, "good")
             .expect("seed file");
         store
             .apply_runtime_value(SettingKey::FontFamily, "Iosevka")
@@ -1191,7 +1206,7 @@ mod tests {
         assert!(store.reload_json("{", "bad").is_err());
         assert_eq!(store.generation, generation);
         assert_eq!(*store.current(), *snapshot);
-        assert_eq!(store.current().theme, "ok");
+        assert_eq!(store.current().theme, "ink");
         assert_eq!(store.current().font_family, "Iosevka");
         assert!(store.last_error.is_some());
     }
@@ -1200,22 +1215,26 @@ mod tests {
     fn runtime_overrides_survive_file_reload() {
         let mut store = SettingsStore::new();
         store
-            .reload_json(r#"{"font_size":11.0,"theme":"one"}"#, "one")
+            .reload_json(r#"{"font_size":11.0,"theme":"ink"}"#, "one")
             .expect("file one");
         let changes = store
             .apply_runtime_value(SettingKey::FontSize, "22")
             .expect("runtime");
         assert!(changes.iter().any(|change| change.key == "font-size"));
         store
-            .reload_json(r#"{"font_size":13.0,"theme":"two"}"#, "two")
+            .reload_json(r#"{"font_size":13.0,"theme":"paper"}"#, "two")
             .expect("file two");
         assert_eq!(store.current().font_size, 22.0, "runtime persists");
-        assert_eq!(store.current().theme, "two", "unshadowed file key updates");
+        assert_eq!(
+            store.current().theme,
+            "paper",
+            "unshadowed file key updates"
+        );
         assert!(
             store
                 .last_changes()
                 .iter()
-                .any(|change| change.key == "theme" && change.current == "two")
+                .any(|change| change.key == "theme" && change.current == "paper")
         );
         assert!(
             !store
@@ -1230,7 +1249,7 @@ mod tests {
     fn show_config_prints_complete_effective_layers() {
         let mut store = SettingsStore::new();
         store
-            .reload_json(r#"{"font_size":21.0,"theme":"vapor"}"#, "file")
+            .reload_json(r#"{"font_size":21.0,"theme":"harbor"}"#, "file")
             .expect("file");
         store
             .apply_runtime_value(SettingKey::CursorTrail, "true")
@@ -1244,10 +1263,51 @@ mod tests {
             );
         }
         assert!(text.contains("font-size = 21"));
-        assert!(text.contains("theme = vapor"));
+        assert!(text.contains("theme = harbor"));
         assert!(text.contains("cursor-trail = true"));
         assert!(text.contains("cursor-trail-duration = 250ms"));
         assert!(!text.contains("JetBrains Mono") || text.contains("font-family = JetBrains Mono"));
+    }
+
+    #[test]
+    fn file_overlay_canonicalizes_dark_to_ink() {
+        let mut store = SettingsStore::new();
+        store
+            .reload_json(r#"{"theme":"dark"}"#, "file")
+            .expect("alias");
+        assert_eq!(store.current().theme, "ink");
+    }
+
+    #[test]
+    fn file_overlay_rejects_unknown_theme_atomically() {
+        let mut store = SettingsStore::new();
+        store
+            .reload_json(r#"{"theme":"ink","font_size":12.0}"#, "good")
+            .expect("seed");
+        let generation = store.generation;
+        let snapshot = store.current();
+        let err = store
+            .reload_json(r#"{"theme":"vapor","font_size":99.0}"#, "bad")
+            .expect_err("unknown theme");
+        assert!(matches!(err, SettingsError::Invalid(_)));
+        assert_eq!(store.generation, generation);
+        assert_eq!(*store.current(), *snapshot);
+        assert_eq!(store.current().theme, "ink");
+        assert_eq!(store.current().font_size, 12.0);
+    }
+
+    #[test]
+    fn file_overlay_rejects_invalid_background_blur_json() {
+        let mut store = SettingsStore::new();
+        store
+            .reload_json(r#"{"background_blur": 4}"#, "good")
+            .expect("seed");
+        let generation = store.generation;
+        assert!(store.reload_json(r#"{"background_blur": -1}"#, "neg").is_err());
+        assert!(store.reload_json(r#"{"background_blur": 1.5}"#, "float").is_err());
+        assert!(store.reload_json(r#"{"background_blur": "blur"}"#, "str").is_err());
+        assert_eq!(store.generation, generation);
+        assert_eq!(store.current().background_blur, 4);
     }
 
     #[test]
@@ -1305,7 +1365,7 @@ mod tests {
         assert_eq!(settings.font_family, "Iosevka");
         assert_eq!(settings.font_size, 12.0);
         assert_eq!(settings.line_height_adjust_percent, 8.0);
-        assert_eq!(settings.theme, "dark");
+        assert_eq!(settings.theme, "ink");
         assert_eq!(settings.background_opacity, 0.5);
         assert_eq!(settings.padding_x, 2.0);
         assert_eq!(settings.padding_y, 3.0);
@@ -1362,7 +1422,7 @@ mod tests {
             .expect("parse -h with flag");
         assert!(cli.help);
         let settings = load_effective_from_cli(&cli).expect("effective");
-        assert_eq!(settings.theme, "dark");
+        assert_eq!(settings.theme, "ink");
     }
 
     #[test]

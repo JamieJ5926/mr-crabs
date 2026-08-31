@@ -3161,6 +3161,7 @@ version = "0.1.0"
 dependencies = [
  "lz4_flex",
  "mr-crabs-terminal",
+ "regex",
  "serde",
  "serde_json",
 ]

@@ -22,7 +22,9 @@ mod palette;
 pub mod phase;
 mod selection;
 
-pub use cache::{CacheAction, Capacities, RectBatch, RenderCache, RowBatch, RunBatch};
+pub use cache::{
+    CacheAction, Capacities, RectBatch, RenderCache, RowBatch, RunBatch, cell_col_for_glyph_byte,
+};
 pub use cursor::{
     BlinkHalfPeriod, CursorGeometry, CursorStateExt, blink_phase_active, cursor_geometry,
     needs_blink_animation, needs_blink_animation_with_phase, should_request_animation,
@@ -38,7 +40,7 @@ pub use palette::{
     ANSI_PALETTE, TerminalPalette, background_color, color_to_hsla, cursor_color, indexed_rgb,
     named_rgb, selection_color, style_background, style_foreground, style_underline,
 };
-pub use selection::selection_rects;
+pub use selection::{search_match_rects, selection_rects};
 
 use mr_crabs_terminal::{Cell, Run};
 

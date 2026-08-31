@@ -325,6 +325,11 @@ pub fn synthetic_dock_frame(snap: &InputDockSnapshot) -> FrameDelta {
         generation: snap.generation,
         cells,
         runs,
+        combining: snap
+            .combining
+            .iter()
+            .map(|mark| (mark.cell_index as u16, mark.codepoints.clone()))
+            .collect(),
     }];
     frame.cursor = CursorState {
         row: 0,

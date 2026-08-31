@@ -29,8 +29,7 @@ use gpui::{
     FontFallbacks, InteractiveElement as _, IntoElement, KeyDownEvent, KeyUpEvent, Keystroke,
     Modifiers as GpuiModifiers, MouseButton as GpuiMouseButton, MouseDownEvent, MouseMoveEvent,
     MouseUpEvent, ParentElement as _, Render, Role, ScrollDelta, ScrollWheelEvent, SharedString,
-    StatefulInteractiveElement as _, Styled as _, Subscription, WeakEntity, Window,
-    WindowAppearance, div, font, px,
+    StatefulInteractiveElement as _, Styled as _, Subscription, WeakEntity, Window, div, font, px,
 };
 use parking_lot::Mutex;
 
@@ -47,6 +46,8 @@ use mr_crabs_input::{
 };
 use mr_crabs_terminal::FrameDelta;
 
+use crate::accessibility_policy::AccessibilityPolicy;
+use crate::theme::{WindowMaterial, resolve_chrome};
 use crate::model::app_model::AppModel;
 use crate::model::geometry::{PaddingPx, SurfaceGeometry};
 use crate::model::input_dock::{
@@ -124,6 +125,9 @@ pub struct WindowView {
     modal_input_gate: Arc<AtomicBool>,
     /// Focus subscriptions must remain alive for the lifetime of the view.
     _focus_subscriptions: Vec<Subscription>,
+    /// Host accessibility snapshot taken once when the window is created.
+    /// Render reuses this value and never calls `AccessibilityPolicy::detect`.
+    accessibility_policy: AccessibilityPolicy,
 }
 
 impl WindowView {
@@ -160,6 +164,7 @@ impl WindowView {
             ime_rx,
             modal_input_gate,
             _focus_subscriptions: vec![focused, blurred],
+            accessibility_policy: load_accessibility_policy(),
         }
     }
 }
@@ -298,6 +303,30 @@ fn terminal_element_id(pane_id: PaneId) -> ElementId {
     )
 }
 
+fn load_accessibility_policy() -> AccessibilityPolicy {
+    let host = AccessibilityPolicy::detect();
+    match std::env::var("MR_CRABS_REDUCE_MOTION") {
+        Ok(value) if value == "1" || value.eq_ignore_ascii_case("true") => {
+            AccessibilityPolicy::from_flags(true, host.reduce_transparency)
+        }
+        Ok(value) if value == "0" || value.eq_ignore_ascii_case("false") => {
+            AccessibilityPolicy::from_flags(false, host.reduce_transparency)
+        }
+        _ => host,
+    }
+}
+
+fn effects_config_from_animation(
+    animation: mr_crabs_config::AnimationDefaults,
+    policy: AccessibilityPolicy,
+) -> EffectsConfig {
+    let mut config = EffectsConfig::from(animation);
+    if !policy.allows_motion() {
+        config.cursor_trail = false;
+    }
+    config
+}
+
 impl Render for WindowView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         if !self.focus.is_focused(window) {
@@ -322,18 +351,19 @@ impl Render for WindowView {
                 .unwrap_or_else(|| settings.animation_defaults());
             (settings, shell.settings.generation, animation)
         };
-        let terminal_palette = match settings.theme.as_str() {
-            "light" => TerminalPalette::light(settings.background_opacity),
-            "dark" => TerminalPalette::dark(settings.background_opacity),
-            _ => match window.appearance() {
-                WindowAppearance::Light | WindowAppearance::VibrantLight => {
-                    TerminalPalette::light(settings.background_opacity)
-                }
-                WindowAppearance::Dark | WindowAppearance::VibrantDark => {
-                    TerminalPalette::dark(settings.background_opacity)
-                }
-            },
+        let chrome = resolve_chrome(
+            &settings.theme,
+            settings.background_opacity,
+            settings.background_blur,
+            window.appearance(),
+            self.accessibility_policy,
+        );
+        let terminal_palette = chrome.palette;
+        let appearance = match chrome.material {
+            WindowMaterial::Opaque => gpui::WindowBackgroundAppearance::Opaque,
+            WindowMaterial::Blurred { .. } => gpui::WindowBackgroundAppearance::Blurred,
         };
+        window.set_background_appearance(appearance);
         let measurement_is_stale = self
             .measured
             .as_ref()
@@ -505,7 +535,7 @@ impl Render for WindowView {
                     )
                     .with_font_size(px(settings.font_size))
                     .with_palette(terminal_palette)
-                    .with_effects(EffectsConfig::from(animation))
+                    .with_effects(effects_config_from_animation(animation, self.accessibility_policy))
                     .with_graphics(bundle.graphics)
                     .with_input_sink(move |text| {
                         let _ = ime_tx.send((ime_pane_id, text.to_owned()));
@@ -2922,5 +2952,44 @@ mod tests {
             !chat_a11y_later,
             "second Cmd+Shift+J must remove the Chat overlay exactly once"
         );
+    }
+
+    #[test]
+    fn reduce_motion_disables_cursor_trail_without_changing_user_config() {
+        let mut animation = mr_crabs_config::AnimationDefaults::default();
+        animation.cursor_trail = true;
+        let off = effects_config_from_animation(
+            animation,
+            AccessibilityPolicy::from_flags(true, false),
+        );
+        assert!(!off.cursor_trail);
+        let on = effects_config_from_animation(
+            animation,
+            AccessibilityPolicy::from_flags(false, false),
+        );
+        assert!(on.cursor_trail);
+    }
+
+    #[test]
+    fn load_accessibility_policy_honors_reduce_motion_override() {
+        let host = AccessibilityPolicy::detect();
+        unsafe {
+            std::env::set_var("MR_CRABS_REDUCE_MOTION", "1");
+        }
+        assert_eq!(
+            load_accessibility_policy(),
+            AccessibilityPolicy::from_flags(true, host.reduce_transparency)
+        );
+        unsafe {
+            std::env::set_var("MR_CRABS_REDUCE_MOTION", "0");
+        }
+        assert_eq!(
+            load_accessibility_policy(),
+            AccessibilityPolicy::from_flags(false, host.reduce_transparency)
+        );
+        unsafe {
+            std::env::remove_var("MR_CRABS_REDUCE_MOTION");
+        }
+        assert_eq!(load_accessibility_policy(), host);
     }
 }

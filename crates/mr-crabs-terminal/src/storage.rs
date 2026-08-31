@@ -106,6 +106,7 @@ struct RowDesc {
     occupancy: u16,
     first_occupied: u16,
     wrapped: bool,
+    combining: Option<Arc<[(u16, Vec<u32>)]>>,
 }
 
 /// Zero-copy carrier for hot segmented suffix extraction. Preserves the
@@ -118,6 +119,7 @@ pub(crate) struct StoredRow {
     pub(crate) first_occupied: u16,
     pub(crate) wrapped: bool,
     pub(crate) generation: u64,
+    pub(crate) combining: Option<Arc<[(u16, Vec<u32>)]>>,
 }
 
 /// Hot resident variants:
@@ -158,6 +160,7 @@ struct ColdReadCache {
     page_id: u64,
     generation: u64,
     cells: Vec<Cell>,
+    extras: Vec<Option<Arc<[(u16, Vec<u32>)]>>>,
     encoded: Vec<u8>,
 }
 
@@ -169,19 +172,14 @@ struct Page {
     id: u64,
     generation: u64,
     lines: usize,
-    /// Number of the page's `lines` that are entirely default cells (blank
-    /// rows created by cursor movement/wrapping, not by payload records).
-    /// Maintained at push time so retention metrics can distinguish payload
-    /// lines from blank scrollback rows without decompressing cold pages.
     empty_lines: usize,
     cols: u16,
     capacity_lines: usize,
-    /// Hot resident. `Flat` is the contiguous buffer used by `push_line`;
-    /// `Segmented` is the grouped descriptor Vec used by `ingest_owned_*`.
     resident: Option<Resident>,
     compressed: Option<Arc<[u8]>>,
     sparse: bool,
     pending: bool,
+    combining: Vec<Option<Arc<[(u16, Vec<u32>)]>>>,
 }
 
 impl Page {
@@ -372,8 +370,19 @@ impl ScrollbackStorage {
     /// payload is corrupt (decompression failure); corrupt pages keep their
     /// compressed bytes and are never fabricated.
     pub fn read_line(&mut self, index: usize, out: &mut Vec<Cell>) -> bool {
+        self.read_line_with_combining(index, out, None)
+    }
+
+    pub fn read_line_with_combining(
+        &mut self,
+        index: usize,
+        out: &mut Vec<Cell>,
+        mut combining: Option<&mut Vec<(u16, Vec<u32>)>>,
+    ) -> bool {
         out.clear();
-        // Locate the page containing `index` by scanning logical offsets.
+        if let Some(combining) = combining.as_mut() {
+            combining.clear();
+        }
         let mut offset = 0usize;
         let mut target = None;
         for (page_index, page) in self.history.iter().enumerate() {
@@ -401,10 +410,16 @@ impl ScrollbackStorage {
                     let cols = usize::from(page.cols);
                     let start = line_in_page * cols;
                     out.extend_from_slice(&buf[start..start + cols]);
+                    copy_page_combining(page, line_in_page, combining);
                     return true;
                 }
                 Resident::Segmented(descs) => {
                     out.extend_from_slice(&descs[line_in_page].cells);
+                    if let Some(combining) = combining {
+                        if let Some(extras) = descs[line_in_page].combining.as_ref() {
+                            combining.extend(extras.iter().cloned());
+                        }
+                    }
                     return true;
                 }
             }
@@ -414,10 +429,11 @@ impl ScrollbackStorage {
                 page_id: 0,
                 generation: 0,
                 cells: Vec::new(),
+                extras: Vec::new(),
                 encoded: Vec::new(),
             });
             if cache.page_id != page.id || cache.generation != page.generation {
-                if decode_page(page, &mut cache.cells, &mut cache.encoded) {
+                if decode_page(page, &mut cache.cells, &mut cache.encoded, &mut cache.extras) {
                     cache.page_id = page.id;
                     cache.generation = page.generation;
                 } else {
@@ -426,6 +442,11 @@ impl ScrollbackStorage {
                 }
             }
             out.extend_from_slice(&cache.cells[start..start + cols]);
+            if let Some(combining) = combining {
+                if let Some(Some(extras)) = cache.extras.get(line_in_page) {
+                    combining.extend(extras.iter().cloned());
+                }
+            }
             return true;
         }
         false
@@ -471,10 +492,16 @@ impl ScrollbackStorage {
                     page_id: 0,
                     generation: 0,
                     cells: Vec::new(),
+                    extras: Vec::new(),
                     encoded: Vec::new(),
                 });
                 if cache.page_id != page.id || cache.generation != page.generation {
-                    if decode_page(page, &mut cache.cells, &mut cache.encoded) {
+                    if decode_page(
+                        page,
+                        &mut cache.cells,
+                        &mut cache.encoded,
+                        &mut cache.extras,
+                    ) {
                         cache.page_id = page.id;
                         cache.generation = page.generation;
                     } else {
@@ -537,6 +564,7 @@ impl ScrollbackStorage {
                 compressed: None,
                 sparse: false,
                 pending: false,
+                combining: Vec::new(),
             });
             self.next_page_id = self.next_page_id.wrapping_add(1);
             self.logical_lines += 1;
@@ -593,7 +621,7 @@ impl ScrollbackStorage {
             if page.resident.is_none() && page.compressed.is_some() {
                 let mut restored = Vec::new();
                 let mut encoded = Vec::new();
-                if decode_page(page, &mut restored, &mut encoded) {
+                if decode_page(page, &mut restored, &mut encoded, &mut Vec::new()) {
                     page.resident = Some(Resident::Flat(Arc::from(restored.into_boxed_slice())));
                     page.compressed = None;
                     page.sparse = false;
@@ -743,6 +771,7 @@ impl ScrollbackStorage {
                     compressed: None,
                     sparse: false,
                     pending: false,
+                    combining: Vec::new(),
                 };
                 self.next_page_id = self.next_page_id.wrapping_add(1);
                 self.history.push_back(page);
@@ -838,6 +867,7 @@ impl ScrollbackStorage {
     fn enqueue_page(&mut self, idx: usize) -> bool {
         let (page_id, generation, cols, payload) = {
             let page = &mut self.history[idx];
+            freeze_page_combining(page);
             let Some(resident) = page.resident.take() else {
                 return false;
             };
@@ -892,7 +922,8 @@ impl ScrollbackStorage {
         if page.resident.is_none() {
             let mut restored = Vec::new();
             let mut encoded = Vec::new();
-            if !decode_page(page, &mut restored, &mut encoded) {
+            let mut decoded_combining = Vec::new();
+            if !decode_page(page, &mut restored, &mut encoded, &mut decoded_combining) {
                 return false;
             }
             page.resident = Some(Resident::Flat(Arc::from(restored.into_boxed_slice())));
@@ -919,6 +950,7 @@ impl ScrollbackStorage {
                     .chunks_exact(cols)
                     .filter(|row| row.iter().all(Cell::is_default))
                     .count();
+                page.combining.drain(..drop_lines.min(page.combining.len()));
             }
             None => return false,
         }
@@ -1120,8 +1152,14 @@ impl ScrollbackStorage {
             compressed,
             sparse,
             pending: page.pending,
+            combining: page.combining.clone(),
         };
-        let ok = decode_page(&tmp, &mut self.census_cells, &mut self.census_encoded);
+        let ok = decode_page(
+            &tmp,
+            &mut self.census_cells,
+            &mut self.census_encoded,
+            &mut Vec::new(),
+        );
         if ok {
             Some(self.census_cells.len())
         } else {
@@ -1282,6 +1320,7 @@ impl ScrollbackStorage {
                                 occupancy: row.occupancy,
                                 first_occupied: row.first_occupied,
                                 wrapped: row.wrapped,
+                                combining: row.combining.clone(),
                             });
                         }
                         Some(Resident::Segmented(remapped_rows))
@@ -1673,6 +1712,7 @@ impl ScrollbackStorage {
                 page.id, expected_id,
                 "force_compress page-id ordering mismatch"
             );
+            freeze_page_combining(page);
             page.compressed = Some(Self::intern_compressed(
                 &mut self.compressed_pool,
                 bytes_vec,
@@ -1699,7 +1739,7 @@ impl ScrollbackStorage {
             }
             let mut restored = Vec::new();
             let mut encoded = Vec::new();
-            if decode_page(page, &mut restored, &mut encoded) {
+            if decode_page(page, &mut restored, &mut encoded, &mut Vec::new()) {
                 page.resident = Some(Resident::Flat(Arc::from(restored.into_boxed_slice())));
                 page.compressed = None;
                 page.sparse = false;
@@ -1789,6 +1829,7 @@ impl ScrollbackStorage {
                 occupancy,
                 first_occupied,
                 wrapped,
+                combining: None,
             },
             generation,
             true,
@@ -1802,6 +1843,7 @@ impl ScrollbackStorage {
             occupancy,
             first_occupied,
             wrapped,
+            combining: _,
         } = &row;
         if *cols == 0 {
             return;
@@ -1852,6 +1894,7 @@ impl ScrollbackStorage {
             compressed: None,
             sparse: false,
             pending: false,
+            combining: Vec::new(),
         };
         self.next_page_id = self.next_page_id.wrapping_add(1);
         self.history.push_back(page);
@@ -1877,9 +1920,19 @@ impl ScrollbackStorage {
 
     pub(crate) fn ingest_owned_rows_with_bounds<I>(&mut self, rows: I)
     where
-        I: IntoIterator<Item = (Arc<[Cell]>, u16, u16, u16, bool, u64)>,
+        I: IntoIterator<
+            Item = (
+                Arc<[Cell]>,
+                u16,
+                u16,
+                u16,
+                bool,
+                u64,
+                Option<Arc<[(u16, Vec<u32>)]>>,
+            ),
+        >,
     {
-        for (cells, cols, first_occupied, occupancy, wrapped, generation) in rows {
+        for (cells, cols, first_occupied, occupancy, wrapped, generation, combining) in rows {
             self.ingest_owned_row_inner(
                 RowDesc {
                     cells,
@@ -1887,6 +1940,7 @@ impl ScrollbackStorage {
                     occupancy,
                     first_occupied,
                     wrapped,
+                    combining,
                 },
                 generation,
                 false,
@@ -1945,6 +1999,7 @@ impl ScrollbackStorage {
             compressed: None,
             sparse: false,
             pending: false,
+            combining: Vec::new(),
         };
         self.next_page_id = self.next_page_id.wrapping_add(1);
         self.history.push_back(p);
@@ -2021,6 +2076,7 @@ impl ScrollbackStorage {
                     first_occupied: d.first_occupied,
                     wrapped: d.wrapped,
                     generation,
+                    combining: d.combining.clone(),
                 });
             }
             let whole_page = take == descs.len() && suffix_start == 0;
@@ -2145,7 +2201,33 @@ fn encode_cold_page(page: &Page, cells: &[Cell]) -> Result<Vec<u8>, TerminalErro
     Ok(compressed)
 }
 
-fn decode_page(page: &Page, cells: &mut Vec<Cell>, encoded: &mut Vec<u8>) -> bool {
+fn freeze_page_combining(page: &mut Page) {
+    if let Some(Resident::Segmented(descs)) = page.resident.as_ref() {
+        page.combining = descs.iter().map(|d| d.combining.clone()).collect();
+    }
+}
+
+fn copy_page_combining(
+    page: &Page,
+    line_in_page: usize,
+    combining: Option<&mut Vec<(u16, Vec<u32>)>>,
+) {
+    let Some(combining) = combining else {
+        return;
+    };
+    if let Some(Some(extras)) = page.combining.get(line_in_page) {
+        combining.extend(extras.iter().cloned());
+    }
+}
+
+fn decode_page(
+    page: &Page,
+    cells: &mut Vec<Cell>,
+    encoded: &mut Vec<u8>,
+    extras: &mut Vec<Option<Arc<[(u16, Vec<u32>)]>>>,
+) -> bool {
+    extras.clear();
+    extras.extend(page.combining.iter().cloned());
     let Some(compressed) = page.compressed.as_ref() else {
         return false;
     };
@@ -2686,6 +2768,7 @@ mod owned_ingest_tests {
             1,
             false,
             1,
+            None,
         )));
 
         let styles = [crate::Style::default(), crate::Style::default()];
@@ -2697,5 +2780,116 @@ mod owned_ingest_tests {
         };
         assert_eq!(rows[0].cells[0].content, u32::from('x'));
         assert_eq!(rows[0].cells[3], Cell::default());
+    }
+
+    #[test]
+    fn owned_rows_with_combining_survive_hot_and_cold_reads() {
+        let mut storage = ScrollbackStorage::new(
+            2,
+            ScrollbackConfig {
+                max_lines: 100,
+                hot_page_lines: 1,
+                max_queued_jobs: 4,
+                max_pending_completions: 4,
+            },
+        );
+        let cells: Arc<[Cell]> = vec![
+            Cell {
+                content: u32::from('e'),
+                style: 0,
+                flags: Cell::COMBINING,
+            },
+            Cell {
+                content: u32::from('x'),
+                style: 0,
+                flags: 0,
+            },
+        ]
+        .into();
+        let extras: Arc<[(u16, Vec<u32>)]> = Arc::from(vec![(0, vec![0x0301])].into_boxed_slice());
+        storage.ingest_owned_rows_with_bounds(std::iter::once((
+            Arc::clone(&cells),
+            2,
+            0,
+            2,
+            false,
+            1,
+            Some(extras),
+        )));
+
+        let mut out = Vec::new();
+        let mut combining = Vec::new();
+        assert!(storage.read_line_with_combining(0, &mut out, Some(&mut combining)));
+        assert_eq!(out.as_slice(), cells.as_ref());
+        assert_eq!(combining, vec![(0, vec![0x0301])]);
+
+        storage.force_compress_all();
+        out.clear();
+        combining.clear();
+        assert!(storage.read_line_with_combining(0, &mut out, Some(&mut combining)));
+        assert_eq!(out.as_slice(), cells.as_ref());
+        assert_eq!(combining, vec![(0, vec![0x0301])]);
+    }
+
+    #[test]
+    fn cold_partial_front_eviction_shifts_combining_sidecar() {
+        let mut storage = ScrollbackStorage::new(
+            2,
+            ScrollbackConfig {
+                max_lines: 3,
+                hot_page_lines: 3,
+                max_queued_jobs: 4,
+                max_pending_completions: 4,
+            },
+        );
+        for row in 0..3u32 {
+            let cells: Arc<[Cell]> = vec![
+                Cell {
+                    content: u32::from('a') + row,
+                    style: 0,
+                    flags: Cell::COMBINING,
+                },
+                Cell {
+                    content: u32::from('0') + row,
+                    style: 0,
+                    flags: 0,
+                },
+            ]
+            .into();
+            let extras: Arc<[(u16, Vec<u32>)]> =
+                Arc::from(vec![(0, vec![0x0301 + row])].into_boxed_slice());
+            storage.ingest_owned_rows_with_bounds(std::iter::once((
+                cells,
+                2,
+                0,
+                2,
+                false,
+                1,
+                Some(extras),
+            )));
+        }
+
+        storage.force_compress_all();
+        storage.update_config(ScrollbackConfig {
+            max_lines: 2,
+            hot_page_lines: 3,
+            max_queued_jobs: 4,
+            max_pending_completions: 4,
+        });
+        assert_eq!(storage.total_lines(), 2);
+
+        let mut out = Vec::new();
+        let mut combining = Vec::new();
+        assert!(storage.read_line_with_combining(0, &mut out, Some(&mut combining)));
+        assert_eq!(out[0].content, u32::from('b'));
+        assert_eq!(out[1].content, u32::from('1'));
+        assert_eq!(combining, vec![(0, vec![0x0302])]);
+
+        out.clear();
+        combining.clear();
+        assert!(storage.read_line_with_combining(1, &mut out, Some(&mut combining)));
+        assert_eq!(out[0].content, u32::from('c'));
+        assert_eq!(out[1].content, u32::from('2'));
+        assert_eq!(combining, vec![(0, vec![0x0303])]);
     }
 }

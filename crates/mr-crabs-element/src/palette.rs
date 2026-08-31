@@ -35,6 +35,34 @@ impl TerminalPalette {
         }
     }
 
+    pub const fn ink(background_opacity: f32) -> Self {
+        Self::dark(background_opacity)
+    }
+
+    pub const fn paper(background_opacity: f32) -> Self {
+        Self::light(background_opacity)
+    }
+
+    pub const fn harbor(background_opacity: f32) -> Self {
+        Self {
+            foreground: [0xd7, 0xe0, 0xea],
+            background: [0x12, 0x16, 0x1c],
+            cursor: [0x7e, 0xb6, 0xd6],
+            selection: [0x3d, 0x6a, 0x8a],
+            background_opacity,
+        }
+    }
+
+    pub const fn ember(background_opacity: f32) -> Self {
+        Self {
+            foreground: [0xe8, 0xdc, 0xc8],
+            background: [0x1a, 0x14, 0x10],
+            cursor: [0xe0, 0x7a, 0x3d],
+            selection: [0x8a, 0x4a, 0x28],
+            background_opacity,
+        }
+    }
+
     pub fn background_color(self) -> Hsla {
         rgb_hsla(self.background, self.background_opacity.clamp(0.0, 1.0))
     }
@@ -206,6 +234,16 @@ pub fn cursor_color() -> Hsla {
 pub fn selection_color() -> Hsla {
     hsla(0.6, 0.5, 0.6, 0.3)
 }
+
+/// Regular search match overlay. Distinct from selection (lower alpha, warmer hue).
+pub fn search_match_color() -> Hsla {
+    hsla(0.12, 0.55, 0.55, 0.22)
+}
+
+/// Current search match overlay. Stronger than regular matches, still below selection alpha.
+pub fn search_current_color() -> Hsla {
+    hsla(0.12, 0.70, 0.62, 0.38)
+}
 fn rgb_hsla(rgb: [u8; 3], alpha: f32) -> Hsla {
     let alpha = (alpha * 255.0).round() as u32;
     let hex =
@@ -316,5 +354,10 @@ mod tests {
         assert_eq!(background_color().a, 1.0);
         assert_eq!(cursor_color().a, 1.0);
         assert_eq!(selection_color().a, 0.3);
+        assert_ne!(search_match_color(), selection_color());
+        assert_ne!(search_current_color(), search_match_color());
+        assert_ne!(search_current_color(), selection_color());
+        assert!(search_match_color().a < search_current_color().a);
+        assert!(search_current_color().a < 0.5);
     }
 }

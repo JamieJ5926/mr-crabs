@@ -116,13 +116,15 @@ impl Viewport {
     }
 }
 
-/// One viewport row: an absolute line index plus its cells and width.
-/// History rows carry their original (possibly pre-resize) width.
+/// One viewport row: an absolute line index plus its cells, width, and
+/// resolved combining-codepoint extras. History rows carry their original
+/// (possibly pre-resize) width.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ViewportRow {
     pub absolute: usize,
     pub cols: u16,
     pub cells: Vec<Cell>,
+    pub combining: Vec<(u16, Vec<u32>)>,
 }
 
 /// Resolve viewport row `row` against the current history and a captured
@@ -138,25 +140,38 @@ pub fn viewport_row<R: HistoryRead + ?Sized>(
     let rows = snapshot.size.rows;
     let absolute = viewport.absolute_line(row, history_lines, rows)?;
     if absolute < history_lines {
+        let cols = u16::try_from(reader.history_line_cols(absolute)?).ok()?;
         let mut cells = Vec::new();
         if !reader.read_history_line(absolute, &mut cells) {
             return None;
         }
-        let cols = reader.history_line_cols(absolute)?;
-        let cols = u16::try_from(cols).ok()?;
+        let mut combining = Vec::new();
+        if !reader.read_history_line_combining(absolute, &mut combining) {
+            return None;
+        }
         Some(ViewportRow {
             absolute,
             cols,
             cells,
+            combining,
         })
     } else {
         let screen_row = absolute - history_lines;
         let cols = snapshot.size.cols;
         let start = screen_row * usize::from(cols);
+        let end = start + usize::from(cols);
+        let mut combining = Vec::new();
+        for mark in &snapshot.combining_marks {
+            let idx = mark.cell_index as usize;
+            if idx >= start && idx < end && !mark.codepoints.is_empty() {
+                combining.push(((idx - start) as u16, mark.codepoints.clone()));
+            }
+        }
         Some(ViewportRow {
             absolute,
             cols,
-            cells: snapshot.cells[start..start + usize::from(cols)].to_vec(),
+            cells: snapshot.cells[start..end].to_vec(),
+            combining,
         })
     }
 }
@@ -248,6 +263,9 @@ pub fn project_frame(
                 }
             }
         }
+        let mut combining = vr.combining;
+        combining.retain(|(col, marks)| usize::from(*col) < cols && !marks.is_empty());
+        combining.sort_by_key(|(col, _)| *col);
         let mut runs = Vec::new();
         batch_runs(&cells, &mut runs);
         rows.push(RowDelta {
@@ -255,6 +273,7 @@ pub fn project_frame(
             generation: frame.sequence,
             cells,
             runs,
+            combining,
         });
     }
     frame.size = frame_size;
@@ -519,6 +538,54 @@ mod tests {
         let visible = viewport_row(&mut term, &snap, &vp3, 0).expect("visible row");
         assert_eq!(visible.absolute, term.history_len());
         assert_eq!(visible.cells.len(), 8);
+    }
+
+    #[test]
+    fn scrolled_combining_projection_survives_hot_and_cold_history() {
+        let size = GridSize::new(4, 2);
+        let mut term = Terminal::new_with_config(
+            size,
+            mr_crabs_terminal::ScrollbackConfig {
+                max_lines: 1000,
+                hot_page_lines: 1,
+                max_queued_jobs: 4,
+                max_pending_completions: 4,
+            },
+        )
+        .unwrap();
+        term.feed("e\u{0301}x!\r\nzz\r\n".as_bytes())
+            .expect("combining scroll fixture feed should succeed");
+        assert!(term.history_len() >= 1, "first row scrolled into history");
+
+        let snap = snapshot_for(&term);
+        let mut vp = Viewport::new();
+        vp.to_top(term.history_len());
+        let hot = viewport_row(&mut term, &snap, &vp, 0).expect("hot combining row");
+        assert_eq!(hot.cells[0].content, u32::from('e'));
+        assert_eq!(hot.cells[1].content, u32::from('x'));
+        assert_eq!(hot.combining, vec![(0, vec![0x0301])]);
+
+        let mut pool = mr_crabs_terminal::frame_pool_default();
+        let mut hot_frame = term.build_frame_delta(&mut pool);
+        project_frame(&mut term, &mut vp, &mut hot_frame).expect("hot projection");
+        let hot_projected = &hot_frame.rows[0];
+        assert_eq!(hot_projected.cells[0].content, u32::from('e'));
+        assert_eq!(hot_projected.cells[1].content, u32::from('x'));
+        assert_eq!(hot_projected.extras_at(0), &[0x0301]);
+        assert!(hot_projected.extras_at(1).is_empty());
+        let hot_cells = hot_projected.cells.clone();
+        let hot_combining = hot_projected.combining.clone();
+
+        term.force_compress_all();
+        let cold_snap = snapshot_for(&term);
+        let cold = viewport_row(&mut term, &cold_snap, &vp, 0).expect("cold combining row");
+        assert_eq!(cold.cells, hot.cells);
+        assert_eq!(cold.combining, hot.combining);
+
+        let mut cold_frame = term.build_frame_delta(&mut pool);
+        project_frame(&mut term, &mut vp, &mut cold_frame).expect("cold projection");
+        assert_eq!(cold_frame.rows[0].cells, hot_cells);
+        assert_eq!(cold_frame.rows[0].combining, hot_combining);
     }
 
     #[test]

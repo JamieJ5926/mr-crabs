@@ -17,9 +17,9 @@ use std::time::Duration;
 
 use mr_crabs_element::{CellMetrics, GraphicsOverlay, Point as GridPoint, TerminalContext};
 use mr_crabs_history::{
-    DEFAULT_SEARCH_LIMIT, ExtractOptions, SearchDirection, SearchMatch, SearchRequest, SearchStart,
-    Selection, SelectionGesture, SelectionPoint, Viewport, hyperlink_span, project_frame,
-    search_slice, selection_text, visible_rows,
+    DEFAULT_SEARCH_LIMIT, ExtractOptions, SearchDirection, SearchMatch, SearchPattern,
+    SearchRequest, SearchStart, Selection, SelectionGesture, SelectionPoint, Viewport,
+    hyperlink_span, project_frame, search_slice, selection_text, visible_rows,
 };
 use mr_crabs_protocols::apc::{self, ScanStep};
 use mr_crabs_pty::{
@@ -1427,6 +1427,7 @@ impl PaneModel {
             next_line: 0,
             request: SearchRequest {
                 needle: needle.to_vec(),
+                pattern: SearchPattern::Literal,
                 direction: SearchDirection::Forward,
                 start: SearchStart::Top,
                 limit: DEFAULT_SEARCH_LIMIT,

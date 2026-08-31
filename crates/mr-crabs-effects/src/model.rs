@@ -101,7 +101,7 @@ impl EffectsModel {
 
     /// Replace the configuration at runtime. Disabling the text animation
     /// drops the change tracker and reveal buffers (zero retained
-    /// allocations); disabling the trail drops its gradient cache.
+    /// allocations); disabling the trail drops leftover fade state.
     /// Re-enabling allocates a fresh tracker whose cells are all
     /// never-seen, so the next rebuild stamps every changed row — the
     /// oracle's enable behavior.
@@ -336,30 +336,6 @@ impl EffectsModel {
         &self.frame
     }
 
-    /// The packed per-cell change texture (one rgba8 texel per tracked
-    /// cell, little-endian IEEE-754 bit pattern of shader-time seconds;
-    /// sentinel = never changed). Empty when the text animation is
-    /// disabled.
-    pub fn change_texture(&self) -> &[u8] {
-        self.tracker
-            .as_ref()
-            .map_or(&[], ChangeTracker::change_texture)
-    }
-
-    /// True when the change texture needs re-uploading since the last
-    /// [`Self::clear_change_texture_dirty`].
-    pub fn change_texture_dirty(&self) -> bool {
-        self.tracker
-            .as_ref()
-            .is_some_and(ChangeTracker::upload_dirty)
-    }
-
-    /// Acknowledge a texture upload.
-    pub fn clear_change_texture_dirty(&mut self) {
-        if let Some(tracker) = &mut self.tracker {
-            tracker.clear_upload_dirty();
-        }
-    }
 
     /// The most recent change timestamp (oracle `last_change_time`), in
     /// milliseconds; `None` until a cell changes. May lie in the future
@@ -371,8 +347,8 @@ impl EffectsModel {
 
     /// Retained heap bytes across every subsystem: the change tracker
     /// arrays (exactly `min(cols * rows, max_tracked_cells)` tracked
-    /// cells), the reveal/pending buffers, and the gradient descriptor
-    /// cache. With all effects disabled this is exactly 0.
+    /// cells) and the reveal/pending buffers. With all effects disabled
+    /// this is exactly 0.
     pub fn retained_capacity(&self) -> usize {
         self.tracker
             .as_ref()
@@ -432,6 +408,7 @@ mod tests {
             generation,
             cells: contents.iter().copied().map(cell).collect(),
             runs: Vec::new(),
+            combining: Vec::new(),
         }
     }
 
@@ -611,9 +588,9 @@ mod tests {
         let _ = m.apply_frame(&frame_at(size, 1, Vec::new(), cursor), 2000, true);
         cursor.col = 5;
         let f = m.apply_frame(&frame_at(size, 2, Vec::new(), cursor), 2016, true);
-
-        assert_eq!(f.trail.glow_rect.x, 50.0);
-
+        assert!(f.trail.active);
+        assert_eq!(f.trail.leftover_rect.map(|r| r.x), Some(0.0));
+        assert!(f.trail.segment.is_some());
         // Linear fade at t=2241: (1 - 225/250) * 0.35.
         let f = m.apply_frame(&frame_at(size, 3, Vec::new(), cursor), 2241, true);
         assert!((f.trail.alpha - 0.035).abs() < f64::EPSILON);
@@ -646,8 +623,6 @@ mod tests {
         assert!(f.pending.is_empty());
         assert!(f.is_idle());
         assert_eq!(m.retained_capacity(), 0);
-        assert!(m.change_texture().is_empty());
-        assert!(!m.change_texture_dirty());
         assert_eq!(m.last_change_ms(), None);
     }
 
@@ -911,32 +886,17 @@ mod tests {
             ]
         );
     }
-
     #[test]
-    fn change_texture_flows_through_model() {
+    fn streaming_reveal_vectors_survive_without_change_texture() {
         let size = GridSize::new(4, 1);
         let mut m = model(TextAnimation::Streaming, 4, 1);
         let cursor = CursorState::default();
-        assert!(m.change_texture_dirty()); // fresh tracker needs upload
-        // A fresh tracker's texels are all sentinel: -1000 shader seconds
-        // -> -1000.0 f32 -> 0xC47A0000 little-endian.
-        assert_eq!(m.change_texture().len(), 16); // 4 cells x rgba8
-        assert_eq!(&m.change_texture()[0..4], &[0x00, 0x00, 0x7A, 0xC4]);
-        m.clear_change_texture_dirty();
-        assert!(!m.change_texture_dirty());
-
         let rows = vec![row(0, 1, &[65, 32, 32, 32])];
-        let _ = m.apply_frame(&frame_at(size, 1, rows, cursor), 1000, true);
-        assert!(m.change_texture_dirty());
-        // Every rebuilt cell was stamped at 1000 ms -> 1.0 s -> 0x3F800000
-        // little-endian.
-        assert!(
-            m.change_texture()
-                .chunks_exact(4)
-                .all(|t| t == [0x00, 0x00, 0x80, 0x3F])
-        );
-        m.clear_change_texture_dirty();
-        assert!(!m.change_texture_dirty());
+        let f = m.apply_frame(&frame_at(size, 1, rows, cursor), 1000, true);
+        assert_eq!(f.revealing.len(), 4);
+        assert!(f.revealing.iter().all(|cell| cell.change_ms == 1000.0));
+        assert!(f.pending.is_empty());
+        assert!(f.needs_frame);
     }
     #[test]
     fn primary_scroll_translates_reveal_state_and_stamps_only_new_row() {

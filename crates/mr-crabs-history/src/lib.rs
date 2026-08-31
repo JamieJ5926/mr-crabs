@@ -33,7 +33,8 @@ pub use persist::{HistoryFile, PersistConfig, PersistError};
 pub use replay::{ReplayError, ReplayEvent, ReplayLog, TerminalSnapshot};
 pub use search::{
     DEFAULT_SEARCH_LIMIT, MAX_NEEDLE_BYTES, SearchDirection, SearchMatch, SearchOutcome,
-    SearchRequest, SearchSpan, SearchStart, SearchWorker, row_text, search_slice, search_sync,
+    SearchPattern, SearchRequest, SearchSpan, SearchStart, SearchWorker, row_text, search_slice,
+    search_sync,
 };
 pub use selection::{
     DEFAULT_WORD_BOUNDARIES, ExtractOptions, Selection, SelectionGesture, SelectionPoint,

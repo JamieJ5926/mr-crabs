@@ -933,6 +933,7 @@ fn headless_cache_workload() -> WorkloadOutcome {
             len: 4,
             style: 0,
         }],
+        combining: Vec::new(),
     });
     let warm_action = cache.apply_frame(&warm);
     let capacities_warm = cache.snapshot_capacities();
@@ -1396,7 +1397,7 @@ fn effects_workload() -> WorkloadOutcome {
 
 fn search_workload() -> WorkloadOutcome {
     use mr_crabs_history::search::{
-        SearchDirection, SearchRequest, SearchStart, SearchWorker, search_sync,
+        SearchDirection, SearchPattern, SearchRequest, SearchStart, SearchWorker, search_sync,
     };
     use mr_crabs_terminal::HistoryRead;
     use std::sync::{Arc, Mutex};
@@ -1435,6 +1436,7 @@ fn search_workload() -> WorkloadOutcome {
         &mut term,
         &SearchRequest {
             needle: payloads::SEARCH_NEEDLE.to_vec(),
+            pattern: SearchPattern::Literal,
             direction: SearchDirection::Forward,
             start: SearchStart::Top,
             limit: mr_crabs_history::search::MAX_SEARCH_LIMIT,
@@ -1471,6 +1473,7 @@ fn search_workload() -> WorkloadOutcome {
     let worker_start = Instant::now();
     let token = worker.start(SearchRequest {
         needle: payloads::SEARCH_NEEDLE.to_vec(),
+        pattern: SearchPattern::Literal,
         direction: SearchDirection::Forward,
         start: SearchStart::Top,
         limit: mr_crabs_history::search::MAX_SEARCH_LIMIT,

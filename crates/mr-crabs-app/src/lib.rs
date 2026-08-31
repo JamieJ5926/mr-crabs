@@ -37,6 +37,7 @@
 //!   production state; nothing is deleted to simplify the shell.
 
 pub mod accessibility;
+pub mod accessibility_policy;
 pub mod action;
 pub mod animated_fetch;
 pub mod animation_config;
@@ -56,8 +57,10 @@ pub mod quick_terminal;
 pub mod restore;
 pub mod secure_input;
 pub mod settings;
+pub mod theme;
 pub mod ui;
 pub mod updates;
+pub use accessibility_policy::AccessibilityPolicy;
 pub use action::AppAction;
 pub use diagnostics::{
     DiagnosticEvent, DiagnosticFrameEvent, DiagnosticPaintEvent, DiagnosticPumpEvent,
@@ -126,6 +129,14 @@ impl AppCore {
     /// Live OSC 133 semantic-prompt state. Additive; terminal stays private.
     pub fn semantic_state(&self) -> &mr_crabs_protocols::shell::SemanticPromptState {
         self.terminal.semantic_state()
+    }
+
+    /// Typed OSC 133 command-block snapshot for status UI. Cursor truth stays on
+    /// [`Self::semantic_state`].
+    pub fn command_block_snapshot(
+        &self,
+    ) -> &mr_crabs_protocols::semantic_prompt::CommandBlockSnapshot {
+        self.terminal.command_block_snapshot()
     }
     /// Live terminal modes used by keyboard/mouse input.
     pub fn modes(&self) -> Vec<TerminalMode> {
@@ -265,5 +276,33 @@ mod tests {
         };
         core.set_animation_defaults(defaults);
         assert!(!core.animation_defaults().cursor_trail);
+    }
+
+    #[test]
+    fn app_core_command_block_snapshot_tracks_osc_133() {
+        use mr_crabs_protocols::semantic_prompt::CommandBlockPhase;
+        let mut core = AppCore::new(GridSize::new(80, 24)).expect("core creation");
+        core.feed_terminal_output(b"\x1b]133;A\x07\x1b]133;B\x07\x1b]133;C\x07")
+            .expect("feed");
+        assert_eq!(
+            core.command_block_snapshot().phase,
+            CommandBlockPhase::Running
+        );
+        assert_eq!(core.semantic_state().last_exit_code, None);
+        core.feed_terminal_output(b"\x1b]133;D;3\x07").expect("feed");
+        assert_eq!(
+            core.command_block_snapshot().phase,
+            CommandBlockPhase::Finished
+        );
+        assert_eq!(core.command_block_snapshot().exit_code, Some(3));
+        assert!(core.command_block_snapshot().failed);
+        core.feed_terminal_output(b"\x1b]133;A\x07\x1b]133;C\x07")
+            .expect("feed");
+        assert_eq!(core.semantic_state().last_exit_code, Some(3));
+        assert_eq!(
+            core.command_block_snapshot().phase,
+            CommandBlockPhase::Running
+        );
+        assert_eq!(core.command_block_snapshot().exit_code, None);
     }
 }

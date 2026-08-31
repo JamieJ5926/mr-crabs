@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
+use std::sync::Arc;
 
 use mr_crabs_protocols::shell::SemanticPromptState;
 use mr_crabs_protocols::sink::ProtocolSink;
@@ -332,6 +333,15 @@ pub trait HistoryRead {
     fn history_len(&self) -> usize;
     fn history_line_cols(&self, index: usize) -> Option<usize>;
     fn read_history_line(&mut self, index: usize, out: &mut Vec<Cell>) -> bool;
+    fn read_history_line_combining(
+        &mut self,
+        index: usize,
+        out: &mut Vec<(u16, Vec<u32>)>,
+    ) -> bool {
+        let _ = index;
+        out.clear();
+        true
+    }
 }
 
 impl HistoryRead for Terminal {
@@ -345,6 +355,16 @@ impl HistoryRead for Terminal {
 
     fn read_history_line(&mut self, index: usize, out: &mut Vec<Cell>) -> bool {
         self.read_history_line(index, out)
+    }
+
+    fn read_history_line_combining(
+        &mut self,
+        index: usize,
+        out: &mut Vec<(u16, Vec<u32>)>,
+    ) -> bool {
+        let mut cells = Vec::new();
+        self.storage
+            .read_line_with_combining(index, &mut cells, Some(out))
     }
 }
 
@@ -642,7 +662,26 @@ impl Terminal {
         if rows.is_empty() {
             return;
         }
+        let graphemes = self.protocol.engine().graphemes();
         let iter = rows.into_iter().map(|row| {
+            let combining = row.extras.as_ref().and_then(|extras| {
+                if extras.combining.is_empty() {
+                    return None;
+                }
+                let mut resolved: Vec<(u16, Vec<u32>)> = extras
+                    .combining
+                    .iter()
+                    .filter_map(|(&col, &id)| {
+                        graphemes.get(id).map(|marks| (col, marks.to_vec()))
+                    })
+                    .collect();
+                if resolved.is_empty() {
+                    None
+                } else {
+                    resolved.sort_by_key(|(col, _)| *col);
+                    Some(Arc::from(resolved.into_boxed_slice()))
+                }
+            });
             (
                 row.cells,
                 row.cols,
@@ -650,6 +689,7 @@ impl Terminal {
                 row.occupancy,
                 row.wrapped,
                 row.generation,
+                combining,
             )
         });
         self.storage.ingest_owned_rows_with_bounds(iter);
@@ -682,20 +722,20 @@ impl Terminal {
                 .storage
                 .take_newest_hot_segmented_rows(added, cols, &mut stored);
             if taken > 0 {
-                let rows: Vec<crate::compact::row::CompactRow> = stored
-                    .into_iter()
-                    .map(|r| {
-                        crate::compact::row::CompactRow::from_parts(
-                            r.cells,
-                            r.cols,
-                            r.occupancy,
-                            r.first_occupied,
-                            r.wrapped,
-                            r.generation,
-                        )
-                    })
-                    .collect();
-                self.protocol.engine_mut().prepend_storage_history(rows);
+                let engine = self.protocol.engine_mut();
+                let mut rows: Vec<crate::compact::row::CompactRow> = Vec::with_capacity(stored.len());
+                for r in stored {
+                    rows.push(engine.row_from_storage_parts(
+                        r.cells,
+                        r.cols,
+                        r.occupancy,
+                        r.first_occupied,
+                        r.wrapped,
+                        r.generation,
+                        r.combining,
+                    ));
+                }
+                engine.prepend_storage_history(rows);
             }
         }
         self.protocol.engine_mut().resize(size)?;
@@ -849,6 +889,16 @@ impl Terminal {
         self.storage.read_line(index, out)
     }
 
+    pub fn read_history_line_combining(
+        &mut self,
+        index: usize,
+        out: &mut Vec<(u16, Vec<u32>)>,
+    ) -> bool {
+        let mut cells = Vec::new();
+        self.storage
+            .read_line_with_combining(index, &mut cells, Some(out))
+    }
+
     pub fn fold_history_lines<A>(&mut self, init: A, fold: impl FnMut(A, &[Cell]) -> A) -> A {
         self.storage.fold_lines(init, fold)
     }
@@ -884,6 +934,12 @@ impl Terminal {
 
     pub fn semantic_state(&self) -> &SemanticPromptState {
         self.protocol.semantic_state()
+    }
+
+    pub fn command_block_snapshot(
+        &self,
+    ) -> &mr_crabs_protocols::semantic_prompt::CommandBlockSnapshot {
+        self.protocol.semantic_state().command_block_snapshot()
     }
 
     pub fn hyperlink_at(&self, row: u16, col: u16) -> Option<HyperlinkInfo> {
@@ -1025,6 +1081,21 @@ impl Terminal {
         self.sequence
     }
 
+    fn fill_row_combining(row_delta: &mut crate::RowDelta, snapshot: &NormalizedSnapshot, cols: usize) {
+        row_delta.combining.clear();
+        let row = usize::from(row_delta.row);
+        let start = row * cols;
+        let end = start + cols;
+        for mark in &snapshot.combining_marks {
+            let idx = mark.cell_index as usize;
+            if idx >= start && idx < end && !mark.codepoints.is_empty() {
+                row_delta
+                    .combining
+                    .push(((idx - start) as u16, mark.codepoints.clone()));
+            }
+        }
+    }
+
     pub fn build_frame_delta(&mut self, pool: &mut FramePool) -> FrameDelta {
         let size = self.size;
         let sequence = self.sequence;
@@ -1086,6 +1157,7 @@ impl Terminal {
                         .cells
                         .extend_from_slice(&snapshot.cells[start..end]);
                     delta::batch_runs(&row_delta.cells, &mut row_delta.runs);
+                    Self::fill_row_combining(&mut row_delta, &snapshot, cols);
                     frame.rows.push(row_delta);
                 }
             }
@@ -1116,6 +1188,7 @@ impl Terminal {
                         .cells
                         .extend_from_slice(&snapshot.cells[start..end]);
                     delta::batch_runs(&row_delta.cells, &mut row_delta.runs);
+                    Self::fill_row_combining(&mut row_delta, &snapshot, cols);
                     frame.rows.push(row_delta);
                 }
             }
@@ -1368,6 +1441,24 @@ mod tests {
         let _ = term.take_damage();
     }
     // -------------------------------------------------------------------
+
+    #[test]
+    fn frame_delta_carries_combining_extras_for_acute_e() {
+        let size = GridSize::new(12, 3);
+        let mut term = Terminal::new(size).unwrap();
+        term.feed("e\u{0301}".as_bytes()).expect("terminal feed");
+        let mut pool = crate::FramePool::new(1);
+        let frame = term.build_frame_delta(&mut pool);
+        let row = frame
+            .rows
+            .iter()
+            .find(|r| r.row == 0)
+            .expect("row 0 in frame");
+        assert_eq!(row.cells[0].content, u32::from('e'));
+        assert_eq!(row.extras_at(0), &[0x0301]);
+        assert_eq!(row.cells[1].content, u32::from(' '));
+        assert!(row.extras_at(1).is_empty());
+    }
 
     #[test]
     fn wide_combining_emoji_style_hyperlink_semantic_roundtrips() {
@@ -2784,6 +2875,34 @@ mod tests {
     }
 
     #[test]
+    fn same_width_growth_restores_combining_history_to_visible_grid() {
+        let mut term = Terminal::new_with_config(
+            GridSize::new(4, 1),
+            ScrollbackConfig {
+                max_lines: 100,
+                hot_page_lines: 4,
+                max_queued_jobs: 4,
+                max_pending_completions: 4,
+            },
+        )
+        .unwrap();
+        term.feed("e\u{0301}x!\r\n".as_bytes())
+            .expect("combining resize fixture feed should succeed");
+        assert_eq!(term.history_len(), 1, "fixture row scrolled into storage");
+        let mut before = Vec::new();
+        assert!(term.read_history_line_combining(0, &mut before));
+        assert_eq!(before, vec![(0, vec![0x0301])]);
+
+        term.resize(GridSize::new(4, 2)).expect("same-width growth");
+        let snap = term.snapshot();
+        assert_eq!(snap.cells[0].content, u32::from('e'));
+        assert_eq!(snap.cells[1].content, u32::from('x'));
+        assert_eq!(snap.combining_marks.len(), 1);
+        assert_eq!(snap.combining_marks[0].cell_index, 0);
+        assert_eq!(snap.combining_marks[0].codepoints, vec![0x0301]);
+    }
+
+    #[test]
     fn invalid_utf8_cannot_swallow_string_terminators() {
         let mut term = Terminal::new(GridSize::new(8, 2)).unwrap();
         term.feed(b"\x1b]0;abc\xc2\x07X").expect("terminal feed");
@@ -3019,5 +3138,39 @@ mod tests {
         assert_eq!(r.optimized_ids, r.exhaustive_ids);
         assert!(!r.has_corruption);
         assert!(r.quiesced && !r.pending_any);
+    }
+
+    #[test]
+    fn command_block_snapshot_follows_osc_133() {
+        use mr_crabs_protocols::semantic_prompt::CommandBlockPhase;
+        let mut term = Terminal::new(GridSize::new(80, 24)).unwrap();
+        term.feed(b"\x1b]133;A;k=i\x07")
+            .expect("terminal feed");
+        assert_eq!(
+            term.command_block_snapshot().phase,
+            CommandBlockPhase::Prompt
+        );
+        term.feed(b"\x1b]133;B\x07").expect("terminal feed");
+        assert_eq!(
+            term.command_block_snapshot().phase,
+            CommandBlockPhase::Input
+        );
+        term.feed(b"\x1b]133;C;cmdline=$'ls'\x07")
+            .expect("terminal feed");
+        assert_eq!(
+            term.command_block_snapshot().phase,
+            CommandBlockPhase::Running
+        );
+        assert_eq!(
+            term.command_block_snapshot().cmdline.as_deref(),
+            Some(b"ls".as_slice())
+        );
+        term.feed(b"\x1b]133;D;0\x07").expect("terminal feed");
+        assert_eq!(
+            term.command_block_snapshot().phase,
+            CommandBlockPhase::Finished
+        );
+        assert_eq!(term.command_block_snapshot().exit_code, Some(0));
+        assert!(!term.command_block_snapshot().failed);
     }
 }

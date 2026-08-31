@@ -16,10 +16,9 @@
 //!   cell in reading order, via a persistent bounded burst schedule that
 //!   sequences adjacent rebuilds; cells whose timestamp has not arrived yet
 //!   stay fully concealed and keep animation frames scheduled.
-//! * **Cursor trail** (`cursor-trail`, opt-in): a linear 250 ms
-//!   fade at opacity 0.35 with a soft glow around the current cursor rect
-//!   and a segment connecting the previous and current rect centers. The
-//!   gradient resource descriptors come from a bounded cache.
+//! * **Cursor trail** (`cursor-trail`, opt-in): a linear 250 ms leftover
+//!   fade at opacity 0.35 with a leftover glow around the vacated cursor
+//!   rect and a segment connecting leftover and current rect centers.
 //! * **Disabled path**: with `text-animation=none` and `cursor-trail=false`
 //!   the model retains zero allocations and never schedules a frame.
 //!
@@ -44,10 +43,7 @@ pub use key::ChangeTracker;
 pub use model::{EffectsFrame, EffectsModel};
 pub use reveal::{CellPos, CellReveal, RevealMath, RevealPhase};
 pub use schedule::TypewriterSchedule;
-pub use trail::{
-    CursorTrail, GradientCache, GradientId, LinePx, MAX_GRADIENTS, PointPx, RectPx, TrailConfig,
-    TrailFrame,
-};
+pub use trail::{CursorTrail, LinePx, PointPx, RectPx, TrailConfig, TrailFrame};
 
 pub use mr_crabs_config::TextAnimation;
 

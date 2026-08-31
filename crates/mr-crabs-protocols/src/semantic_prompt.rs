@@ -90,6 +90,51 @@ pub enum PromptKind {
     Secondary,
 }
 
+
+/// Typed OSC 133 command-block phase for UI consumers.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CommandBlockPhase {
+    Prompt,
+    Input,
+    Running,
+    Finished,
+}
+
+/// Opaque command-block identity: OSC `aid` when present, else a generation.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum CommandBlockId {
+    Aid(String),
+    Generated(u64),
+}
+
+/// Read-only command-block snapshot for Lane M. Live cursor truth stays on
+/// [`crate::shell::SemanticPromptState`].
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CommandBlockSnapshot {
+    pub id: CommandBlockId,
+    pub phase: CommandBlockPhase,
+    pub prompt_kind: std::option::Option<PromptKind>,
+    pub input_start: std::option::Option<(u16, u16)>,
+    pub exit_code: std::option::Option<i32>,
+    pub failed: bool,
+    pub duration_ms: std::option::Option<u64>,
+    pub cmdline: std::option::Option<Vec<u8>>,
+}
+
+impl CommandBlockSnapshot {
+    pub fn empty(id: CommandBlockId) -> Self {
+        Self {
+            id,
+            phase: CommandBlockPhase::Prompt,
+            prompt_kind: None,
+            input_start: None,
+            exit_code: None,
+            failed: false,
+            duration_ms: None,
+            cmdline: None,
+        }
+    }
+}
 impl PromptKind {
     fn init(c: u8) -> std::option::Option<Self> {
         match c {

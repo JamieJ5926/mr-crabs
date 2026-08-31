@@ -147,6 +147,11 @@ pub struct SemanticPromptState {
     pub input_start_row: Option<u16>,
     /// Last OSC 133 D exit code, when the option was present and valid.
     pub last_exit_code: Option<i32>,
+    /// Typed current-block snapshot beside the live cursor machine.
+    block: super::semantic_prompt::CommandBlockSnapshot,
+    next_block_id: u64,
+    running_started_ms: Option<u64>,
+    last_finished: Option<super::semantic_prompt::CommandBlockSnapshot>,
 }
 
 /// The `redraw` option value (Ghostty `Redraw`); defaults to true.
@@ -186,6 +191,12 @@ impl SemanticPromptState {
             input_start_col: None,
             input_start_row: None,
             last_exit_code: None,
+            block: super::semantic_prompt::CommandBlockSnapshot::empty(
+                super::semantic_prompt::CommandBlockId::Generated(0),
+            ),
+            next_block_id: 1,
+            running_started_ms: None,
+            last_finished: None,
         }
     }
 
@@ -200,6 +211,17 @@ impl SemanticPromptState {
         cmd: &super::semantic_prompt::SemanticPrompt,
         cursor_col: u16,
         cursor_row: u16,
+    ) -> Vec<SemanticAction> {
+        self.apply_at(cmd, cursor_col, cursor_row, monotonic_now_ms())
+    }
+
+    /// Apply with an injected millisecond clock for duration tests.
+    pub fn apply_at(
+        &mut self,
+        cmd: &super::semantic_prompt::SemanticPrompt,
+        cursor_col: u16,
+        cursor_row: u16,
+        now_ms: u64,
     ) -> Vec<SemanticAction> {
         use super::semantic_prompt::{Action, Option as Opt, OptionValue};
         match cmd.action {
@@ -230,6 +252,7 @@ impl SemanticPromptState {
                 self.input_start_row = None;
                 self.content = SemanticContent::Prompt;
                 self.row = RowSemantic::Prompt;
+                self.begin_prompt_block(cmd);
                 actions
             }
             Action::PromptStart => {
@@ -242,6 +265,7 @@ impl SemanticPromptState {
                 self.input_start_row = None;
                 self.content = SemanticContent::Prompt;
                 self.row = RowSemantic::Prompt;
+                self.begin_prompt_block(cmd);
                 vec![SemanticAction::MarkPrompt]
             }
             Action::EndPromptStartInput => {
@@ -249,6 +273,7 @@ impl SemanticPromptState {
                 self.row = RowSemantic::Input;
                 self.input_start_col = Some(cursor_col);
                 self.input_start_row = Some(cursor_row);
+                self.mark_input(cursor_col, cursor_row);
                 vec![SemanticAction::MarkInput]
             }
             Action::EndPromptStartInputTerminateEol => {
@@ -256,13 +281,11 @@ impl SemanticPromptState {
                 self.row = RowSemantic::Input;
                 self.input_start_col = Some(cursor_col);
                 self.input_start_row = Some(cursor_row);
+                self.mark_input(cursor_col, cursor_row);
                 vec![SemanticAction::ClearInputEol]
             }
             Action::EndInputStartOutput => {
                 let mut actions = vec![SemanticAction::MarkOutput];
-                // Heuristic for fish: at column zero on a prompt row, assume
-                // we are overwriting the prompt (Ghostty comment in
-                // `semanticPrompt`).
                 if self.row != RowSemantic::None {
                     actions.push(SemanticAction::None);
                 }
@@ -270,6 +293,7 @@ impl SemanticPromptState {
                 self.row = RowSemantic::None;
                 self.input_start_col = None;
                 self.input_start_row = None;
+                self.mark_running(cmd, now_ms);
                 actions
             }
             Action::EndCommand => {
@@ -280,6 +304,7 @@ impl SemanticPromptState {
                 self.row = RowSemantic::None;
                 self.input_start_col = None;
                 self.input_start_row = None;
+                self.mark_finished(cmd, now_ms);
                 vec![SemanticAction::MarkOutput]
             }
         }
@@ -296,6 +321,88 @@ impl SemanticPromptState {
             SemanticContent::Input | SemanticContent::Prompt
         )
     }
+
+    /// Current typed block. Does not parse OSC.
+    pub fn command_block_snapshot(&self) -> &super::semantic_prompt::CommandBlockSnapshot {
+        &self.block
+    }
+
+    /// Last finalized command, if any D has completed.
+    pub fn last_finished_command(&self) -> Option<&super::semantic_prompt::CommandBlockSnapshot> {
+        self.last_finished.as_ref()
+    }
+
+    fn next_id(
+        &mut self,
+        cmd: &super::semantic_prompt::SemanticPrompt,
+    ) -> super::semantic_prompt::CommandBlockId {
+        use super::semantic_prompt::{CommandBlockId, Option as Opt, OptionValue};
+        if let Some(OptionValue::Aid(aid)) = cmd.read_option(Opt::Aid) {
+            CommandBlockId::Aid(aid)
+        } else {
+            let id = CommandBlockId::Generated(self.next_block_id);
+            self.next_block_id = self.next_block_id.saturating_add(1);
+            id
+        }
+    }
+
+    fn begin_prompt_block(&mut self, cmd: &super::semantic_prompt::SemanticPrompt) {
+        use super::semantic_prompt::{CommandBlockPhase, CommandBlockSnapshot};
+        self.running_started_ms = None;
+        self.block = CommandBlockSnapshot {
+            id: self.next_id(cmd),
+            phase: CommandBlockPhase::Prompt,
+            prompt_kind: self.prompt_kind,
+            input_start: None,
+            exit_code: None,
+            failed: false,
+            duration_ms: None,
+            cmdline: None,
+        };
+    }
+
+    fn mark_input(&mut self, cursor_col: u16, cursor_row: u16) {
+        use super::semantic_prompt::CommandBlockPhase;
+        self.block.phase = CommandBlockPhase::Input;
+        self.block.input_start = Some((cursor_row, cursor_col));
+        self.block.prompt_kind = self.prompt_kind;
+    }
+
+    fn mark_running(&mut self, cmd: &super::semantic_prompt::SemanticPrompt, now_ms: u64) {
+        use super::semantic_prompt::CommandBlockPhase;
+        self.running_started_ms = Some(now_ms);
+        self.block.phase = CommandBlockPhase::Running;
+        self.block.input_start = None;
+        self.block.exit_code = None;
+        self.block.failed = false;
+        self.block.duration_ms = None;
+        let mut cmdline = Vec::new();
+        if cmd.write_command_line(&mut cmdline).is_ok() && !cmdline.is_empty() {
+            self.block.cmdline = Some(cmdline);
+        }
+    }
+
+    fn mark_finished(&mut self, cmd: &super::semantic_prompt::SemanticPrompt, now_ms: u64) {
+        use super::semantic_prompt::{CommandBlockPhase, Option as Opt, OptionValue};
+        let exit_code = match cmd.read_option(Opt::ExitCode) {
+            Some(OptionValue::ExitCode(code)) => Some(code),
+            _ => None,
+        };
+        self.block.phase = CommandBlockPhase::Finished;
+        self.block.exit_code = exit_code;
+        self.block.failed = exit_code.is_some_and(|c| c != 0);
+        self.block.duration_ms = self
+            .running_started_ms
+            .map(|start| now_ms.saturating_sub(start));
+        self.running_started_ms = None;
+        self.last_finished = Some(self.block.clone());
+    }
+}
+
+fn monotonic_now_ms() -> u64 {
+    static EPOCH: std::sync::LazyLock<std::time::Instant> =
+        std::sync::LazyLock::new(std::time::Instant::now);
+    u64::try_from(EPOCH.elapsed().as_millis()).unwrap_or(u64::MAX)
 }
 
 impl Default for SemanticPromptState {
@@ -467,5 +574,93 @@ mod tests {
         assert_eq!(s.input_start_col, Some(22));
         assert_eq!(s.input_start_row, Some(5));
         assert!(s.cursor_is_at_prompt());
+    }
+
+    #[test]
+    fn command_block_phases_a_b_c_d() {
+        use crate::semantic_prompt::CommandBlockPhase;
+        let mut s = SemanticPromptState::new();
+        s.apply_at(&sp(Action::FreshLineNewPrompt, "k=i;aid=p1"), 0, 0, 10);
+        assert_eq!(s.command_block_snapshot().phase, CommandBlockPhase::Prompt);
+        assert_eq!(
+            s.command_block_snapshot().prompt_kind,
+            Some(crate::semantic_prompt::PromptKind::Initial)
+        );
+
+        s.apply_at(&sp(Action::EndPromptStartInput, ""), 3, 1, 11);
+        assert_eq!(s.command_block_snapshot().phase, CommandBlockPhase::Input);
+        assert_eq!(s.command_block_snapshot().input_start, Some((1, 3)));
+
+        s.apply_at(
+            &sp(Action::EndInputStartOutput, "cmdline=$'echo hi'"),
+            3,
+            1,
+            100,
+        );
+        let running = s.command_block_snapshot();
+        assert_eq!(running.phase, CommandBlockPhase::Running);
+        assert_eq!(running.cmdline.as_deref(), Some(b"echo hi".as_slice()));
+        assert_eq!(running.exit_code, None);
+        assert!(!running.failed);
+        assert_eq!(running.duration_ms, None);
+        assert_eq!(s.last_exit_code, None);
+
+        s.apply_at(&sp(Action::EndCommand, "0"), 0, 0, 250);
+        let finished = s.command_block_snapshot();
+        assert_eq!(finished.phase, CommandBlockPhase::Finished);
+        assert_eq!(finished.exit_code, Some(0));
+        assert!(!finished.failed);
+        assert_eq!(finished.duration_ms, Some(150));
+        assert_eq!(s.last_exit_code, Some(0));
+    }
+
+    #[test]
+    fn sticky_last_exit_code_is_not_running_phase() {
+        use crate::semantic_prompt::CommandBlockPhase;
+        let mut s = SemanticPromptState::new();
+        s.apply_at(&sp(Action::FreshLineNewPrompt, ""), 0, 0, 0);
+        s.apply_at(&sp(Action::EndPromptStartInput, ""), 0, 0, 1);
+        s.apply_at(&sp(Action::EndInputStartOutput, ""), 0, 0, 2);
+        s.apply_at(&sp(Action::EndCommand, "7"), 0, 0, 3);
+        assert_eq!(s.last_exit_code, Some(7));
+        assert_eq!(s.command_block_snapshot().phase, CommandBlockPhase::Finished);
+
+        s.apply_at(&sp(Action::FreshLineNewPrompt, "k=i"), 0, 0, 4);
+        s.apply_at(&sp(Action::EndPromptStartInput, ""), 0, 0, 5);
+        s.apply_at(&sp(Action::EndInputStartOutput, ""), 0, 0, 6);
+        assert_eq!(s.last_exit_code, Some(7));
+        let running = s.command_block_snapshot();
+        assert_eq!(running.phase, CommandBlockPhase::Running);
+        assert_eq!(running.exit_code, None);
+        assert!(!running.failed);
+    }
+
+    #[test]
+    fn missing_exit_code_is_unknown_not_failure() {
+        use crate::semantic_prompt::CommandBlockPhase;
+        let mut s = SemanticPromptState::new();
+        s.apply_at(&sp(Action::FreshLineNewPrompt, ""), 0, 0, 0);
+        s.apply_at(&sp(Action::EndInputStartOutput, ""), 0, 0, 10);
+        s.apply_at(&sp(Action::EndCommand, ""), 0, 0, 20);
+        let finished = s.command_block_snapshot();
+        assert_eq!(finished.phase, CommandBlockPhase::Finished);
+        assert_eq!(finished.exit_code, None);
+        assert!(!finished.failed);
+        assert_eq!(s.last_exit_code, None);
+
+        s.apply_at(&sp(Action::FreshLineNewPrompt, ""), 0, 0, 21);
+        s.apply_at(&sp(Action::EndInputStartOutput, ""), 0, 0, 22);
+        s.apply_at(&sp(Action::EndCommand, "1"), 0, 0, 40);
+        assert_eq!(s.last_exit_code, Some(1));
+        assert!(s.command_block_snapshot().failed);
+
+        s.apply_at(&sp(Action::FreshLineNewPrompt, ""), 0, 0, 41);
+        s.apply_at(&sp(Action::EndInputStartOutput, ""), 0, 0, 42);
+        s.apply_at(&sp(Action::EndCommand, ""), 0, 0, 50);
+        assert_eq!(s.last_exit_code, Some(1));
+        let unknown = s.command_block_snapshot();
+        assert_eq!(unknown.phase, CommandBlockPhase::Finished);
+        assert_eq!(unknown.exit_code, None);
+        assert!(!unknown.failed);
     }
 }

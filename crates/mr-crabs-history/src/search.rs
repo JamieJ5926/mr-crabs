@@ -41,6 +41,7 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 
 use mr_crabs_terminal::{Cell, HistoryRead};
+use regex::{Regex, RegexBuilder};
 
 /// Hard cap on the needle length in bytes (Ghostty mailbox `WriteReq` cap).
 pub const MAX_NEEDLE_BYTES: usize = 255;
@@ -165,18 +166,31 @@ pub struct SearchMatch {
     pub start_col: u16,
 }
 
+/// How the request's needle is interpreted. Default is literal substring
+/// search so existing callers stay Ghostty-shaped.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum SearchPattern {
+    /// UTF-8 substring. Empty needle means stop the search.
+    #[default]
+    Literal,
+    /// Rust `regex` crate pattern over the encoded search stream.
+    Regex,
+}
+
 /// A search request. `visible_rows` is the visible-grid copy captured by the
 /// caller when the search starts (the worker never reads the live grid).
 #[derive(Clone, Debug)]
 pub struct SearchRequest {
-    /// UTF-8 needle; empty means "stop the search" (Ghostty inactive search).
+    /// UTF-8 needle or regex source; empty means "stop the search".
     pub needle: Vec<u8>,
+    /// Literal versus regex. Defaults to [`SearchPattern::Literal`].
+    pub pattern: SearchPattern,
     pub direction: SearchDirection,
     pub start: SearchStart,
     /// Maximum matches returned; clamped into `[1, MAX_SEARCH_LIMIT]`.
     pub limit: usize,
     /// Case-sensitive matching (default false, matching Ghostty's
-    /// case-insensitive search).
+    /// case-insensitive search). For regex this sets `case_insensitive`.
     pub case_sensitive: bool,
     pub visible_rows: Vec<Vec<Cell>>,
 }
@@ -185,6 +199,7 @@ impl Default for SearchRequest {
     fn default() -> Self {
         Self {
             needle: Vec::new(),
+            pattern: SearchPattern::Literal,
             direction: SearchDirection::Forward,
             start: SearchStart::Top,
             limit: DEFAULT_SEARCH_LIMIT,
@@ -194,8 +209,6 @@ impl Default for SearchRequest {
     }
 }
 
-/// The outcome of one search.
-#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SearchOutcome {
     /// Generation token captured when the search started. Compare with the
     /// worker's current generation: a mismatch means the outcome is stale.
@@ -210,6 +223,8 @@ pub struct SearchOutcome {
     pub cancelled: bool,
     /// Number of lines scanned.
     pub lines_searched: usize,
+    /// Regex compile failure. Empty when the pattern compiled or was literal.
+    pub pattern_error: Option<String>,
 }
 
 impl SearchOutcome {
@@ -314,7 +329,6 @@ fn search_core_range<R: HistoryRead + ?Sized>(
     let history_len = reader.history_len();
     let visible_len = req.visible_rows.len();
     let total = history_len + visible_len;
-    let limit = req.limit.clamp(1, MAX_SEARCH_LIMIT);
     let needle = &req.needle[..req.needle.len().min(MAX_NEEDLE_BYTES)];
     let mut matches = Vec::new();
     let mut truncated = false;
@@ -331,15 +345,69 @@ fn search_core_range<R: HistoryRead + ?Sized>(
                 completed: true,
                 cancelled: false,
                 lines_searched: 0,
+                pattern_error: None,
             },
             total,
         );
     }
+
+    let compiled_regex = match req.pattern {
+        SearchPattern::Literal => None,
+        SearchPattern::Regex => {
+            let Ok(source) = std::str::from_utf8(needle) else {
+                return (
+                    SearchOutcome {
+                        token,
+                        matches,
+                        truncated: false,
+                        completed: true,
+                        cancelled: false,
+                        lines_searched: 0,
+                        pattern_error: Some("regex needle is not valid UTF-8".to_string()),
+                    },
+                    total,
+                );
+            };
+            match RegexBuilder::new(source)
+                .case_insensitive(!req.case_sensitive)
+                .build()
+            {
+                Ok(re) => Some(re),
+                Err(err) => {
+                    return (
+                        SearchOutcome {
+                            token,
+                            matches,
+                            truncated: false,
+                            completed: true,
+                            cancelled: false,
+                            lines_searched: 0,
+                            pattern_error: Some(err.to_string()),
+                        },
+                        total,
+                    );
+                }
+            }
+        }
+    };
+
     let needle_len = needle.len();
+    let overlap = compiled_regex
+        .as_ref()
+        .map(|_| 4096usize)
+        .unwrap_or(needle_len);
+    let limit = req.limit.clamp(1, MAX_SEARCH_LIMIT);
 
     let reverse = req.direction == SearchDirection::Reverse;
+    let reverse_window = reverse && compiled_regex.is_none();
     let start_line = start_override.unwrap_or_else(|| match req.start {
-        SearchStart::Top => 0,
+        SearchStart::Top => {
+            if reverse {
+                total - 1
+            } else {
+                0
+            }
+        }
         SearchStart::Bottom => total - 1,
         SearchStart::Line(line) => line.min(total - 1),
     });
@@ -352,27 +420,26 @@ fn search_core_range<R: HistoryRead + ?Sized>(
                 completed: true,
                 cancelled: false,
                 lines_searched: 0,
+                pattern_error: None,
             },
             total,
         );
     }
 
-    // The search window: at most `needle_len - 1` bytes of overlap plus the
-    // current entry (a leading entry is kept whole when it straddles the
-    // prune boundary). `window_base` is the global byte offset of
-    // `window[0]`; `search_from` is a window-relative offset.
-    let mut window: Vec<u8> = Vec::with_capacity(needle_len + 4096);
+    let mut window: Vec<u8> = Vec::with_capacity(overlap + 4096);
     let mut entries: Vec<LineEntry> = Vec::new();
     let mut window_base: usize = 0;
     let mut search_from: usize = 0;
     let mut blank = 0usize;
-    // Reversed needle for reverse searches (sliding_window.zig:111-143).
     let mut needle_rev: Vec<u8> = needle.to_vec();
-    if reverse {
+    if reverse_window {
         needle_rev.reverse();
     }
-    let search_needle: &[u8] = if reverse { &needle_rev } else { needle };
-
+    let search_needle: &[u8] = if reverse_window {
+        &needle_rev
+    } else {
+        needle
+    };
     let mut line = start_line;
     let mut previous_wrapped_for_next = false;
 
@@ -409,12 +476,8 @@ fn search_core_range<R: HistoryRead + ?Sized>(
             encode_row_with_map(&cells, continuation, &mut blank);
         let sep_len = if !wrapped { 1 } else { 0 };
         let mut entry_bytes = Vec::with_capacity(text.len() + 1);
-        let reversed = reverse;
-        if reverse {
-            // Reverse the row text (Ghostty sliding_window reverses the page
-            // encoding for reverse searches) but keep the cell maps in
-            // forward order; spans_for maps match ranges back through
-            // `forward_pos` before resolving columns.
+        let reversed = reverse_window;
+        if reverse_window {
             text.reverse();
             if !wrapped {
                 entry_bytes.push(b'\n');
@@ -428,9 +491,7 @@ fn search_core_range<R: HistoryRead + ?Sized>(
         }
         let text_len = text.len();
 
-        // Prune the window: keep at most `needle_len - 1` bytes from before
-        // this entry, dropping only whole entries.
-        let keep = needle_len.saturating_sub(1);
+        let keep = overlap.saturating_sub(1);
         if window.len() > keep {
             let mut drop_target = window.len() - keep;
             while drop_target > 0 {
@@ -474,11 +535,15 @@ fn search_core_range<R: HistoryRead + ?Sized>(
             if abort() {
                 break;
             }
-            let Some(found) = find_needle(&window, search_needle, search_from, req.case_sensitive)
-            else {
+            let Some((found, end)) = find_match(
+                &window,
+                search_needle,
+                search_from,
+                req.case_sensitive,
+                compiled_regex.as_ref(),
+            ) else {
                 break;
             };
-            let end = found + needle_len;
             // `found`/`end` are window-relative; spans_for maps a *global*
             // byte range onto entries, so translate before mapping (the
             // window prunes whole entries, so window_base grows past 0).
@@ -539,9 +604,40 @@ fn search_core_range<R: HistoryRead + ?Sized>(
             completed: !cancelled && !truncated && !abort() && !budget_exhausted,
             cancelled,
             lines_searched,
+            pattern_error: None,
         },
         line.min(total),
     )
+}
+
+fn find_match(
+    hay: &[u8],
+    needle: &[u8],
+    from: usize,
+    case_sensitive: bool,
+    regex: Option<&Regex>,
+) -> Option<(usize, usize)> {
+    if from > hay.len() {
+        return None;
+    }
+    if let Some(re) = regex {
+        let Ok(hay_str) = std::str::from_utf8(hay) else {
+            return None;
+        };
+        let start = hay_str
+            .char_indices()
+            .find(|(i, _)| *i >= from)
+            .map(|(i, _)| i)
+            .unwrap_or(hay_str.len());
+        if start > hay_str.len() {
+            return None;
+        }
+        let m = re.find_at(hay_str, start)?;
+        let end = m.end().max(m.start() + 1);
+        return Some((m.start(), end));
+    }
+    let found = find_needle(hay, needle, from, case_sensitive)?;
+    Some((found, found + needle.len()))
 }
 
 /// Case-insensitive (ASCII-only, Ghostty `indexOfIgnoreCase`) or exact
@@ -562,7 +658,6 @@ fn find_needle(hay: &[u8], needle: &[u8], from: usize, case_sensitive: bool) -> 
             .map(|pos| from + pos)
     }
 }
-
 fn eq_ignore_case_ascii(a: &[u8], b: &[u8]) -> bool {
     a.len() == b.len() && a.iter().zip(b).all(|(x, y)| x.eq_ignore_ascii_case(y))
 }
@@ -985,6 +1080,7 @@ mod tests {
     ) -> SearchRequest {
         SearchRequest {
             needle: needle.as_bytes().to_vec(),
+            pattern: SearchPattern::Literal,
             direction,
             start,
             limit,
@@ -1197,6 +1293,7 @@ mod tests {
 
         let req = SearchRequest {
             needle: b"target 12".to_vec(),
+            pattern: SearchPattern::Literal,
             direction: SearchDirection::Forward,
             start: SearchStart::Top,
             limit: 10,
@@ -1420,5 +1517,90 @@ mod tests {
         assert!(third.completed);
         assert_eq!(done, 4);
         assert!(third.matches.is_empty());
+    }
+
+    fn regex_req(needle: &str, direction: SearchDirection, limit: usize) -> SearchRequest {
+        let mut request = req(needle, direction, SearchStart::Top, limit);
+        request.pattern = SearchPattern::Regex;
+        request
+    }
+
+    #[test]
+    fn regex_search_matches_and_literal_stays_substring() {
+        let mut history = VecHistory::new();
+        history.push(20, "alpha 12 beta");
+        history.push(20, "alpha 99 beta");
+        history.push(20, "nope");
+
+        let literal = search_sync(
+            &mut history,
+            &req("alpha 1", SearchDirection::Forward, SearchStart::Top, 10),
+            1,
+        );
+        assert_eq!(literal.matches.len(), 1);
+        assert_eq!(literal.matches[0].start_line, 0);
+        assert!(literal.pattern_error.is_none());
+
+        let regex = search_sync(
+            &mut history,
+            &regex_req(r"alpha \d+", SearchDirection::Forward, 10),
+            1,
+        );
+        assert_eq!(regex.matches.len(), 2);
+        assert_eq!(regex.matches[0].start_line, 0);
+        assert_eq!(regex.matches[1].start_line, 1);
+        assert!(regex.pattern_error.is_none());
+        assert!(regex.completed);
+    }
+
+    #[test]
+    fn regex_no_match_and_bad_pattern_are_boundary_errors() {
+        let mut history = VecHistory::new();
+        history.push(12, "hello world");
+
+        let none = search_sync(
+            &mut history,
+            &regex_req(r"z{3}", SearchDirection::Forward, 10),
+            1,
+        );
+        assert!(none.matches.is_empty());
+        assert!(none.completed);
+        assert!(none.pattern_error.is_none());
+
+        let bad = search_sync(
+            &mut history,
+            &regex_req(r"(unclosed", SearchDirection::Forward, 10),
+            1,
+        );
+        assert!(bad.matches.is_empty());
+        assert!(bad.completed);
+        assert!(bad.pattern_error.is_some());
+    }
+
+    #[test]
+    fn regex_case_policy_and_reverse() {
+        let mut history = VecHistory::new();
+        history.push(12, "Alpha");
+        history.push(12, "ALPHA");
+        history.push(12, "other");
+
+        let mut insensitive = regex_req("alpha", SearchDirection::Forward, 10);
+        insensitive.case_sensitive = false;
+        let outcome = search_sync(&mut history, &insensitive, 1);
+        assert_eq!(outcome.matches.len(), 2);
+
+        let mut sensitive = regex_req("alpha", SearchDirection::Forward, 10);
+        sensitive.case_sensitive = true;
+        let outcome = search_sync(&mut history, &sensitive, 1);
+        assert!(outcome.matches.is_empty());
+
+        let reverse = search_sync(
+            &mut history,
+            &regex_req("Alpha|ALPHA", SearchDirection::Reverse, 10),
+            1,
+        );
+        assert_eq!(reverse.matches.len(), 2);
+        assert_eq!(reverse.matches[0].start_line, 1);
+        assert_eq!(reverse.matches[1].start_line, 0);
     }
 }

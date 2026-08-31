@@ -1,25 +1,20 @@
-//! The cursor glow/trail effect: shape-aware cursor rectangles, the linear
-//! fade, and the bounded gradient-resource descriptor cache.
+//! The cursor glow/trail effect: shape-aware cursor rectangles and the
+//! linear leftover fade.
 //!
 //! Port of the oracle's cursor-trail contract
 //! (`verification/manifests/dirty-oracle-v2.patch`):
 //!
 //! * `src/renderer/shaders/cursor-trail.glsl:11-27` — defaults: enabled,
 //!   opacity 0.35, duration 250 ms.
-//! * `cursor-trail.glsl:53-88` — a soft glow around the current cursor
+//! * `cursor-trail.glsl:53-88` — a soft glow around the leftover cursor
 //!   rectangle (`exp(-d / radius)` with `radius = 0.5 * max(w, h)`) plus a
-//!   trail along the segment connecting the previous and current rectangle
+//!   trail along the segment connecting the leftover and current rectangle
 //!   centers, blended with `fade * opacity` where `fade = 1 - elapsed /
 //!   duration` (linear); nothing is drawn when the cursor is hidden, the
 //!   surface is unfocused, or the rectangle is degenerate.
 //! * `src/renderer/generic.zig` (committed cursor-change plumbing): the
 //!   previous rect is captured and the change time reset whenever the
 //!   cursor rect changes.
-//!
-//! The gradient resource descriptor comes from a bounded LRU cache keyed
-//! by the quantized glow radius, so a renderer caches one radial-gradient
-//! texture per radius bucket and reuses it across frames (the same
-//! `GradientId` is returned while the radius bucket is unchanged).
 //!
 //! Coordinates are grid-relative pixels (top-left origin, y down); alpha,
 //! radius, and segment geometry are origin-independent, so the renderer
@@ -124,23 +119,22 @@ impl TrailConfig {
 /// One frame of trail state for the renderer.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TrailFrame {
-    /// True when the effect should draw: enabled, focused, cursor visible,
-    /// current rectangle valid, and still inside the fade window.
+    /// True when a vacated leftover cell should draw: enabled, focused,
+    /// cursor visible, leftover present, and still inside the fade window.
     pub active: bool,
     /// Milliseconds since the last cursor change.
     pub elapsed_ms: f64,
     /// The blend alpha: `(1 - elapsed / duration) * opacity`, 0 when
     /// inactive.
     pub alpha: f64,
-    /// The glow falloff radius: `0.5 * max(w, h)` of the current rect.
+    /// The glow falloff radius: `0.5 * max(w, h)` of the leftover rect.
     pub radius_px: f64,
-    /// The current cursor rectangle (glow anchor).
-    pub glow_rect: RectPx,
-    /// The segment between the previous and current cursor centers; `None`
+    /// The vacated cursor rectangle. `None` before the first move and
+    /// whenever the trail is not drawing.
+    pub leftover_rect: Option<RectPx>,
+    /// The segment between the leftover and current cursor centers; `None`
     /// until the cursor has moved at least once.
     pub segment: Option<LinePx>,
-    /// The cached gradient descriptor for `radius_px`.
-    pub gradient: GradientId,
 }
 
 impl Default for TrailFrame {
@@ -150,105 +144,12 @@ impl Default for TrailFrame {
             elapsed_ms: 0.0,
             alpha: 0.0,
             radius_px: 0.0,
-            glow_rect: RectPx::default(),
+            leftover_rect: None,
             segment: None,
-            gradient: GradientId(0),
         }
     }
 }
 
-/// A stable descriptor for a cached radial-gradient resource. Equal ids
-/// denote the same cached gradient (same radius bucket); ids are only
-/// reused for live cache entries, so a renderer may key its gradient
-/// texture by this id safely.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct GradientId(pub u32);
-
-/// The maximum number of gradient descriptors retained.
-pub const MAX_GRADIENTS: usize = 16;
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct GradientEntry {
-    bucket: u64,
-    id: u32,
-    last_use: u64,
-}
-
-/// Bounded LRU cache of gradient resource descriptors keyed by the
-/// quantized glow radius (0.5 px buckets). Never grows beyond
-/// [`MAX_GRADIENTS`] entries; on overflow the least-recently-used entry is
-/// evicted and its slot reused with a fresh id, so stale renderer caches
-/// are invalidated deterministically.
-#[derive(Clone, Debug, PartialEq)]
-pub struct GradientCache {
-    entries: Vec<GradientEntry>,
-    next_id: u32,
-    clock: u64,
-}
-
-impl GradientCache {
-    pub const fn new() -> Self {
-        Self {
-            entries: Vec::new(),
-            next_id: 0,
-            clock: 0,
-        }
-    }
-
-    /// Resolve the gradient descriptor for a glow radius, touching the
-    /// entry's recency. A radius bucket of `ceil(radius * 2)` px.
-    pub fn get(&mut self, radius_px: f64) -> GradientId {
-        let bucket = (radius_px * 2.0).ceil().max(0.0) as u64;
-        self.clock += 1;
-        if let Some(entry) = self.entries.iter_mut().find(|e| e.bucket == bucket) {
-            entry.last_use = self.clock;
-            return GradientId(entry.id);
-        }
-        let id = self.next_id;
-        self.next_id = self.next_id.wrapping_add(1);
-        if self.entries.len() < MAX_GRADIENTS {
-            self.entries.push(GradientEntry {
-                bucket,
-                id,
-                last_use: self.clock,
-            });
-        } else {
-            let lru = self
-                .entries
-                .iter()
-                .enumerate()
-                .min_by_key(|(_, e)| e.last_use)
-                .map(|(i, _)| i)
-                .expect("non-empty at MAX_GRADIENTS");
-            self.entries[lru] = GradientEntry {
-                bucket,
-                id,
-                last_use: self.clock,
-            };
-        }
-        GradientId(id)
-    }
-
-    /// The number of retained descriptors.
-    pub fn len(&self) -> usize {
-        self.entries.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.entries.is_empty()
-    }
-
-    /// Retained heap bytes.
-    pub fn retained_capacity(&self) -> usize {
-        self.entries.capacity() * std::mem::size_of::<GradientEntry>()
-    }
-}
-
-impl Default for GradientCache {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 /// The cursor trail state machine.
 #[derive(Clone, Debug, PartialEq)]
@@ -258,7 +159,6 @@ pub struct CursorTrail {
     previous: Option<RectPx>,
     change_ms: f64,
     last_rect: Option<RectPx>,
-    gradient: GradientCache,
 }
 
 impl CursorTrail {
@@ -269,14 +169,11 @@ impl CursorTrail {
             previous: None,
             change_ms: 0.0,
             last_rect: None,
-            gradient: GradientCache::new(),
         }
     }
 
-    /// Replace the trail configuration, keeping the retained geometry and
-    /// gradient descriptors (changing opacity/duration does not invalidate
-    /// radius buckets). Disabling resets the state so the disabled path
-    /// retains nothing.
+    /// Replace the trail configuration, keeping the retained geometry.
+    /// Disabling resets the state so the disabled path retains nothing.
     pub fn set_config(&mut self, config: TrailConfig) {
         if !config.enabled {
             *self = Self::new(config);
@@ -289,21 +186,16 @@ impl CursorTrail {
         self.config
     }
 
-    pub fn gradient_cache(&self) -> &GradientCache {
-        &self.gradient
+    /// Geometry is stack-sized; the trail retains no heap.
+    pub const fn retained_capacity(&self) -> usize {
+        0
     }
 
-    /// Retained heap bytes (the gradient descriptor cache only; geometry
-    /// is stack-sized).
-    pub fn retained_capacity(&self) -> usize {
-        self.gradient.retained_capacity()
-    }
-
-    /// Advance the trail to a frame: track cursor movement, compute the
-    /// fade, and resolve the gradient descriptor. The cursor rect is
-    /// tracked regardless of visibility/focus (matching the oracle, which
-    /// updates `iPreviousCursor`/`iTimeCursorChange` on every rect
-    /// change); drawing is gated by `active`.
+    /// Advance the trail to a frame: track cursor movement and compute the
+    /// leftover fade. The cursor rect is tracked regardless of
+    /// visibility/focus (matching the oracle, which updates
+    /// `iPreviousCursor`/`iTimeCursorChange` on every rect change);
+    /// drawing is gated by `active` and requires a leftover cell.
     pub fn frame(&mut self, rect: RectPx, visible: bool, now_ms: f64, focus: bool) -> TrailFrame {
         if self.last_rect != Some(rect) {
             self.previous = self.current;
@@ -319,6 +211,10 @@ impl CursorTrail {
         if current.degenerate() {
             return frame;
         }
+        let leftover = self.previous.filter(|r| !r.degenerate());
+        let Some(leftover) = leftover else {
+            return frame;
+        };
         let elapsed = (now_ms - self.change_ms).max(0.0);
         if !self.config.enabled || !focus || !visible {
             return frame;
@@ -329,12 +225,9 @@ impl CursorTrail {
         frame.active = true;
         frame.elapsed_ms = elapsed;
         frame.alpha = (1.0 - elapsed / self.config.duration_ms as f64) * self.config.opacity;
-        frame.radius_px = 0.5 * current.w.max(current.h);
-        frame.glow_rect = current;
-        frame.segment = self
-            .previous
-            .map(|prev| LinePx::new(prev.center(), current.center()));
-        frame.gradient = self.gradient.get(frame.radius_px);
+        frame.leftover_rect = Some(leftover);
+        frame.radius_px = 0.5 * leftover.w.max(leftover.h);
+        frame.segment = Some(LinePx::new(leftover.center(), current.center()));
         frame
     }
 }
@@ -380,16 +273,14 @@ mod tests {
     }
 
     #[test]
-    fn first_frame_glows_without_segment() {
+    fn first_frame_has_no_leftover() {
         let mut t = CursorTrail::new(config());
         let f = t.frame(RectPx::new(0.0, 0.0, 10.0, 20.0), true, 2000.0, true);
-        assert!(f.active);
-        assert_eq!(f.elapsed_ms, 0.0);
-        assert_eq!(f.alpha, 0.35);
-        assert_eq!(f.radius_px, 10.0);
-        assert_eq!(f.glow_rect, RectPx::new(0.0, 0.0, 10.0, 20.0));
+        assert!(!f.active);
+        assert_eq!(f.alpha, 0.0);
+        assert_eq!(f.leftover_rect, None);
         assert_eq!(f.segment, None);
-        assert_eq!(f.gradient, GradientId(0));
+        assert_eq!(f.radius_px, 0.0);
     }
 
     #[test]
@@ -398,9 +289,10 @@ mod tests {
         _ = t.frame(RectPx::new(0.0, 0.0, 10.0, 20.0), true, 2000.0, true);
         let f = t.frame(RectPx::new(50.0, 0.0, 10.0, 20.0), true, 2016.0, true);
         assert!(f.active);
-        assert_eq!(f.elapsed_ms, 0.0); // fade restarted at the move
+        assert_eq!(f.elapsed_ms, 0.0);
         assert_eq!(f.alpha, 0.35);
-        assert_eq!(f.glow_rect, RectPx::new(50.0, 0.0, 10.0, 20.0));
+        assert_eq!(f.leftover_rect, Some(RectPx::new(0.0, 0.0, 10.0, 20.0)));
+        assert_eq!(f.radius_px, 10.0);
         assert_eq!(
             f.segment,
             Some(LinePx::new(
@@ -408,34 +300,35 @@ mod tests {
                 PointPx::new(55.0, 10.0)
             ))
         );
-        // Same radius bucket: the descriptor is reused.
-        assert_eq!(f.gradient, GradientId(0));
     }
 
     #[test]
     fn fade_is_linear_and_expires() {
         let mut t = CursorTrail::new(config());
         _ = t.frame(RectPx::new(0.0, 0.0, 10.0, 20.0), true, 2000.0, true);
-        let mid = t.frame(RectPx::new(0.0, 0.0, 10.0, 20.0), true, 2125.0, true);
+        _ = t.frame(RectPx::new(50.0, 0.0, 10.0, 20.0), true, 2016.0, true);
+        let mid = t.frame(RectPx::new(50.0, 0.0, 10.0, 20.0), true, 2141.0, true);
         assert!(mid.active);
         assert_eq!(mid.elapsed_ms, 125.0);
-        assert_eq!(mid.alpha, 0.175); // (1 - 125/250) * 0.35
-        assert_eq!(mid.gradient, GradientId(0));
-        let end = t.frame(RectPx::new(0.0, 0.0, 10.0, 20.0), true, 2250.0, true);
+        assert_eq!(mid.alpha, 0.175);
+        assert_eq!(mid.leftover_rect, Some(RectPx::new(0.0, 0.0, 10.0, 20.0)));
+        let end = t.frame(RectPx::new(50.0, 0.0, 10.0, 20.0), true, 2266.0, true);
         assert!(!end.active);
         assert_eq!(end.alpha, 0.0);
+        assert_eq!(end.leftover_rect, None);
     }
 
     #[test]
     fn hidden_or_unfocused_or_disabled_draws_nothing() {
         let mut t = CursorTrail::new(config());
-        let rect = RectPx::new(0.0, 0.0, 10.0, 20.0);
-        _ = t.frame(rect, true, 2000.0, true);
-        assert!(!t.frame(rect, false, 2016.0, true).active);
-        assert!(!t.frame(rect, true, 2016.0, false).active);
+        let first = RectPx::new(0.0, 0.0, 10.0, 20.0);
+        let next = RectPx::new(50.0, 0.0, 10.0, 20.0);
+        _ = t.frame(first, true, 2000.0, true);
+        _ = t.frame(next, true, 2016.0, true);
+        assert!(!t.frame(next, false, 2016.0, true).active);
+        assert!(!t.frame(next, true, 2016.0, false).active);
         t.set_config(TrailConfig::new(false, 0.35, 250));
-        assert!(!t.frame(rect, true, 2016.0, true).active);
-        assert!(t.gradient_cache().is_empty());
+        assert!(!t.frame(next, true, 2016.0, true).active);
         assert_eq!(t.retained_capacity(), 0);
     }
 
@@ -447,32 +340,20 @@ mod tests {
     }
 
     #[test]
-    fn gradient_cache_is_bounded_and_evicts_lru() {
+    fn leftover_fade_survives_without_gradient_id() {
         let mut t = CursorTrail::new(config());
-        // 16 distinct radius buckets fill the cache: vary the rect height
-        // (radius = 0.5 * max(w, h)).
-        let mut first = GradientId(0);
-        for i in 0..MAX_GRADIENTS {
-            let h = 20.0 + f64::from(i as u32) * 2.0;
-            let f = t.frame(RectPx::new(0.0, 0.0, 10.0, h), true, 2000.0, true);
-            if i == 0 {
-                first = f.gradient;
-            }
-            assert_eq!(t.gradient_cache().len(), i + 1);
-        }
-        assert_eq!(t.gradient_cache().len(), MAX_GRADIENTS);
-        // Touching bucket 0 again reuses its id (cache hit).
-        let f = t.frame(RectPx::new(0.0, 0.0, 10.0, 20.0), true, 2000.0, true);
-        assert_eq!(f.gradient, first);
-        assert_eq!(t.gradient_cache().len(), MAX_GRADIENTS);
-        // A new bucket evicts the least-recently-used entry with a fresh id.
-        let f = t.frame(
-            RectPx::new(0.0, 0.0, 10.0, 20.0 + 2.0 * 32.0),
-            true,
-            2000.0,
-            true,
+        _ = t.frame(RectPx::new(0.0, 0.0, 10.0, 20.0), true, 2000.0, true);
+        let f = t.frame(RectPx::new(50.0, 0.0, 10.0, 20.0), true, 2016.0, true);
+        assert!(f.active);
+        assert_eq!(f.alpha, 0.35);
+        assert_eq!(f.radius_px, 10.0);
+        assert_eq!(f.leftover_rect, Some(RectPx::new(0.0, 0.0, 10.0, 20.0)));
+        assert_eq!(
+            f.segment,
+            Some(LinePx::new(
+                PointPx::new(5.0, 10.0),
+                PointPx::new(55.0, 10.0)
+            ))
         );
-        assert_ne!(f.gradient, first);
-        assert_eq!(t.gradient_cache().len(), MAX_GRADIENTS);
     }
 }

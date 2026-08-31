@@ -171,6 +171,34 @@ impl CompactEngine {
         );
     }
 
+    pub(crate) fn graphemes(&self) -> &GraphemeTable {
+        &self.graphemes
+    }
+
+    pub(crate) fn row_from_storage_parts(
+        &mut self,
+        cells: Arc<[Cell]>,
+        cols: u16,
+        occupancy: u16,
+        first_occupied: u16,
+        wrapped: bool,
+        generation: u64,
+        combining: Option<Arc<[(u16, Vec<u32>)]>>,
+    ) -> CompactRow {
+        let mut row =
+            CompactRow::from_parts(cells, cols, occupancy, first_occupied, wrapped, generation);
+        if let Some(combining) = combining {
+            for (col, marks) in combining.iter() {
+                if marks.is_empty() || usize::from(*col) >= usize::from(cols) {
+                    continue;
+                }
+                let id = self.graphemes.intern(marks.clone());
+                row.extras_mut().combining.insert(*col, id);
+            }
+        }
+        row
+    }
+
     /// Prepend stored scrollback rows into primary history for same-width
     /// taller resize. Zero-copy: moves `CompactRow` descriptors; preserves
     /// occupancy/wrapped/generation. No-op in alternate screen.

@@ -739,6 +739,32 @@ mod tests {
     }
 
     #[test]
+    fn consecutive_phases_recolor_the_same_logo_glyph() {
+        let layout = parse_fetch_layout(&sample_output()).expect("layout");
+        let frames: Vec<String> = (0..FRAME_COUNT)
+            .map(|phase| String::from_utf8(frame_bytes(&layout, phase)).expect("utf8"))
+            .collect();
+        let glyph = layout
+            .lines
+            .iter()
+            .flat_map(|line| line.logo.chars())
+            .find(|ch| *ch != ' ')
+            .expect("logo glyph");
+        let mut unique_sgr = std::collections::HashSet::new();
+        for frame in &frames {
+            let needle = format!("m{glyph}\x1b[0m");
+            let at = frame.find(&needle).expect("colored glyph");
+            let sgr_start = frame[..at].rfind("\x1b[38;2;").expect("sgr");
+            unique_sgr.insert(frame[sgr_start..at + 1].to_string());
+        }
+        assert_eq!(frames.len(), FRAME_COUNT);
+        assert_eq!(unique_sgr.len(), FRAME_COUNT);
+        for pair in frames.windows(2) {
+            assert_ne!(pair[0], pair[1]);
+        }
+    }
+
+    #[test]
     fn should_run_requires_supported_first_argument() {
         assert!(should_run_animated_fetch(&["+animated-fetch".to_string()]));
         assert!(should_run_animated_fetch(&["+rustfetch".to_string()]));

@@ -9,7 +9,7 @@
 use gpui::{
     App, BorderStyle, Bounds, BoxShadow, ContentMask, Corners, Element, ElementId, FocusHandle,
     Font, FontFeatures, FontStyle, FontWeight, GlobalElementId, Hsla, InspectorElementId,
-    IntoElement, LayoutId, PathBuilder, Pixels, Point, RenderImage, ShapedLine, SharedString,
+    IntoElement, LayoutId, Pixels, Point, RenderImage, ShapedLine, SharedString,
     StrikethroughStyle, Style as GpuiStyle, TextRun, UnderlineStyle, Window, fill, font, outline,
     point, px, size, white,
 };
@@ -36,14 +36,16 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::{
-    CacheAction, CellMetrics, RenderCache, ResizeDeduper, RowBatch, RunBatch, cursor,
+    CacheAction, CellMetrics, RenderCache, ResizeDeduper, RowBatch, RunBatch,
+    cell_col_for_glyph_byte, cursor,
     geometry::{pixel_bounds_to_grid, run_bounds},
     paint_diagnostics::{
         PaintDiagnosticsEvent, PaintDiagnosticsSink, PaintEffectsOutcome, diagnostic_event,
     },
     palette,
-    selection::selection_rects,
+    selection::{search_match_rects, selection_rects},
 };
+
 
 type OnPaintCallback = Arc<dyn Fn(&mut App)>;
 /// A GPUI element that renders a terminal [`FrameDelta`].
@@ -203,52 +205,19 @@ impl PaintState {
 }
 
 pub(crate) fn trail_glow_bounds(
-    glow_rect: RectPx,
+    leftover_rect: RectPx,
     origin: Point<Pixels>,
 ) -> Option<Bounds<Pixels>> {
-    if glow_rect.degenerate() {
+    if leftover_rect.degenerate() {
         return None;
     }
     Some(Bounds {
         origin: point(
-            origin.x + px(glow_rect.x as f32),
-            origin.y + px(glow_rect.y as f32),
+            origin.x + px(leftover_rect.x as f32),
+            origin.y + px(leftover_rect.y as f32),
         ),
-        size: size(px(glow_rect.w as f32), px(glow_rect.h as f32)),
+        size: size(px(leftover_rect.w as f32), px(leftover_rect.h as f32)),
     })
-}
-pub(crate) fn trail_stroke_width(radius_px: f64) -> Pixels {
-    px((radius_px * 0.5).max(1.0) as f32)
-}
-
-fn trail_segment_quad(
-    segment: mr_crabs_effects::LinePx,
-    origin: Point<Pixels>,
-    width: Pixels,
-) -> [Point<Pixels>; 4] {
-    let from = point(
-        origin.x + px(segment.from.x as f32),
-        origin.y + px(segment.from.y as f32),
-    );
-    let to = point(
-        origin.x + px(segment.to.x as f32),
-        origin.y + px(segment.to.y as f32),
-    );
-    let dx = f32::from(to.x - from.x);
-    let dy = f32::from(to.y - from.y);
-    let length = (dx * dx + dy * dy).sqrt();
-    let half = f32::from(width) * 0.5;
-    let (nx, ny) = if length > f32::EPSILON {
-        (-dy / length * half, dx / length * half)
-    } else {
-        (0.0, half)
-    };
-    [
-        point(from.x + px(nx), from.y + px(ny)),
-        point(to.x + px(nx), to.y + px(ny)),
-        point(to.x - px(nx), to.y - px(ny)),
-        point(from.x - px(nx), from.y - px(ny)),
-    ]
 }
 
 const REVEAL_FEATHER_PX: f64 = 2.0;
@@ -723,6 +692,18 @@ impl TerminalElement {
             }
         });
 
+        // Search highlights sit under the selection overlay so a user
+        // selection and the current-match selection still read as selection.
+        for hit in &frame.search_matches {
+            let color = if hit.current {
+                palette::search_current_color()
+            } else {
+                palette::search_match_color()
+            };
+            for rect in search_match_rects(hit.range, frame.size, self.metrics) {
+                window.paint_quad(fill(rect + origin, color));
+            }
+        }
         // Selection overlay above backgrounds, below text-reveal and cursor.
         for rect in selection_rects(&frame.selection, frame.size, self.metrics) {
             window.paint_quad(fill(rect + origin, self.palette.selection_color()));
@@ -958,7 +939,10 @@ impl TerminalElement {
     }
 
     fn paint_trail(&self, trail: &TrailFrame, origin: Point<Pixels>, window: &mut Window) {
-        let Some(bounds) = trail_glow_bounds(trail.glow_rect, origin) else {
+        let Some(leftover) = trail.leftover_rect else {
+            return;
+        };
+        let Some(bounds) = trail_glow_bounds(leftover, origin) else {
             return;
         };
         let mut glow = self.palette.cursor_color();
@@ -971,19 +955,7 @@ impl TerminalElement {
             Corners::all(px(0.0)),
             &[BoxShadow::new(px(0.0), px(0.0), glow).blur_radius(px(trail.radius_px as f32))],
         );
-        let Some(segment) = trail.segment else {
-            return;
-        };
-        let [a, b, c, d] = trail_segment_quad(segment, origin, trail_stroke_width(trail.radius_px));
-        let mut builder = PathBuilder::fill();
-        builder.move_to(a);
-        builder.line_to(b);
-        builder.line_to(c);
-        builder.line_to(d);
-        builder.close();
-        if let Ok(path) = builder.build() {
-            window.paint_path(path, glow);
-        }
+        window.paint_quad(fill(bounds, glow));
     }
 
     /// (ascent/descent centering plus per-glyph vertical offset).
@@ -1001,21 +973,9 @@ impl TerminalElement {
         let cell_height = px(self.metrics.height);
         let padding_top = (cell_height - line.ascent - line.descent) / 2.0;
         let baseline_offset = point(px(0.0), padding_top + line.ascent);
-        let mut chars = run.text.char_indices();
-        let mut next_char = chars.next();
-        let mut cell_col = run.col;
-        let mut width_index = 0usize;
         for shaped_run in &line.runs {
             for glyph in &shaped_run.glyphs {
-                while let Some((byte, _)) = next_char {
-                    if byte >= glyph.index {
-                        break;
-                    }
-                    cell_col = cell_col
-                        .saturating_add(run.glyph_widths.get(width_index).copied().unwrap_or(1));
-                    width_index += 1;
-                    next_char = chars.next();
-                }
+                let cell_col = cell_col_for_glyph_byte(run, glyph.index);
                 let glyph_origin = point(
                     origin.x + px(f32::from(cell_col) * self.metrics.width),
                     origin.y + px(f32::from(row) * self.metrics.height),
@@ -1862,6 +1822,8 @@ mod tests {
         CursorShape, CursorState, DamageKind, FramePool, GridSize, RowDelta, Run, SelectionState,
         Style as TermStyle,
     };
+    use crate::cell_col_for_glyph_byte;
+
 
     const METRICS: CellMetrics = CellMetrics {
         width: 10.0,
@@ -1895,6 +1857,7 @@ mod tests {
                 len: 2,
                 style: 0,
             }],
+            combining: Vec::new(),
         }];
         frame.cursor = CursorState {
             row: 0,
@@ -1913,6 +1876,23 @@ mod tests {
         frame.styles = vec![TermStyle::default()];
         frame
     }
+
+    #[test]
+    fn combining_cluster_then_x_maps_second_glyph_to_next_column() {
+        let run = RunBatch {
+            col: 0,
+            len: 2,
+            style: 0,
+            flags: 0,
+            text: SharedString::from("e\u{0301}x"),
+            glyph_widths: vec![1, 1],
+            cluster_starts: vec![0, "e\u{0301}".len() as u32],
+        };
+        assert_eq!(cell_col_for_glyph_byte(&run, 0), 0);
+        assert_eq!(cell_col_for_glyph_byte(&run, 1), 0);
+        assert_eq!(cell_col_for_glyph_byte(&run, "e\u{0301}".len()), 1);
+    }
+
 
     #[test]
     fn constructor_owns_frame_and_defaults() {
@@ -2033,6 +2013,7 @@ mod tests {
                     len: text.chars().count() as u16,
                     style: 0,
                 }],
+                combining: Vec::new(),
             })
             .collect();
         frame.cursor = CursorState {
@@ -2378,9 +2359,9 @@ mod tests {
 
     #[test]
     fn trail_glow_translates_by_origin() {
-        let glow = RectPx::new(12.0, 8.0, 10.0, 20.0);
+        let leftover = RectPx::new(12.0, 8.0, 10.0, 20.0);
         let origin = point(px(5.0), px(7.0));
-        let bounds = trail_glow_bounds(glow, origin).expect("bounds");
+        let bounds = trail_glow_bounds(leftover, origin).expect("bounds");
         assert_eq!(bounds.origin.x, px(17.0));
         assert_eq!(bounds.origin.y, px(15.0));
         assert_eq!(bounds.size.width, px(10.0));
@@ -2397,34 +2378,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn trail_segment_quad_handles_horizontal_vertical_diagonal_and_zero_length() {
-        let origin = point(px(0.0), px(0.0));
-        let width = px(4.0);
-        for segment in [
-            mr_crabs_effects::LinePx {
-                from: mr_crabs_effects::PointPx::new(0.0, 0.0),
-                to: mr_crabs_effects::PointPx::new(10.0, 0.0),
-            },
-            mr_crabs_effects::LinePx {
-                from: mr_crabs_effects::PointPx::new(0.0, 0.0),
-                to: mr_crabs_effects::PointPx::new(0.0, 10.0),
-            },
-            mr_crabs_effects::LinePx {
-                from: mr_crabs_effects::PointPx::new(0.0, 0.0),
-                to: mr_crabs_effects::PointPx::new(10.0, 10.0),
-            },
-            mr_crabs_effects::LinePx {
-                from: mr_crabs_effects::PointPx::new(5.0, 5.0),
-                to: mr_crabs_effects::PointPx::new(5.0, 5.0),
-            },
-        ] {
-            for point in trail_segment_quad(segment, origin, width) {
-                assert!(f32::from(point.x).is_finite());
-                assert!(f32::from(point.y).is_finite());
-            }
-        }
-    }
 
     fn reveal_row(col: u16, len: u16, style: u16, flags: u16, widths: Vec<u16>) -> RowBatch {
         RowBatch {
@@ -2436,6 +2389,7 @@ mod tests {
                 flags,
                 text: SharedString::from("x"),
                 glyph_widths: widths,
+                cluster_starts: vec![0],
             }],
             backgrounds: vec![crate::RectBatch {
                 col,

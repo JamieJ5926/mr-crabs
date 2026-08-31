@@ -72,6 +72,7 @@ fn parse_row(v: &serde_json::Value) -> RowDelta {
             .map(parse_cell)
             .collect(),
         runs: Vec::new(),
+        combining: Vec::new(),
     }
 }
 
@@ -164,27 +165,35 @@ fn check_trail(actual: mr_crabs_effects::TrailFrame, expected: &serde_json::Valu
         expected["radius"].as_f64().unwrap(),
         &format!("step {step} trail.radius"),
     );
-    let glow = expected["glow"].as_array().expect("glow");
-    assert_close(
-        actual.glow_rect.x,
-        glow[0].as_f64().unwrap(),
-        &format!("step {step} trail.glow.x"),
-    );
-    assert_close(
-        actual.glow_rect.y,
-        glow[1].as_f64().unwrap(),
-        &format!("step {step} trail.glow.y"),
-    );
-    assert_close(
-        actual.glow_rect.w,
-        glow[2].as_f64().unwrap(),
-        &format!("step {step} trail.glow.w"),
-    );
-    assert_close(
-        actual.glow_rect.h,
-        glow[3].as_f64().unwrap(),
-        &format!("step {step} trail.glow.h"),
-    );
+    match (
+        actual.leftover_rect,
+        expected.get("leftover").or_else(|| expected.get("glow")),
+    ) {
+        (None, None | Some(serde_json::Value::Null)) => {}
+        (Some(rect), Some(serde_json::Value::Array(leftover))) => {
+            assert_close(
+                rect.x,
+                leftover[0].as_f64().unwrap(),
+                &format!("step {step} trail.leftover.x"),
+            );
+            assert_close(
+                rect.y,
+                leftover[1].as_f64().unwrap(),
+                &format!("step {step} trail.leftover.y"),
+            );
+            assert_close(
+                rect.w,
+                leftover[2].as_f64().unwrap(),
+                &format!("step {step} trail.leftover.w"),
+            );
+            assert_close(
+                rect.h,
+                leftover[3].as_f64().unwrap(),
+                &format!("step {step} trail.leftover.h"),
+            );
+        }
+        other => panic!("step {step} leftover mismatch: {other:?}"),
+    }
     match (&actual.segment, expected["segment"].as_array()) {
         (None, None) => {}
         (Some(seg), Some(exp)) => {
@@ -294,13 +303,6 @@ fn run_sequence_case(case: &serde_json::Value, id: &str) {
         check_trail(actual.trail, &exp["trail"], step_idx);
     }
 
-    if let Some(len) = case.get("expected_texture_len").and_then(|v| v.as_u64()) {
-        assert_eq!(
-            model.change_texture().len(),
-            len as usize,
-            "{id}: change texture length"
-        );
-    }
     if let Some(zero) = case
         .get("expected_retained_capacity")
         .and_then(|v| v.as_u64())

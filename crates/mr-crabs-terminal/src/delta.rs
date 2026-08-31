@@ -32,6 +32,9 @@ pub struct RowDelta {
     pub generation: u64,
     pub cells: Vec<Cell>,
     pub runs: Vec<Run>,
+    /// Extra scalars attached to cells in this row (column, extras).
+    /// Only cells with side-table combining entries appear here.
+    pub combining: Vec<(u16, Vec<u32>)>,
 }
 
 /// Terminal cursor shape (subset of the ANSI/vte shapes; `Beam` maps to
@@ -220,6 +223,7 @@ impl FrameDelta {
         for row in &mut self.rows {
             row.cells.clear();
             row.runs.clear();
+            row.combining.clear();
         }
         self.spare_rows.append(&mut self.rows);
         self.styles.clear();
@@ -235,7 +239,18 @@ impl FrameDelta {
             generation: 0,
             cells: Vec::new(),
             runs: Vec::new(),
+            combining: Vec::new(),
         })
+    }
+}
+
+impl RowDelta {
+    pub fn extras_at(&self, col: u16) -> &[u32] {
+        self.combining
+            .iter()
+            .find(|(c, _)| *c == col)
+            .map(|(_, extras)| extras.as_slice())
+            .unwrap_or(&[])
     }
 }
 /// Coalesce `cells` into same-style runs, refilling `out` without allocating
@@ -482,6 +497,7 @@ mod tests {
                         len: 8,
                         style: 0,
                     }],
+                    combining: Vec::new(),
                 },
                 RowDelta {
                     row: 1,
@@ -492,6 +508,7 @@ mod tests {
                         len: 8,
                         style: 0,
                     }],
+                    combining: Vec::new(),
                 },
             ],
             cursor: CursorState::default(),
@@ -595,6 +612,7 @@ mod tests {
                 generation: 42,
                 cells: Vec::with_capacity(64),
                 runs: Vec::with_capacity(16),
+                combining: Vec::new(),
             }],
         };
         let slot = frame.take_row();
@@ -621,5 +639,26 @@ mod tests {
 
         right.viewport = TerminalViewport::default();
         assert_eq!(left, right);
+    }
+
+    #[test]
+    fn extras_at_returns_attached_scalars() {
+        let row = RowDelta {
+            row: 0,
+            generation: 1,
+            cells: vec![Cell {
+                content: u32::from('e'),
+                style: 0,
+                flags: Cell::COMBINING,
+            }],
+            runs: vec![Run {
+                start_col: 0,
+                len: 1,
+                style: 0,
+            }],
+            combining: vec![(0, vec![0x0301])],
+        };
+        assert_eq!(row.extras_at(0), &[0x0301]);
+        assert!(row.extras_at(1).is_empty());
     }
 }

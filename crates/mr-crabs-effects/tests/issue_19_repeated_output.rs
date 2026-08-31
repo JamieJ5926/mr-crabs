@@ -15,6 +15,7 @@ fn row_at(row: u16, generation: u64, contents: &[u32]) -> RowDelta {
             })
             .collect(),
         runs: Vec::new(),
+        combining: Vec::new(),
     }
 }
 
@@ -40,6 +41,7 @@ fn wide_pair_row(generation: u64) -> RowDelta {
             Cell::default(),
         ],
         runs: Vec::new(),
+        combining: Vec::new(),
     }
 }
 

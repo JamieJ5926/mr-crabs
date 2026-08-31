@@ -18,6 +18,7 @@ pub const DEFAULT_GRID_COLS: u16 = 80;
 pub const DEFAULT_GRID_ROWS: u16 = 24;
 pub const DEFAULT_THEME: &str = "auto";
 pub const DEFAULT_BACKGROUND_OPACITY: f32 = 1.0;
+pub const DEFAULT_BACKGROUND_BLUR: u16 = 0;
 pub const DEFAULT_CURSOR_BLINK: bool = false;
 pub const DEFAULT_CURSOR_TRAIL: bool = true;
 pub const DEFAULT_CURSOR_TRAIL_OPACITY: f32 = 0.35;
@@ -159,6 +160,7 @@ pub enum SettingKey {
     LineHeightAdjustPercent,
     Theme,
     BackgroundOpacity,
+    BackgroundBlur,
     PaddingX,
     PaddingY,
     CursorBlink,
@@ -182,12 +184,13 @@ pub enum SettingKey {
 }
 
 impl SettingKey {
-    pub const ALL: [Self; 25] = [
+    pub const ALL: [Self; 26] = [
         Self::FontFamily,
         Self::FontSize,
         Self::LineHeightAdjustPercent,
         Self::Theme,
         Self::BackgroundOpacity,
+        Self::BackgroundBlur,
         Self::PaddingX,
         Self::PaddingY,
         Self::CursorBlink,
@@ -217,6 +220,7 @@ impl SettingKey {
             Self::LineHeightAdjustPercent => "adjust-cell-height",
             Self::Theme => "theme",
             Self::BackgroundOpacity => "background-opacity",
+            Self::BackgroundBlur => "background-blur",
             Self::PaddingX => "window-padding-x",
             Self::PaddingY => "window-padding-y",
             Self::CursorBlink => "cursor-style-blink",
@@ -248,6 +252,7 @@ impl SettingKey {
             }
             "theme" => Some(Self::Theme),
             "background-opacity" => Some(Self::BackgroundOpacity),
+            "background-blur" => Some(Self::BackgroundBlur),
             "window-padding-x" | "padding-x" => Some(Self::PaddingX),
             "window-padding-y" | "padding-y" => Some(Self::PaddingY),
             "cursor-style-blink" | "cursor-blink" => Some(Self::CursorBlink),
@@ -292,8 +297,13 @@ impl SettingKey {
             Self::LineHeightAdjustPercent => {
                 "Ghostty adjust-cell-height percentage applied after rounding."
             }
-            Self::Theme => "Theme name; \"auto\" follows the system appearance.",
+            Self::Theme => {
+                "Theme: auto, ink, paper, harbor, ember. dark aliases ink; light aliases paper. auto follows the system appearance."
+            }
             Self::BackgroundOpacity => "Window background opacity in 0.0..=1.0.",
+            Self::BackgroundBlur => {
+                "Window background blur intensity. 0 is off. Applied only when opacity is below 1."
+            }
             Self::PaddingX => "Horizontal window padding in logical pixels.",
             Self::PaddingY => "Vertical window padding in logical pixels.",
             Self::CursorBlink => "Whether the cursor blinks.",
@@ -328,6 +338,7 @@ pub struct ConfigOverlay {
     pub line_height_adjust_percent: Option<f32>,
     pub theme: Option<String>,
     pub background_opacity: Option<f32>,
+    pub background_blur: Option<u16>,
     pub padding_x: Option<f32>,
     pub padding_y: Option<f32>,
     pub cursor_blink: Option<bool>,
@@ -370,6 +381,9 @@ impl ConfigOverlay {
         }
         if over.background_opacity.is_some() {
             self.background_opacity = over.background_opacity;
+        }
+        if over.background_blur.is_some() {
+            self.background_blur = over.background_blur;
         }
         if over.padding_x.is_some() {
             self.padding_x = over.padding_x;
@@ -449,6 +463,9 @@ impl ConfigOverlay {
         if let Some(v) = self.background_opacity {
             dst.background_opacity = v;
         }
+        if let Some(v) = self.background_blur {
+            dst.background_blur = v;
+        }
         if let Some(v) = self.padding_x {
             dst.padding_x = v;
         }
@@ -525,6 +542,9 @@ impl ConfigOverlay {
             SettingKey::BackgroundOpacity => {
                 self.background_opacity = Some(parse_unit_f32(value, key.flag())?)
             }
+            SettingKey::BackgroundBlur => {
+                self.background_blur = Some(parse_background_blur(value)?)
+            }
             SettingKey::PaddingX => self.padding_x = Some(parse_f32(value, key.flag())?),
             SettingKey::PaddingY => self.padding_y = Some(parse_f32(value, key.flag())?),
             SettingKey::CursorBlink => self.cursor_blink = Some(parse_bool(value)?),
@@ -572,6 +592,7 @@ pub struct EffectiveConfig {
     pub line_height_adjust_percent: f32,
     pub theme: String,
     pub background_opacity: f32,
+    pub background_blur: u16,
     pub padding_x: f32,
     pub padding_y: f32,
     pub cursor_blink: bool,
@@ -616,6 +637,7 @@ impl EffectiveConfig {
             line_height_adjust_percent: DEFAULT_LINE_HEIGHT_ADJUST_PERCENT,
             theme: DEFAULT_THEME.to_string(),
             background_opacity: DEFAULT_BACKGROUND_OPACITY,
+            background_blur: DEFAULT_BACKGROUND_BLUR,
             padding_x: DEFAULT_PADDING_PX,
             padding_y: DEFAULT_PADDING_PX,
             cursor_blink: DEFAULT_CURSOR_BLINK,
@@ -660,6 +682,7 @@ impl EffectiveConfig {
             }
             SettingKey::Theme => self.theme.clone(),
             SettingKey::BackgroundOpacity => format!("{}", self.background_opacity),
+            SettingKey::BackgroundBlur => format!("{}", self.background_blur),
             SettingKey::PaddingX => format!("{}", self.padding_x),
             SettingKey::PaddingY => format!("{}", self.padding_y),
             SettingKey::CursorBlink => format!("{}", self.cursor_blink),
@@ -833,13 +856,28 @@ fn parse_unit_f32(value: &str, flag: &str) -> Result<f32, String> {
         .ok_or_else(|| format!("invalid {flag} value {value:?}, expected 0.0..=1.0"))
 }
 
-fn parse_theme(value: &str) -> Result<&str, String> {
+fn parse_theme(value: &str) -> Result<&'static str, String> {
     match value {
-        "auto" | "dark" | "light" => Ok(value),
+        "auto" => Ok("auto"),
+        "ink" | "dark" => Ok("ink"),
+        "paper" | "light" => Ok("paper"),
+        "harbor" => Ok("harbor"),
+        "ember" => Ok("ember"),
         _ => Err(format!(
-            "invalid theme value {value:?}, expected auto, dark, or light"
+            "invalid theme value {value:?}, expected auto, ink, paper, harbor, ember, dark, or light"
         )),
     }
+}
+
+fn parse_background_blur(value: &str) -> Result<u16, String> {
+    if value.starts_with('-') || value.contains('.') {
+        return Err(format!(
+            "invalid background-blur value {value:?}, expected a non-negative integer"
+        ));
+    }
+    value.parse::<u16>().map_err(|_| {
+        format!("invalid background-blur value {value:?}, expected a non-negative integer")
+    })
 }
 
 fn parse_u32(value: &str, flag: &str) -> Result<u32, String> {
@@ -958,11 +996,41 @@ mod tests {
         overlay
             .set(SettingKey::BackgroundOpacity, "0.75")
             .expect("opacity");
-        assert_eq!(overlay.theme.as_deref(), Some("light"));
+        assert_eq!(overlay.theme.as_deref(), Some("paper"));
         assert_eq!(overlay.background_opacity, Some(0.75));
         assert!(overlay.set(SettingKey::Theme, "unknown").is_err());
         assert!(overlay.set(SettingKey::BackgroundOpacity, "1.1").is_err());
         assert!(overlay.set(SettingKey::BackgroundOpacity, "NaN").is_err());
+    }
+
+    #[test]
+    fn parse_theme_accepts_named_themes_and_aliases() {
+        let mut overlay = ConfigOverlay::default();
+        for (input, canonical) in [
+            ("auto", "auto"),
+            ("ink", "ink"),
+            ("paper", "paper"),
+            ("harbor", "harbor"),
+            ("ember", "ember"),
+            ("dark", "ink"),
+            ("light", "paper"),
+        ] {
+            overlay.set(SettingKey::Theme, input).expect(input);
+            assert_eq!(overlay.theme.as_deref(), Some(canonical));
+        }
+        assert!(overlay.set(SettingKey::Theme, "dracula").is_err());
+    }
+
+    #[test]
+    fn background_blur_rejects_negatives_and_non_integers() {
+        let mut overlay = ConfigOverlay::default();
+        overlay
+            .set(SettingKey::BackgroundBlur, "20")
+            .expect("blur");
+        assert_eq!(overlay.background_blur, Some(20));
+        assert!(overlay.set(SettingKey::BackgroundBlur, "-1").is_err());
+        assert!(overlay.set(SettingKey::BackgroundBlur, "1.5").is_err());
+        assert!(overlay.set(SettingKey::BackgroundBlur, "blur").is_err());
     }
 
     #[test]

@@ -6,7 +6,7 @@
 //! rows in the middle — clipped to the grid.
 
 use gpui::{Bounds, Pixels, point, px, size};
-use mr_crabs_terminal::{GridSize, SelectionState};
+use mr_crabs_terminal::{FrameRange, GridSize, SelectionKind, SelectionState};
 
 use crate::CellMetrics;
 
@@ -83,12 +83,30 @@ pub fn selection_rects(
     rects
 }
 
+/// Per-row highlight rectangles for a half-open [`FrameRange`], using the
+/// same row-major clipping as [`selection_rects`].
+pub fn search_match_rects(
+    range: FrameRange,
+    grid: GridSize,
+    metrics: CellMetrics,
+) -> Vec<Bounds<Pixels>> {
+    selection_rects(
+        &SelectionState {
+            start: Some((range.start.row, range.start.col)),
+            end: Some((range.end.row, range.end.col)),
+            active: true,
+            kind: SelectionKind::Linear,
+        },
+        grid,
+        metrics,
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use gpui::px;
-    use mr_crabs_terminal::SelectionState;
-
+    use mr_crabs_terminal::{FramePoint, FrameRange, SelectionState};
     const SIZE: GridSize = GridSize::new(10, 5);
     const METRICS: CellMetrics = CellMetrics {
         width: 10.0,
@@ -252,5 +270,44 @@ mod tests {
                 rect(4, 0, 10),
             ]
         );
+    }
+
+    fn range(start: (u16, u16), end: (u16, u16)) -> FrameRange {
+        FrameRange {
+            start: FramePoint {
+                row: start.0,
+                col: start.1,
+            },
+            end: FramePoint {
+                row: end.0,
+                col: end.1,
+            },
+        }
+    }
+
+    #[test]
+    fn search_match_single_row() {
+        assert_eq!(
+            search_match_rects(range((2, 3), (2, 7)), SIZE, METRICS),
+            vec![rect(2, 3, 4)]
+        );
+    }
+
+    #[test]
+    fn search_match_multi_row() {
+        assert_eq!(
+            search_match_rects(range((1, 8), (3, 4)), SIZE, METRICS),
+            vec![rect(1, 8, 2), rect(2, 0, 10), rect(3, 0, 4)]
+        );
+    }
+
+    #[test]
+    fn search_match_clips_and_empty() {
+        assert_eq!(
+            search_match_rects(range((0, 8), (0, 20)), SIZE, METRICS),
+            vec![rect(0, 8, 2)]
+        );
+        assert!(search_match_rects(range((1, 1), (1, 1)), SIZE, METRICS).is_empty());
+        assert!(search_match_rects(range((5, 0), (6, 0)), SIZE, METRICS).is_empty());
     }
 }

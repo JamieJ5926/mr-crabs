@@ -151,6 +151,7 @@ mod tests {
                 len: 8,
                 style: 0,
             }],
+            combining: Vec::new(),
         });
         frame.styles.push(Style::default());
         frame.viewport = crate::TerminalViewport {

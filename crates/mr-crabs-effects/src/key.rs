@@ -27,23 +27,23 @@ use mr_crabs_terminal::{Cell, RowDelta};
 pub const NEVER_MS: f64 = -1_000_000.0;
 
 /// Pack a change time in milliseconds into the IEEE-754 `f32` bit pattern
-/// of shader-time seconds, matching the oracle's change-texture texel
-/// format (each texel holds the bit pattern of the shader time at which the
-/// cell's content last changed).
+/// of seconds. The stored `u32` is `f32::to_bits(ms / 1000)` so later
+/// readers can recover seconds without a second conversion.
 pub const fn pack_time_ms(ms: f64) -> u32 {
     f32::to_bits((ms / 1000.0) as f32)
 }
 
-/// Unpack a change-texture texel bit pattern back into milliseconds.
+/// Unpack a packed change-time bit pattern back into milliseconds.
 ///
-/// Test-only round-trip helper: the packed texels are consumed by the GPU
-/// path, so this is never used outside `#[cfg(test)]` verification.
+/// Test-only round-trip helper: production code keeps the packed bits and
+/// the parallel `change_ms` values, so this is never used outside
+/// `#[cfg(test)]` verification.
 #[cfg(test)]
 pub const fn unpack_time_bits(bits: u32) -> f64 {
     f32::from_bits(bits) as f64 * 1000.0
 }
 
-/// The bit pattern of the never-changed sentinel texel.
+/// The bit pattern of the never-changed sentinel (`NEVER_MS` as packed seconds).
 pub const NEVER_BITS: u32 = pack_time_ms(NEVER_MS);
 
 /// A stable render key for a terminal cell: the raw 8-byte cell pattern
@@ -72,8 +72,6 @@ fn cell_paints_glyph(cell: Cell) -> bool {
 ///   `u64::MAX` = never seen),
 /// * `change_times` — packed change timestamps (sentinel
 ///   [`NEVER_BITS`] = never changed),
-/// * `packed` — the same timestamps repacked as rgba8 texel bytes for GPU
-///   upload (little-endian bit pattern, oracle `textAnimationUpload`),
 /// * `row_generations` — the last-seen row generation for both the fast path
 ///   (an unchanged generation is skipped) and repeated-write detection (a
 ///   new generation with identical final keys re-times drawable glyphs).
@@ -100,21 +98,17 @@ pub struct ChangeTracker {
     change_times: Vec<u32>,
     /// Exact change timestamps in milliseconds, parallel to
     /// `change_times`. The model's deterministic clock runs at f64
-    /// millisecond precision; the packed `u32`/rgba8 texels carry the
-    /// oracle's IEEE-754 `f32` shader-seconds approximation (≤ 1.5e-5 ms
-    /// error, far below any reveal window) for GPU upload.
+    /// millisecond precision.
     change_ms: Vec<f64>,
-    packed: Vec<u8>,
     row_generations: Vec<u64>,
     last_change_ms: f64,
-    upload_dirty: bool,
 }
 
 impl ChangeTracker {
     /// Create a tracker for a grid, capped at `max_cells` tracked cells.
     pub fn new(cols: usize, rows: usize, max_cells: usize) -> Self {
         let cap = Self::cap_for(cols, rows, max_cells);
-        let mut tracker = Self {
+        Self {
             cols,
             rows,
             cap,
@@ -122,13 +116,9 @@ impl ChangeTracker {
             snapshot: vec![u64::MAX; cap],
             change_times: vec![NEVER_BITS; cap],
             change_ms: vec![NEVER_MS; cap],
-            packed: vec![0; cap * 4],
             row_generations: vec![u64::MAX; rows],
             last_change_ms: NEVER_MS,
-            upload_dirty: true,
-        };
-        tracker.repack();
-        tracker
+        }
     }
 
     /// The tracked-cell bound for a grid: `min(cols * rows, max_cells)`,
@@ -158,7 +148,6 @@ impl ChangeTracker {
             let mut snapshot = vec![u64::MAX; new_cap];
             let mut change_times = vec![NEVER_BITS; new_cap];
             let mut change_ms = vec![NEVER_MS; new_cap];
-            let packed = vec![0u8; new_cap * 4];
             snapshot[..preserve].copy_from_slice(&self.snapshot[..preserve]);
             change_times[..preserve].copy_from_slice(&self.change_times[..preserve]);
             change_ms[..preserve].copy_from_slice(&self.change_ms[..preserve]);
@@ -173,12 +162,9 @@ impl ChangeTracker {
             self.snapshot = snapshot;
             self.change_times = change_times;
             self.change_ms = change_ms;
-            self.packed = packed;
             self.cap = new_cap;
         }
         self.row_generations.resize(rows, u64::MAX);
-        self.upload_dirty = true;
-        self.repack();
     }
 
     /// Diff one rebuilt row against the previous snapshot and timestamp
@@ -338,8 +324,6 @@ impl ChangeTracker {
 
         if timestamp_changed {
             self.last_change_ms = self.change_ms.iter().copied().fold(NEVER_MS, f64::max);
-            self.upload_dirty = true;
-            self.repack();
         }
     }
 
@@ -404,8 +388,6 @@ impl ChangeTracker {
             .copied()
             .filter(|value| *value != NEVER_MS)
             .fold(NEVER_MS, f64::max);
-        self.upload_dirty = true;
-        self.repack();
     }
 
     /// Synchronize bypassed rows without assigning fresh reveal stamps.
@@ -450,8 +432,6 @@ impl ChangeTracker {
                 .copied()
                 .filter(|value| *value != NEVER_MS)
                 .fold(NEVER_MS, f64::max);
-            self.upload_dirty = true;
-            self.repack();
         }
     }
 
@@ -462,8 +442,6 @@ impl ChangeTracker {
         self.change_times.fill(NEVER_BITS);
         self.change_ms.fill(NEVER_MS);
         self.last_change_ms = NEVER_MS;
-        self.upload_dirty = true;
-        self.repack();
     }
 
     pub fn adopt_rows(&mut self, rows: &[RowDelta]) {
@@ -486,36 +464,8 @@ impl ChangeTracker {
             }
         }
         self.last_change_ms = NEVER_MS;
-        self.upload_dirty = true;
-        self.repack();
     }
 
-    /// Repack every change time into the rgba8 texel byte layout.
-    fn repack(&mut self) {
-        for (i, &bits) in self.change_times.iter().enumerate() {
-            let b = i * 4;
-            self.packed[b] = bits as u8;
-            self.packed[b + 1] = (bits >> 8) as u8;
-            self.packed[b + 2] = (bits >> 16) as u8;
-            self.packed[b + 3] = (bits >> 24) as u8;
-        }
-    }
-
-    /// The packed change texture (one rgba8 texel per tracked cell,
-    /// little-endian IEEE-754 bit pattern of shader-time seconds).
-    pub fn change_texture(&self) -> &[u8] {
-        &self.packed
-    }
-
-    /// True when the change texture needs re-uploading.
-    pub const fn upload_dirty(&self) -> bool {
-        self.upload_dirty
-    }
-
-    /// Acknowledge a texture upload.
-    pub fn clear_upload_dirty(&mut self) {
-        self.upload_dirty = false;
-    }
 
     /// The most recent change timestamp handed out, or [`NEVER_MS`] when
     /// no cell has changed yet.
@@ -550,13 +500,12 @@ impl ChangeTracker {
     }
 
     /// Retained heap bytes (snapshot keys, packed times, exact
-    /// millisecond times, texel bytes, and row generations). All arrays
-    /// are exactly `cap`/`rows` sized.
+    /// millisecond times, and row generations). All arrays are exactly
+    /// `cap`/`rows` sized.
     pub fn retained_capacity(&self) -> usize {
         self.snapshot.capacity() * 8
             + self.change_times.capacity() * 4
             + self.change_ms.capacity() * 8
-            + self.packed.capacity()
             + self.row_generations.capacity() * 8
     }
 }
@@ -605,7 +554,6 @@ mod tests {
         assert_eq!(t.change_ms_at(1), 1000.0);
         assert_eq!(t.change_ms_at(2), 1000.0);
         assert_eq!(t.change_ms_at(3), 1000.0);
-        assert!(t.upload_dirty());
 
         // Same generation: no diff, no restamp.
         t.update_row(0, 1, &row, 2000.0, &mut sched);
@@ -891,23 +839,29 @@ mod tests {
     }
 
     #[test]
-    fn texture_packing_matches_shader_byte_order() {
+    fn stamp_and_adopt_keep_change_times_without_texture() {
         let mut t = ChangeTracker::new(1, 1, 16);
         let mut sched = TypewriterSchedule::new(0.0);
         t.update_row(0, 1, &[cell(65, 0, 0)], 1000.0, &mut sched);
-        // 1000 ms -> 1.0 s -> 0x3F800000, little-endian bytes.
-        assert_eq!(t.change_texture(), &[0x00, 0x00, 0x80, 0x3F]);
-        // Never-changed texel: -1000.0 s -> 0xC47A0000.
-        let t2 = ChangeTracker::new(1, 1, 16);
-        assert_eq!(t2.change_texture(), &[0x00, 0x00, 0x7A, 0xC4]);
-        assert_eq!(t2.bits_at(0), NEVER_BITS);
+        assert_eq!(t.change_ms_at(0), 1000.0);
+        assert_eq!(t.bits_at(0), pack_time_ms(1000.0));
+        t.clear_changes();
+        assert_eq!(t.change_ms_at(0), NEVER_MS);
+        t.adopt_rows(&[RowDelta {
+            row: 0,
+            generation: 2,
+            cells: vec![cell(66, 0, 0)],
+            runs: Vec::new(),
+            combining: Vec::new(),
+        }]);
+        assert_eq!(t.change_ms_at(0), NEVER_MS);
+        assert_eq!(t.last_change_ms(), NEVER_MS);
     }
-
     #[test]
     fn retained_capacity_is_exact() {
         let t = ChangeTracker::new(4, 2, 16);
         // 8 snapshot keys * 8B + 8 packed times * 4B + 8 exact ms * 8B
-        // + 32 texel bytes + 2 row generations * 8B.
-        assert_eq!(t.retained_capacity(), 8 * 8 + 8 * 4 + 8 * 8 + 32 + 2 * 8);
+        // + 2 row generations * 8B.
+        assert_eq!(t.retained_capacity(), 8 * 8 + 8 * 4 + 8 * 8 + 2 * 8);
     }
 }
