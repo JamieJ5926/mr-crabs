@@ -7,7 +7,7 @@
 //! other actions refresh/sync, and quit follows model policy only.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use gpui::{
     App, AppContext as _, Context, Entity, SharedString, Subscription, Task, TitlebarOptions,
@@ -15,7 +15,7 @@ use gpui::{
 };
 
 use crate::action::AppAction;
-use crate::model::app_model::AppModel;
+use crate::model::app_model::{AppModel, minimum_fetch_deadline};
 use crate::model::window::WindowId;
 
 use super::workspace::{WINDOW_TITLE_PREFIX, WindowView};
@@ -56,7 +56,6 @@ struct FetchSchedule {
     task: Option<Task<()>>,
     generation: u64,
     deadline_ms: Option<u64>,
-    clock: Instant,
 }
 
 impl FetchSchedule {
@@ -65,17 +64,52 @@ impl FetchSchedule {
             task: None,
             generation: 0,
             deadline_ms: None,
-            clock: Instant::now(),
         }
     }
 
     fn now_ms(&self) -> u64 {
-        u64::try_from(self.clock.elapsed().as_millis()).unwrap_or(u64::MAX)
+        crate::model::app_model::monotonic_ms()
     }
 }
 
 fn fetch_timer_delay(now_ms: u64, deadline_ms: u64) -> Duration {
     Duration::from_millis(deadline_ms.saturating_sub(now_ms))
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ScheduleArm {
+    Unchanged,
+    Cancel,
+    Replace { deadline_ms: u64, generation: u64 },
+}
+
+fn plan_fetch_schedule(
+    stored_deadline: Option<u64>,
+    stored_generation: u64,
+    has_task: bool,
+    next_deadline: Option<u64>,
+) -> ScheduleArm {
+    match next_deadline {
+        None => {
+            if stored_deadline.is_none() && !has_task {
+                ScheduleArm::Unchanged
+            } else {
+                ScheduleArm::Cancel
+            }
+        }
+        Some(deadline) => {
+            if stored_deadline == Some(deadline) && has_task {
+                ScheduleArm::Unchanged
+            } else if stored_deadline.is_some_and(|stored| stored <= deadline) && has_task {
+                ScheduleArm::Unchanged
+            } else {
+                ScheduleArm::Replace {
+                    deadline_ms: deadline,
+                    generation: stored_generation.wrapping_add(1),
+                }
+            }
+        }
+    }
 }
 
 /// Shared shell owning the model and exact native window map.
@@ -170,40 +204,56 @@ impl AppShell {
     }
 
     fn arm_fetch_schedule(&mut self, cx: &mut Context<Self>) {
-        let deadline_ms = self.model.read(cx).next_fetch_deadline_ms();
-        if self.fetch_schedule.deadline_ms == deadline_ms
-            && (deadline_ms.is_none() || self.fetch_schedule.task.is_some())
-        {
-            return;
-        }
-
-        self.fetch_schedule.generation = self.fetch_schedule.generation.wrapping_add(1);
-        self.fetch_schedule.task = None;
-        self.fetch_schedule.deadline_ms = deadline_ms;
-        let Some(deadline_ms) = deadline_ms else {
-            return;
+        let now_ms = self.fetch_schedule.now_ms();
+        let next_deadline = {
+            let model = self.model.read(cx);
+            minimum_fetch_deadline([
+                model.next_fetch_deadline_ms(),
+                model.next_molt_deadline_ms(now_ms),
+            ])
         };
-
-        let generation = self.fetch_schedule.generation;
-        let delay = fetch_timer_delay(self.fetch_schedule.now_ms(), deadline_ms);
-        self.fetch_schedule.task = Some(cx.spawn(async move |weak, cx| {
-            cx.background_executor().timer(delay).await;
-            let _ = weak.update(cx, |this, cx| {
-                if this.fetch_schedule.generation != generation {
-                    return;
-                }
-                this.fetch_schedule.task = None;
-                this.fetch_schedule.deadline_ms = None;
-                let now_ms = this.fetch_schedule.now_ms();
-                let changed = this
-                    .model
-                    .update(cx, |model, _| model.tick_fetch_animations(now_ms));
-                if changed {
-                    this.refresh_windows(cx);
-                }
-                this.arm_fetch_schedule(cx);
-            });
-        }));
+        match plan_fetch_schedule(
+            self.fetch_schedule.deadline_ms,
+            self.fetch_schedule.generation,
+            self.fetch_schedule.task.is_some(),
+            next_deadline,
+        ) {
+            ScheduleArm::Unchanged => {}
+            ScheduleArm::Cancel => {
+                self.fetch_schedule.generation = self.fetch_schedule.generation.wrapping_add(1);
+                self.fetch_schedule.task = None;
+                self.fetch_schedule.deadline_ms = None;
+            }
+            ScheduleArm::Replace {
+                deadline_ms,
+                generation,
+            } => {
+                self.fetch_schedule.generation = generation;
+                self.fetch_schedule.deadline_ms = Some(deadline_ms);
+                let delay = fetch_timer_delay(self.fetch_schedule.now_ms(), deadline_ms);
+                self.fetch_schedule.task = Some(cx.spawn(async move |weak, cx| {
+                    cx.background_executor().timer(delay).await;
+                    let _ = weak.update(cx, |this, cx| {
+                        if this.fetch_schedule.generation != generation {
+                            return;
+                        }
+                        this.fetch_schedule.task = None;
+                        this.fetch_schedule.deadline_ms = None;
+                        let now_ms = this.fetch_schedule.now_ms();
+                        let changed = this
+                            .model
+                            .update(cx, |model, _| model.tick_fetch_animations(now_ms))
+                            || this
+                                .model
+                                .update(cx, |model, _| model.tick_molt_animations(now_ms));
+                        if changed {
+                            this.refresh_windows(cx);
+                        }
+                        this.arm_fetch_schedule(cx);
+                    });
+                }));
+            }
+        }
     }
 
     fn open_native_window(
@@ -319,6 +369,35 @@ mod tests {
         assert_eq!(plan.to_close, vec![c]);
     }
 
+    #[test]
+    fn fetch_schedule_records_deadline_and_does_not_postpone() {
+        assert_eq!(
+            plan_fetch_schedule(None, 0, false, Some(50)),
+            ScheduleArm::Replace {
+                deadline_ms: 50,
+                generation: 1
+            }
+        );
+        assert_eq!(
+            plan_fetch_schedule(Some(50), 1, true, Some(50)),
+            ScheduleArm::Unchanged
+        );
+        assert_eq!(
+            plan_fetch_schedule(Some(50), 1, true, Some(80)),
+            ScheduleArm::Unchanged
+        );
+        assert_eq!(
+            plan_fetch_schedule(Some(80), 1, true, Some(50)),
+            ScheduleArm::Replace {
+                deadline_ms: 50,
+                generation: 2
+            }
+        );
+        assert_eq!(
+            plan_fetch_schedule(Some(50), 1, true, None),
+            ScheduleArm::Cancel
+        );
+    }
     #[test]
     fn window_sync_plan_empty_sets() {
         let plan = window_sync_plan(vec![], vec![]);

@@ -45,7 +45,8 @@ pub use model::{EffectsFrame, EffectsModel};
 pub use reveal::{CellPos, CellReveal, RevealMath, RevealPhase};
 pub use schedule::TypewriterSchedule;
 pub use trail::{
-    CursorTrail, GradientCache, GradientId, LinePx, PointPx, RectPx, TrailConfig, TrailFrame,
+    CursorTrail, GradientCache, GradientId, LinePx, MAX_GRADIENTS, PointPx, RectPx, TrailConfig,
+    TrailFrame,
 };
 
 pub use mr_crabs_config::TextAnimation;

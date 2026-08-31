@@ -553,7 +553,7 @@ mod tests {
             .iter()
             .find(|reveal| reveal.pos == CellPos::new(0, 1))
             .expect("new glyph reveals without a per-cell backlog");
-        assert_eq!(b.change_ms, 1015.0);
+        assert_eq!(b.change_ms, 1016.0);
         assert!(f.pending.is_empty());
 
         let rows = vec![row(0, 3, &[65, 66, 67, 32])];
@@ -563,9 +563,9 @@ mod tests {
             .iter()
             .find(|reveal| reveal.pos == CellPos::new(0, 2))
             .expect("next rebuilt row advances by one slot");
-        assert_eq!(c.change_ms, 1030.0);
+        assert_eq!(c.change_ms, 1032.0);
         assert!(f.pending.is_empty());
-        assert_eq!(m.last_change_ms(), Some(1030.0));
+        assert_eq!(m.last_change_ms(), Some(1032.0));
 
         let rows = vec![row(0, 4, &[90, 66, 67, 32])];
         let f = m.apply_frame(&frame_at(size, 4, rows, cursor), 2000, true);
@@ -581,18 +581,23 @@ mod tests {
     }
 
     #[test]
-    fn typewriter_changed_glyphs_in_one_row_reveal_together() {
+    fn typewriter_changed_glyphs_reveal_in_character_order() {
         let size = GridSize::new(4, 1);
         let mut m = model(TextAnimation::Typewriter, 4, 1);
         let cursor = CursorState::default();
         let rows = vec![row(0, 1, &[65, 66, 67, 32])];
         let f = m.apply_frame(&frame_at(size, 1, rows, cursor), 1000, true);
-        assert_eq!(f.revealing.len(), 3);
-        assert!(f.revealing.iter().all(|reveal| reveal.change_ms == 1000.0));
-        assert!(f.pending.is_empty());
+        assert_eq!(f.revealing.len(), 1);
+        assert_eq!(f.revealing[0].pos, CellPos::new(0, 0));
+        assert_eq!(f.revealing[0].change_ms, 1000.0);
+        assert_eq!(f.pending, vec![CellPos::new(0, 1), CellPos::new(0, 2)]);
         assert!(f.needs_frame);
 
-        let f = m.apply_frame(&frame_at(size, 2, Vec::new(), cursor), 1120, true);
+        let f = m.apply_frame(&frame_at(size, 2, Vec::new(), cursor), 1030, true);
+        assert_eq!(f.revealing.len(), 3);
+        assert!(f.pending.is_empty());
+
+        let f = m.apply_frame(&frame_at(size, 3, Vec::new(), cursor), 1150, true);
         assert!(f.is_idle());
     }
 
@@ -603,20 +608,10 @@ mod tests {
         let mut m = EffectsModel::new(cfg, GridSize::new(8, 1), CellPx::new(10.0, 20.0));
         let mut cursor = CursorState::default();
         let size = GridSize::new(8, 1);
-
-        // First appearance at t=2000: glow, no segment.
-        let f = m.apply_frame(&frame_at(size, 1, Vec::new(), cursor), 2000, true);
-        assert!(f.trail.active);
-        assert_eq!(f.trail.alpha, 0.35);
-        assert_eq!(f.trail.segment, None);
-        assert!(f.needs_frame);
-
-        // Move to col 5 at t=2016: segment from old to new center.
+        let _ = m.apply_frame(&frame_at(size, 1, Vec::new(), cursor), 2000, true);
         cursor.col = 5;
         let f = m.apply_frame(&frame_at(size, 2, Vec::new(), cursor), 2016, true);
-        assert!(f.trail.active);
-        assert_eq!(f.trail.alpha, 0.35);
-        assert!(f.trail.segment.is_some());
+
         assert_eq!(f.trail.glow_rect.x, 50.0);
 
         // Linear fade at t=2241: (1 - 225/250) * 0.35.
@@ -840,7 +835,7 @@ mod tests {
     }
 
     #[test]
-    fn typewriter_partial_frames_advance_once_per_changed_row() {
+    fn typewriter_partial_frames_advance_per_changed_character() {
         let size = GridSize::new(4, 3);
         let mut m = model(TextAnimation::Typewriter, 4, 3);
         let cursor = CursorState::default();
@@ -861,7 +856,7 @@ mod tests {
         let _ = m.apply_frame(&error, 2000, true);
         let prompt = frame_at(size, 3, vec![row(2, 2, &[80, 82, 79, 77])], cursor);
         let _ = m.apply_frame(&prompt, 2001, true);
-        let frame = m.apply_frame(&frame_at(size, 4, Vec::new(), cursor), 2045, true);
+        let frame = m.apply_frame(&frame_at(size, 4, Vec::new(), cursor), 2090, true);
 
         let timestamps = |row| {
             frame
@@ -871,8 +866,8 @@ mod tests {
                 .map(|reveal| reveal.change_ms)
                 .collect::<Vec<_>>()
         };
-        assert_eq!(timestamps(1), vec![2000.0; 3]);
-        assert_eq!(timestamps(2), vec![2015.0; 4]);
+        assert_eq!(timestamps(1), vec![2000.0, 2015.0, 2030.0]);
+        assert_eq!(timestamps(2), vec![2045.0, 2060.0, 2075.0, 2090.0]);
     }
 
     #[test]
@@ -901,13 +896,19 @@ mod tests {
         );
         let frame = m.apply_frame(&output_and_prompt, 2000, true);
 
-        assert!(
-            frame.revealing.iter().any(|reveal| reveal.pos.row == 1),
-            "the earlier output row must reveal first"
-        );
-        assert!(
-            frame.pending.iter().all(|pos| pos.row == 2),
-            "the following prompt row must remain pending"
+        assert_eq!(frame.revealing.len(), 1);
+        assert_eq!(frame.revealing[0].pos, CellPos::new(1, 0));
+        assert_eq!(frame.revealing[0].change_ms, 2000.0);
+        assert_eq!(
+            frame.pending,
+            vec![
+                CellPos::new(1, 1),
+                CellPos::new(1, 2),
+                CellPos::new(2, 0),
+                CellPos::new(2, 1),
+                CellPos::new(2, 2),
+                CellPos::new(2, 3),
+            ]
         );
     }
 

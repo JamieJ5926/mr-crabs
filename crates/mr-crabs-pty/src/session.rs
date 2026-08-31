@@ -732,7 +732,8 @@ fn wait_until_ready(fd: &OwnedFd, events: libc::c_short) -> bool {
         if result >= 0 {
             return true;
         }
-        if io::Error::last_os_error().kind() != io::ErrorKind::Interrupted {
+        let os_err = io::Error::last_os_error();
+        if os_err.kind() != io::ErrorKind::Interrupted {
             return false;
         }
     }

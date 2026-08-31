@@ -1005,6 +1005,21 @@ impl PaneModel {
             .and_then(|pending| pending.config.startup_command.as_deref())
     }
 
+    /// Clear the retained rustfetch overlay and home the cursor so the
+    /// next shell prompt is not drawn over leftover fetch cells.
+    /// The submitted Enter is still forwarded to the PTY.
+    pub fn dismiss_startup_fetch(&mut self) {
+        self.fetch_driver = None;
+        self.fetch_gif_path = None;
+        if self
+            .core
+            .feed_terminal_output(b"\x1b[H\x1b[2J\x1b[3J")
+            .is_ok()
+        {
+            self.rebuild_frame();
+        }
+    }
+
     /// Feed bytes directly to the engine (tests and the detached path).
     /// Graphics protocol commands are not intercepted on this path; use
     /// [`PaneModel::pump`] over a receiver session to exercise the scanned
@@ -1593,14 +1608,8 @@ impl PaneModel {
             if drain_graphics_responses(&mut self.pending_graphics_responses, &mut self.session) {
                 stats.pending = true;
             }
-            let replies = self.protocol_sink.drain_pty_replies();
-            for (index, reply) in replies.iter().enumerate() {
-                if self.session.write(reply).is_err() {
-                    self.protocol_sink
-                        .requeue_pty_replies(replies[index..].to_vec());
-                    stats.pending = true;
-                    break;
-                }
+            if self.flush_pty_replies() {
+                stats.pending = true;
             }
             self.sync_title_from_terminal();
             self.viewport
@@ -1619,14 +1628,8 @@ impl PaneModel {
         if drain_graphics_responses(&mut self.pending_graphics_responses, &mut self.session) {
             stats.pending = true;
         }
-        let replies = self.protocol_sink.drain_pty_replies();
-        for (index, reply) in replies.iter().enumerate() {
-            if self.session.write(reply).is_err() {
-                self.protocol_sink
-                    .requeue_pty_replies(replies[index..].to_vec());
-                stats.pending = true;
-                break;
-            }
+        if self.flush_pty_replies() {
+            stats.pending = true;
         }
         self.sync_title_from_terminal();
         self.viewport
@@ -1889,6 +1892,18 @@ impl PaneModel {
     /// The pane-owned protocol sink (shared with the terminal engine).
     pub fn protocol_sink(&self) -> &PaneProtocolSink {
         &self.protocol_sink
+    }
+
+    pub(crate) fn flush_pty_replies(&mut self) -> bool {
+        let replies = self.protocol_sink.drain_pty_replies();
+        for (index, reply) in replies.iter().enumerate() {
+            if self.session.write(reply).is_err() {
+                self.protocol_sink
+                    .requeue_pty_replies(replies[index..].to_vec());
+                return true;
+            }
+        }
+        false
     }
 
     fn sync_title_from_terminal(&mut self) {

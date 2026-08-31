@@ -39,6 +39,9 @@
 pub mod accessibility;
 pub mod action;
 pub mod animated_fetch;
+pub mod animation_config;
+pub mod animation_control;
+pub mod animation_tui;
 pub mod crash;
 pub mod diagnostics;
 pub mod dock;

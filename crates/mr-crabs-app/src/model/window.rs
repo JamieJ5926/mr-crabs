@@ -3,6 +3,7 @@
 use std::collections::BTreeMap;
 use std::time::Duration;
 
+use mr_crabs_config::{AnimationDefaults, StartupAnimation, TextAnimation};
 use mr_crabs_terminal::GridSize;
 
 use mr_crabs_pty::OutputWake;
@@ -11,6 +12,101 @@ use super::geometry::SurfaceGeometry;
 use super::pane::PaneId;
 use super::split::SplitDirection;
 use super::tab::{TabId, TabModel};
+
+/// Window-local animation keys. Unset keys inherit global settings.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct AnimationOverlay {
+    pub text_animation: Option<TextAnimation>,
+    pub cursor_trail: Option<bool>,
+}
+
+impl AnimationOverlay {
+    pub fn apply_preset(&mut self, preset: &crate::settings::AnimationPreset) {
+        if let Some(text_animation) = preset.text_animation {
+            self.text_animation = Some(TextAnimation::parse(text_animation));
+        }
+        if let Some(cursor_trail) = preset.cursor_trail {
+            self.cursor_trail = Some(cursor_trail);
+        }
+    }
+
+    pub fn merge(self, mut base: AnimationDefaults) -> AnimationDefaults {
+        if let Some(text_animation) = self.text_animation {
+            base.text_animation = text_animation;
+        }
+        if let Some(cursor_trail) = self.cursor_trail {
+            base.cursor_trail = cursor_trail;
+        }
+        base
+    }
+}
+
+pub const MOLT_DURATION_MS: u64 = 600;
+/// Target cadence for molt fade frames (~60 Hz).
+pub const MOLT_FRAME_INTERVAL_MS: u64 = 16;
+
+/// Window-local startup presentation. Enter always forwards; dismiss is
+/// a side-effect of a submitted Enter.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum StartupPresentation {
+    #[default]
+    None,
+    RustfetchRetained,
+    RustfetchDismissed,
+    MoltActive {
+        started_ms: u64,
+    },
+    MoltDismissed,
+    MoltComplete,
+}
+
+impl StartupPresentation {
+    pub fn from_config(kind: StartupAnimation, now_ms: u64) -> Self {
+        match kind {
+            StartupAnimation::None => Self::None,
+            StartupAnimation::Rustfetch => Self::RustfetchRetained,
+            StartupAnimation::Molt => Self::MoltActive { started_ms: now_ms },
+        }
+    }
+
+    pub fn suppressed() -> Self {
+        Self::None
+    }
+
+    pub fn dismiss_on_enter(&mut self) {
+        match *self {
+            Self::RustfetchRetained => *self = Self::RustfetchDismissed,
+            Self::MoltActive { .. } => *self = Self::MoltDismissed,
+            _ => {}
+        }
+    }
+
+    pub fn molt_alpha(&self, now_ms: u64) -> Option<f32> {
+        match *self {
+            Self::MoltActive { started_ms } => {
+                let elapsed = now_ms.saturating_sub(started_ms);
+                if elapsed >= MOLT_DURATION_MS {
+                    Some(0.0)
+                } else {
+                    Some(1.0 - elapsed as f32 / MOLT_DURATION_MS as f32)
+                }
+            }
+            _ => None,
+        }
+    }
+
+    pub fn molt_needs_frames(&self, now_ms: u64) -> bool {
+        matches!(*self, Self::MoltActive { started_ms } if now_ms.saturating_sub(started_ms) < MOLT_DURATION_MS)
+    }
+
+    pub fn tick_molt(&mut self, now_ms: u64) {
+        if let Self::MoltActive { started_ms } = *self
+            && now_ms.saturating_sub(started_ms) >= MOLT_DURATION_MS
+        {
+            *self = Self::MoltComplete;
+        }
+    }
+}
 
 /// A window identity, unique per shell instance.
 #[derive(
@@ -68,6 +164,8 @@ pub struct WindowModel {
     /// `None` before the first measurement (window construction and the
     /// restore path).
     pub geometry: Option<SurfaceGeometry>,
+    /// Runtime-only per-window animation overrides.
+    pub animation_overlay: AnimationOverlay,
     /// Whether this window is the quick-terminal popup.
     pub is_quick_terminal: bool,
     /// Whether the window is currently shown (the quick terminal hides
@@ -75,6 +173,10 @@ pub struct WindowModel {
     pub visible: bool,
     /// Whether the window was restored from shell state.
     pub restored: bool,
+    /// Window-local startup presentation (Rustfetch retention, molt fade).
+    /// Set by `AppModel` from settings when a normal window is created;
+    /// restored windows and suppressed windows carry [`StartupPresentation::None`].
+    pub startup_presentation: StartupPresentation,
 }
 
 impl WindowModel {
@@ -97,12 +199,13 @@ impl WindowModel {
             tab_order: vec![tab_id],
             active_tab: Some(tab_id),
             geometry: None,
+            animation_overlay: AnimationOverlay::default(),
             is_quick_terminal: false,
             visible: true,
             restored: false,
+            startup_presentation: StartupPresentation::default(),
         })
     }
-
     /// A window from parts (restore path). The tab order must contain
     /// exactly the tabs map's keys. The restored window carries no measured
     /// geometry; the live view commits it before the first render.
@@ -139,9 +242,11 @@ impl WindowModel {
             tab_order,
             active_tab,
             geometry: None,
+            animation_overlay: AnimationOverlay::default(),
             is_quick_terminal,
             visible: true,
             restored: true,
+            startup_presentation: StartupPresentation::default(),
         })
     }
 
@@ -219,6 +324,9 @@ impl WindowModel {
         let tab = self.active_tab_mut()?;
         let pane_id = tab.focused_pane_id()?;
         tab.panes.get_mut(&pane_id)
+    }
+    pub fn effective_animation(&self, base: AnimationDefaults) -> AnimationDefaults {
+        self.animation_overlay.merge(base)
     }
 
     /// Focus a pane anywhere in the window; returns whether it exists.
@@ -496,5 +604,19 @@ mod tests {
             Some(PaneId::new(1))
         );
         assert_eq!(window.cycle_pane(true), Some(PaneId::new(9)));
+    }
+
+    #[test]
+    fn animation_overlay_partial_preset_keeps_unspecified_keys() {
+        let mut overlay = AnimationOverlay::default();
+        overlay.apply_preset(crate::settings::animation_preset("none").expect("none"));
+        overlay.apply_preset(crate::settings::animation_preset("cursor-trail").expect("trail"));
+        let merged = overlay.merge(AnimationDefaults::default());
+        assert_eq!(merged.text_animation, TextAnimation::Disabled);
+        assert!(merged.cursor_trail);
+        assert_eq!(
+            merged.cursor_trail_opacity,
+            AnimationDefaults::default().cursor_trail_opacity
+        );
     }
 }

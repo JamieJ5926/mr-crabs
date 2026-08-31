@@ -9,6 +9,7 @@
 use crate::apc::Command as ApcCommand;
 use crate::color::{ColorTarget, KittyColorKey, KittyColorRequest, Rgb};
 use crate::osc::ProgressState;
+use crate::osc::parsers::Iterm2;
 use crate::reports::{DeviceAttributes, Size};
 use crate::semantic_prompt::SemanticPrompt;
 use crate::tmux::Notification;
@@ -58,6 +59,8 @@ pub trait ProtocolSink: Send {
     /// APC command (kitty graphics payloads are handed to the graphics
     /// slice through this hook).
     fn apc(&mut self, _command: &ApcCommand) {}
+    /// OSC 1337 iTerm2 extension.
+    fn iterm2(&mut self, _command: &Iterm2) {}
     /// ConEmu progress report (OSC 9;4).
     fn progress(&mut self, _state: ProgressState, _progress: Option<u8>) {}
     /// Mouse shape request (OSC 22).
@@ -113,6 +116,7 @@ pub struct RecordingSink {
     pub kitty_colors: Vec<Vec<KittyColorRequest>>,
     pub tmux: Vec<Notification>,
     pub apcs: Vec<ApcCommand>,
+    pub iterm2: Vec<Iterm2>,
     pub progress: Vec<(ProgressState, Option<u8>)>,
     pub mouse_shapes: Vec<String>,
 }
@@ -157,6 +161,9 @@ impl ProtocolSink for RecordingSink {
     }
     fn apc(&mut self, command: &ApcCommand) {
         self.apcs.push(command.clone());
+    }
+    fn iterm2(&mut self, command: &Iterm2) {
+        self.iterm2.push(command.clone());
     }
     fn progress(&mut self, state: ProgressState, progress: Option<u8>) {
         self.progress.push((state, progress));

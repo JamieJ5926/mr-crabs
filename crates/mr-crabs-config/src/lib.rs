@@ -30,7 +30,8 @@ pub const DEFAULT_FETCH_GIF_PATH: &str = "";
 pub const DEFAULT_STARTUP_FETCH: bool = true;
 /// POSIX command run on the PTY before the interactive shell starts.
 pub const DEFAULT_STARTUP_FETCH_COMMAND: &str = "sleep 0.5; \"$MR_CRABS_BIN\" +animated-fetch";
-
+/// New-window startup presentation: `none`, `rustfetch`, or `molt`.
+pub const DEFAULT_STARTUP_ANIMATION: &str = "rustfetch";
 pub const TERM_GHOSTTY: &str = "xterm-ghostty";
 pub const TERM_FALLBACK: &str = "xterm-256color";
 pub const COLORTERM_TRUECOLOR: &str = "truecolor";
@@ -58,6 +59,41 @@ impl TextAnimation {
             "none" | "disabled" => Self::Disabled,
             "typewriter" => Self::Typewriter,
             _ => Self::Streaming,
+        }
+    }
+}
+
+/// New-window startup presentation mode.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum StartupAnimation {
+    /// No startup presentation.
+    None,
+    /// Run the startup fetch command; the retained output is dismissed by
+    /// the first forwarded Enter.
+    #[default]
+    Rustfetch,
+    /// Full-window background mask dissolving over 600 ms; forwarded Enter
+    /// dismisses it immediately.
+    Molt,
+}
+
+impl StartupAnimation {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::Rustfetch => "rustfetch",
+            Self::Molt => "molt",
+        }
+    }
+
+    /// Strict parse; unknown values are rejected so typos never silently
+    /// change startup behavior.
+    pub fn parse(value: &str) -> Result<Self, String> {
+        match value {
+            "none" => Ok(Self::None),
+            "rustfetch" => Ok(Self::Rustfetch),
+            "molt" => Ok(Self::Molt),
+            other => Err(format!("invalid startup-animation value {other:?}")),
         }
     }
 }
@@ -141,11 +177,12 @@ pub enum SettingKey {
     AllowOsc52Read,
     StartupFetch,
     StartupFetchCommand,
+    StartupAnimation,
     FetchGifPath,
 }
 
 impl SettingKey {
-    pub const ALL: [Self; 24] = [
+    pub const ALL: [Self; 25] = [
         Self::FontFamily,
         Self::FontSize,
         Self::LineHeightAdjustPercent,
@@ -169,6 +206,7 @@ impl SettingKey {
         Self::AllowOsc52Read,
         Self::StartupFetch,
         Self::StartupFetchCommand,
+        Self::StartupAnimation,
         Self::FetchGifPath,
     ];
 
@@ -197,10 +235,10 @@ impl SettingKey {
             Self::AllowOsc52Read => "clipboard-read",
             Self::StartupFetch => "startup-fetch",
             Self::StartupFetchCommand => "startup-fetch-command",
+            Self::StartupAnimation => "startup-animation",
             Self::FetchGifPath => "fetch-gif-path",
         }
     }
-
     pub fn from_flag(name: &str) -> Option<Self> {
         match name {
             "font-family" => Some(Self::FontFamily),
@@ -230,6 +268,7 @@ impl SettingKey {
             "clipboard-read" | "allow-osc52-read" => Some(Self::AllowOsc52Read),
             "startup-fetch" => Some(Self::StartupFetch),
             "startup-fetch-command" => Some(Self::StartupFetchCommand),
+            "startup-animation" => Some(Self::StartupAnimation),
             "fetch-gif-path" => Some(Self::FetchGifPath),
             _ => None,
         }
@@ -275,6 +314,7 @@ impl SettingKey {
             Self::StartupFetchCommand => {
                 "POSIX command run on the PTY before the interactive shell starts."
             }
+            Self::StartupAnimation => "New-window startup presentation: none, rustfetch, or molt.",
             Self::FetchGifPath => "Path to a GIF for animated fetch; empty disables animation.",
         }
     }
@@ -306,6 +346,7 @@ pub struct ConfigOverlay {
     pub allow_osc52_read: Option<bool>,
     pub startup_fetch: Option<bool>,
     pub startup_fetch_command: Option<String>,
+    pub startup_animation: Option<String>,
     pub fetch_gif_path: Option<String>,
 }
 
@@ -387,6 +428,9 @@ impl ConfigOverlay {
         if over.fetch_gif_path.is_some() {
             self.fetch_gif_path = over.fetch_gif_path;
         }
+        if over.startup_animation.is_some() {
+            self.startup_animation = over.startup_animation;
+        }
     }
 
     pub fn apply_into(&self, dst: &mut EffectiveConfig) {
@@ -465,6 +509,9 @@ impl ConfigOverlay {
         if let Some(v) = &self.fetch_gif_path {
             dst.fetch_gif_path = v.clone();
         }
+        if let Some(v) = &self.startup_animation {
+            dst.startup_animation = v.clone();
+        }
     }
 
     pub fn set(&mut self, key: SettingKey, value: &str) -> Result<(), String> {
@@ -508,6 +555,9 @@ impl ConfigOverlay {
             SettingKey::AllowOsc52Read => self.allow_osc52_read = Some(parse_bool(value)?),
             SettingKey::StartupFetch => self.startup_fetch = Some(parse_bool(value)?),
             SettingKey::StartupFetchCommand => self.startup_fetch_command = Some(value.to_string()),
+            SettingKey::StartupAnimation => {
+                self.startup_animation = Some(StartupAnimation::parse(value)?.as_str().to_string())
+            }
             SettingKey::FetchGifPath => self.fetch_gif_path = Some(value.to_string()),
         }
         Ok(())
@@ -540,7 +590,16 @@ pub struct EffectiveConfig {
     pub allow_osc52_read: bool,
     pub startup_fetch: bool,
     pub startup_fetch_command: String,
+    pub startup_animation: String,
     pub fetch_gif_path: String,
+}
+
+impl EffectiveConfig {
+    /// The parsed startup presentation for this effective config. Unknown
+    /// stored values fall back to the legacy `rustfetch` behavior.
+    pub fn startup_animation(&self) -> StartupAnimation {
+        StartupAnimation::parse(&self.startup_animation).unwrap_or(StartupAnimation::Rustfetch)
+    }
 }
 
 impl Default for EffectiveConfig {
@@ -575,6 +634,7 @@ impl EffectiveConfig {
             allow_osc52_read: false,
             startup_fetch: DEFAULT_STARTUP_FETCH,
             startup_fetch_command: DEFAULT_STARTUP_FETCH_COMMAND.to_string(),
+            startup_animation: DEFAULT_STARTUP_ANIMATION.to_string(),
             fetch_gif_path: DEFAULT_FETCH_GIF_PATH.to_string(),
         }
     }
@@ -626,6 +686,7 @@ impl EffectiveConfig {
             SettingKey::AllowOsc52Read => format!("{}", self.allow_osc52_read),
             SettingKey::StartupFetch => format!("{}", self.startup_fetch),
             SettingKey::StartupFetchCommand => self.startup_fetch_command.clone(),
+            SettingKey::StartupAnimation => self.startup_animation.clone(),
             SettingKey::FetchGifPath => self.fetch_gif_path.clone(),
         }
     }

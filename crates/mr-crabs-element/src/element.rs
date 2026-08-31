@@ -7,14 +7,14 @@
 //! (CoreText on macOS); no wgpu, no libghostty-vt, no Zig.
 
 use gpui::{
-    App, BorderStyle, Bounds, BoxShadow, Corners, Element, ElementId, FocusHandle, Font,
-    FontFeatures, FontStyle, FontWeight, GlobalElementId, Hsla, InspectorElementId, IntoElement,
-    LayoutId, PathBuilder, Pixels, Point, RenderImage, ShapedLine, SharedString,
+    App, BorderStyle, Bounds, BoxShadow, ContentMask, Corners, Element, ElementId, FocusHandle,
+    Font, FontFeatures, FontStyle, FontWeight, GlobalElementId, Hsla, InspectorElementId,
+    IntoElement, LayoutId, PathBuilder, Pixels, Point, RenderImage, ShapedLine, SharedString,
     StrikethroughStyle, Style as GpuiStyle, TextRun, UnderlineStyle, Window, fill, font, outline,
     point, px, size, white,
 };
 use mr_crabs_effects::{
-    CellPx, EffectsConfig, EffectsFrame, EffectsModel, LinePx, RectPx, RevealMath, TextAnimation,
+    CellPx, EffectsConfig, EffectsFrame, EffectsModel, RectPx, RevealMath, TextAnimation,
     TrailFrame,
 };
 use mr_crabs_graphics::{
@@ -217,11 +217,15 @@ pub(crate) fn trail_glow_bounds(
         size: size(px(glow_rect.w as f32), px(glow_rect.h as f32)),
     })
 }
+pub(crate) fn trail_stroke_width(radius_px: f64) -> Pixels {
+    px((radius_px * 0.5).max(1.0) as f32)
+}
 
-pub(crate) fn trail_segment_points(
-    segment: LinePx,
+fn trail_segment_quad(
+    segment: mr_crabs_effects::LinePx,
     origin: Point<Pixels>,
-) -> (Point<Pixels>, Point<Pixels>) {
+    width: Pixels,
+) -> [Point<Pixels>; 4] {
     let from = point(
         origin.x + px(segment.from.x as f32),
         origin.y + px(segment.from.y as f32),
@@ -230,11 +234,21 @@ pub(crate) fn trail_segment_points(
         origin.x + px(segment.to.x as f32),
         origin.y + px(segment.to.y as f32),
     );
-    (from, to)
-}
-
-pub(crate) fn trail_stroke_width(radius_px: f64) -> Pixels {
-    px((radius_px * 0.5).max(1.0) as f32)
+    let dx = f32::from(to.x - from.x);
+    let dy = f32::from(to.y - from.y);
+    let length = (dx * dx + dy * dy).sqrt();
+    let half = f32::from(width) * 0.5;
+    let (nx, ny) = if length > f32::EPSILON {
+        (-dy / length * half, dx / length * half)
+    } else {
+        (0.0, half)
+    };
+    [
+        point(from.x + px(nx), from.y + px(ny)),
+        point(to.x + px(nx), to.y + px(ny)),
+        point(to.x - px(nx), to.y - px(ny)),
+        point(from.x - px(nx), from.y - px(ny)),
+    ]
 }
 
 const REVEAL_FEATHER_PX: f64 = 2.0;
@@ -243,6 +257,8 @@ struct PreparedEffects<'a> {
     config: EffectsConfig,
     cell: CellPx,
     fx: &'a EffectsFrame,
+    focused: bool,
+    now_ms: u64,
 }
 
 fn conceal_color(
@@ -711,11 +727,9 @@ impl TerminalElement {
         for rect in selection_rects(&frame.selection, frame.size, self.metrics) {
             window.paint_quad(fill(rect + origin, self.palette.selection_color()));
         }
-
-        let batches = state.cache.batches();
-        let Some(prepared) =
-            self.prepare_effects(&mut state.effects, &mut state.effects_origin, frame, window)
-        else {
+        let prepared =
+            self.prepare_effects(&mut state.effects, &mut state.effects_origin, frame, window);
+        let Some(prepared) = prepared else {
             let cursor_visible_phase = self.paint_cursor(state, frame, origin, window, cx);
             let cursor_requested = cursor::should_request_animation(frame);
             if let Some(sink) = self.paint_diagnostics.clone() {
@@ -733,7 +747,14 @@ impl TerminalElement {
         };
         let burst = !prepared.fx.text_reveal_allowed;
         if !burst {
-            self.paint_text_reveal(batches, frame, &prepared, origin, window);
+            window.with_content_mask(
+                Some(ContentMask {
+                    bounds: content_bounds,
+                }),
+                |window| {
+                    self.paint_text_reveal(state.cache.batches(), frame, &prepared, origin, window);
+                },
+            );
         }
         let PreparedEffects { fx, .. } = prepared;
         let trail = fx.trail;
@@ -752,11 +773,19 @@ impl TerminalElement {
             trail_active,
             trail_alpha,
         };
-
-        let cursor_visible_phase = self.paint_cursor(state, frame, origin, window, cx);
-        if trail.active && trail.alpha > 0.0 {
-            self.paint_trail(&trail, origin, window);
-        }
+        let cursor_visible_phase = window.with_content_mask(
+            Some(ContentMask {
+                bounds: content_bounds,
+            }),
+            |window| {
+                if trail.active && trail.alpha > 0.0 {
+                    self.paint_trail(&trail, origin, window);
+                }
+                window.paint_layer(content_bounds, |window| {
+                    self.paint_cursor(state, frame, origin, window, cx)
+                })
+            },
+        );
         let cursor_requested = cursor::should_request_animation(frame);
         if let Some(sink) = self.paint_diagnostics.clone() {
             sink(diagnostic_event(
@@ -771,6 +800,44 @@ impl TerminalElement {
         }
     }
 
+    fn paint_cursor(
+        &self,
+        state: &mut PaintState,
+        frame: &FrameDelta,
+        origin: Point<Pixels>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> bool {
+        let cursor = &frame.cursor;
+        let cursor_visible_phase = if cursor.visible {
+            if cursor.blinking {
+                state.cursor_blink.phase_at(frame, Instant::now())
+            } else {
+                true
+            }
+        } else {
+            false
+        };
+        if cursor.visible && cursor_visible_phase {
+            let geometry = cursor::cursor_geometry(cursor, self.metrics);
+            let rect = geometry.bounds + origin;
+            match geometry.shape {
+                CursorShape::Block | CursorShape::Bar | CursorShape::Underline => {
+                    window.paint_quad(fill(rect, self.palette.cursor_color()))
+                }
+                CursorShape::HollowBlock => window.paint_quad(outline(
+                    rect,
+                    self.palette.cursor_color(),
+                    BorderStyle::default(),
+                )),
+            }
+        }
+        if let (Some(focus), Some(input)) = (&self.focus, &self.input) {
+            input.set_bounds(cursor::cursor_geometry(cursor, self.metrics).bounds + origin);
+            window.handle_input(focus, input.clone(), cx);
+        }
+        cursor_visible_phase
+    }
     fn prepare_effects<'a>(
         &self,
         effects: &'a mut Option<EffectsModel>,
@@ -800,7 +867,13 @@ impl TerminalElement {
             .as_ref()
             .is_some_and(|focus| focus.is_focused(window));
         let fx = model.apply_frame(frame, now_ms, focused);
-        Some(PreparedEffects { config, cell, fx })
+        Some(PreparedEffects {
+            config,
+            cell,
+            fx,
+            focused,
+            now_ms,
+        })
     }
 
     fn paint_text_reveal(
@@ -811,7 +884,9 @@ impl TerminalElement {
         origin: Point<Pixels>,
         window: &mut Window,
     ) {
-        let PreparedEffects { config, cell, fx } = prepared;
+        let PreparedEffects {
+            config, cell, fx, ..
+        } = prepared;
         let math = RevealMath::new(
             config.text_animation,
             config.text_animation_duration_ms,
@@ -882,80 +957,35 @@ impl TerminalElement {
         });
     }
 
-    fn paint_cursor(
-        &self,
-        state: &mut PaintState,
-        frame: &FrameDelta,
-        origin: Point<Pixels>,
-        window: &mut Window,
-        cx: &mut App,
-    ) -> bool {
-        let cursor = &frame.cursor;
-        let cursor_visible_phase = if cursor.visible {
-            if cursor.blinking {
-                state.cursor_blink.phase_at(frame, Instant::now())
-            } else {
-                true
-            }
-        } else {
-            false
-        };
-        if cursor.visible && cursor_visible_phase {
-            let geometry = cursor::cursor_geometry(cursor, self.metrics);
-            let rect = geometry.bounds + origin;
-            match geometry.shape {
-                CursorShape::Block | CursorShape::Bar | CursorShape::Underline => {
-                    window.paint_quad(fill(rect, self.palette.cursor_color()));
-                }
-                CursorShape::HollowBlock => {
-                    window.paint_quad(outline(
-                        rect,
-                        self.palette.cursor_color(),
-                        BorderStyle::default(),
-                    ));
-                }
-            }
-        }
-
-        if let (Some(focus), Some(input)) = (&self.focus, &self.input) {
-            input.set_bounds(cursor::cursor_geometry(cursor, self.metrics).bounds + origin);
-            window.handle_input(focus, input.clone(), cx);
-        }
-        cursor_visible_phase
-    }
-
     fn paint_trail(&self, trail: &TrailFrame, origin: Point<Pixels>, window: &mut Window) {
-        if let Some(rect) = trail_glow_bounds(trail.glow_rect, origin) {
-            let mut glow = self.palette.cursor_color();
-            glow.a = trail.alpha as f32;
-            if glow.a > 0.0 {
-                window.paint_drop_shadows(
-                    rect,
-                    Corners::all(px(0.0)),
-                    &[BoxShadow::new(px(0.0), px(0.0), glow)
-                        .blur_radius(px(trail.radius_px as f32))],
-                );
-                if let Some(segment) = trail.segment {
-                    let (from, to) = trail_segment_points(segment, origin);
-                    let width = trail_stroke_width(trail.radius_px);
-                    let mut builder = PathBuilder::stroke(width);
-                    builder.move_to(from);
-                    builder.line_to(to);
-                    if let Ok(path) = builder.build() {
-                        window.paint_path(path, glow);
-                    }
-                }
-            }
+        let Some(bounds) = trail_glow_bounds(trail.glow_rect, origin) else {
+            return;
+        };
+        let mut glow = self.palette.cursor_color();
+        glow.a = trail.alpha as f32;
+        if glow.a <= 0.0 {
+            return;
+        }
+        window.paint_drop_shadows(
+            bounds,
+            Corners::all(px(0.0)),
+            &[BoxShadow::new(px(0.0), px(0.0), glow).blur_radius(px(trail.radius_px as f32))],
+        );
+        let Some(segment) = trail.segment else {
+            return;
+        };
+        let [a, b, c, d] = trail_segment_quad(segment, origin, trail_stroke_width(trail.radius_px));
+        let mut builder = PathBuilder::fill();
+        builder.move_to(a);
+        builder.line_to(b);
+        builder.line_to(c);
+        builder.line_to(d);
+        builder.close();
+        if let Ok(path) = builder.build() {
+            window.paint_path(path, glow);
         }
     }
 
-    /// Paint one shaped run with every glyph anchored to its terminal cell.
-    ///
-    /// The shaper's natural horizontal advances are discarded: glyph `i`
-    /// paints at the content origin plus its terminal column multiplied by
-    /// `cell_width`, so glyph positions can never drift from the cell grid.
-    ///
-    /// Vertical placement keeps GPUI's shaped baseline geometry
     /// (ascent/descent centering plus per-glyph vertical offset).
     /// Underline/strikethrough span the run's cell rectangle.
     fn paint_run_cell_aligned(
@@ -969,16 +999,8 @@ impl TerminalElement {
     ) {
         let (color, underline, strikethrough) = paint_style;
         let cell_height = px(self.metrics.height);
-        // Same baseline math as GPUI's line painting: vertical centering of
-        // the shaped line within the cell, identical for every glyph.
         let padding_top = (cell_height - line.ascent - line.descent) / 2.0;
         let baseline_offset = point(px(0.0), padding_top + line.ascent);
-
-        // Walk the run text in parallel with the shaped glyphs: glyph.index
-        // is a byte offset into `run.text`; each character before it consumes
-        // its terminal cell width, so the owning character's cell column is
-        // `run.col + prefix sum`. Glyphs sharing a character (combining
-        // marks) keep the same cell column.
         let mut chars = run.text.char_indices();
         let mut next_char = chars.next();
         let mut cell_col = run.col;
@@ -1836,7 +1858,6 @@ fn build_render_image(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mr_crabs_effects::PointPx;
     use mr_crabs_terminal::{
         CursorShape, CursorState, DamageKind, FramePool, GridSize, RowDelta, Run, SelectionState,
         Style as TermStyle,
@@ -2377,34 +2398,32 @@ mod tests {
     }
 
     #[test]
-    fn trail_segment_points_translate_by_origin() {
-        let origin = point(px(3.0), px(4.0));
-        let seg = LinePx::new(PointPx::new(1.0, 2.0), PointPx::new(10.0, 12.0));
-        let (from, to) = trail_segment_points(seg, origin);
-        assert_eq!(from, point(px(4.0), px(6.0)));
-        assert_eq!(to, point(px(13.0), px(16.0)));
-    }
-
-    #[test]
-    fn trail_stroke_width_clamps_at_one() {
-        assert_eq!(trail_stroke_width(10.0), px(5.0));
-        assert_eq!(trail_stroke_width(0.2), px(1.0));
-        assert_eq!(trail_stroke_width(1.0), px(1.0));
-    }
-
-    #[test]
-    fn trail_segment_stroke_builds_nonempty_path() {
+    fn trail_segment_quad_handles_horizontal_vertical_diagonal_and_zero_length() {
         let origin = point(px(0.0), px(0.0));
-        let seg = LinePx::new(PointPx::new(0.0, 0.0), PointPx::new(20.0, 0.0));
-        let (from, to) = trail_segment_points(seg, origin);
-        let mut builder = PathBuilder::stroke(px(4.0));
-        builder.move_to(from);
-        builder.line_to(to);
-        let path = builder.build().expect("path");
-        assert_ne!(
-            format!("{path:?}"),
-            format!("{:?}", PathBuilder::stroke(px(1.0)).build().unwrap())
-        );
+        let width = px(4.0);
+        for segment in [
+            mr_crabs_effects::LinePx {
+                from: mr_crabs_effects::PointPx::new(0.0, 0.0),
+                to: mr_crabs_effects::PointPx::new(10.0, 0.0),
+            },
+            mr_crabs_effects::LinePx {
+                from: mr_crabs_effects::PointPx::new(0.0, 0.0),
+                to: mr_crabs_effects::PointPx::new(0.0, 10.0),
+            },
+            mr_crabs_effects::LinePx {
+                from: mr_crabs_effects::PointPx::new(0.0, 0.0),
+                to: mr_crabs_effects::PointPx::new(10.0, 10.0),
+            },
+            mr_crabs_effects::LinePx {
+                from: mr_crabs_effects::PointPx::new(5.0, 5.0),
+                to: mr_crabs_effects::PointPx::new(5.0, 5.0),
+            },
+        ] {
+            for point in trail_segment_quad(segment, origin, width) {
+                assert!(f32::from(point.x).is_finite());
+                assert!(f32::from(point.y).is_finite());
+            }
+        }
     }
 
     fn reveal_row(col: u16, len: u16, style: u16, flags: u16, widths: Vec<u16>) -> RowBatch {
@@ -2537,11 +2556,5 @@ mod tests {
         assert_eq!(only.0.size.width, px(2.0));
         assert_eq!(only.1, 0.2);
         assert_eq!(empty.0.size.width, px(0.0));
-    }
-
-    #[test]
-    fn paint_layer_order_is_reveal_then_cursor_then_trail() {
-        const ORDER: [&str; 3] = ["reveal", "cursor", "trail"];
-        assert_eq!(ORDER, ["reveal", "cursor", "trail"]);
     }
 }

@@ -992,4 +992,31 @@ mod tests {
             other => panic!("unexpected {other:?}"),
         }
     }
+
+    #[test]
+    fn iterm2_kv_split_preserves_auxiliary_fields() {
+        match parse(b"1337;mr_crabs_animation=state;text=inherit;trail=1").unwrap() {
+            Command::Iterm2(command) => assert_eq!(
+                command.pairs,
+                vec![
+                    ("mr_crabs_animation".into(), "state".into()),
+                    ("text".into(), "inherit".into()),
+                    ("trail".into(), "1".into()),
+                ]
+            ),
+            other => panic!("unexpected {other:?}"),
+        }
+        match parse(b"1337;File=x;mr_crabs_animation=save;text=streaming;trail=0").unwrap() {
+            Command::Iterm2(command) => assert_eq!(
+                command.pairs,
+                vec![
+                    ("File".into(), "x".into()),
+                    ("mr_crabs_animation".into(), "save".into()),
+                    ("text".into(), "streaming".into()),
+                    ("trail".into(), "0".into()),
+                ]
+            ),
+            other => panic!("unexpected {other:?}"),
+        }
+    }
 }

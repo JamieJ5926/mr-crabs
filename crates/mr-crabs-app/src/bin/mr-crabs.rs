@@ -15,17 +15,18 @@
 //! queued. That task pumps the model and refreshes GPUI; no frame or timer
 //! polling is used to discover shell output.
 
-use std::borrow::Cow;
-
 use gpui::{App, AppContext as _, QuitMode};
+use std::borrow::Cow;
+use std::io::Write;
+
 use gpui_platform::application;
 
 use mr_crabs_app::action::AppAction;
 use mr_crabs_app::animated_fetch;
 use mr_crabs_app::model::app_model::AppModel;
 use mr_crabs_app::settings::{
-    animation_menu_text, ANIMATION_PRESETS, CliOverrides, SettingsError, SettingsStore,
-    load_effective_from_cli,
+    ANIMATION_OSC_KEY, ANIMATION_PRESETS, AnimationTuiMode, CliOverrides, SettingsError,
+    SettingsStore, animation_menu_text, animation_preset, load_effective_from_cli,
 };
 use mr_crabs_app::ui::{self, AppShell};
 use mr_crabs_config::{EffectiveConfig, SettingKey};
@@ -58,6 +59,10 @@ fn help_text() -> String {
     out.push_str("Animation testing:\n");
     out.push_str("  --animation [list|<name>]\n");
     out.push_str("  --animation=<name>\n");
+    out.push_str("  +animation\n");
+    out.push_str("  +animation [menu|list|<name>]\n");
+    out.push_str("  +animation=<name>\n");
+    out.push_str("    +animation <name> switches only the calling window immediately.\n");
     out.push_str(&format!(
         "    Bare --animation and --animation list print the menu. Named presets: {}.\n",
         ANIMATION_PRESETS
@@ -66,6 +71,14 @@ fn help_text() -> String {
             .collect::<Vec<_>>()
             .join(", ")
     ));
+    out.push_str("    Bare +animation and +animation menu open the interactive animation TUI.\n");
+    out.push_str("    +animation list prints the plain-text menu.\n");
+    out.push('\n');
+    out.push_str("Rustfetch replay:\n");
+    out.push_str("  +rustfetch\n");
+    out.push_str("    Replay rustfetch in the calling window. Requires the mr-crabs binary\n");
+    out.push_str("    directory on the child PATH (set automatically for new panes).\n");
+
     out.push_str("  Inside Mr Crabs, press Cmd+Shift+P and run:\n");
     out.push_str(&format!(
         "    {}\n",
@@ -126,6 +139,46 @@ fn cli_output(args: &[String]) -> Result<Option<String>, SettingsError> {
     Ok(Some(lines.join("\n")))
 }
 
+#[derive(Debug, PartialEq)]
+enum AnimationAction {
+    None,
+    Tui { menu: bool },
+    Emit(String),
+    InvalidName(String),
+}
+
+fn animation_action(args: &[String]) -> Result<AnimationAction, SettingsError> {
+    let cli = CliOverrides::parse(args)?;
+    match cli.animation_tui {
+        AnimationTuiMode::None => {}
+        AnimationTuiMode::Bare => return Ok(AnimationAction::Tui { menu: false }),
+        AnimationTuiMode::Menu => return Ok(AnimationAction::Tui { menu: true }),
+    }
+    let Some(name) = cli.animation_action else {
+        return Ok(AnimationAction::None);
+    };
+    if let Some(preset) = animation_preset(&name) {
+        Ok(AnimationAction::Emit(animation_emit_bytes(preset.name)))
+    } else {
+        Ok(AnimationAction::InvalidName(name))
+    }
+}
+
+fn animation_emit_bytes(name: &str) -> String {
+    format!("\x1b]1337;{ANIMATION_OSC_KEY}={name}\x07")
+}
+
+fn unknown_animation_message(name: &str) -> String {
+    format!(
+        "Mr Crabs: invalid config: unknown animation {name}; expected one of {}",
+        ANIMATION_PRESETS
+            .iter()
+            .map(|preset| preset.name)
+            .collect::<Vec<_>>()
+            .join(", ")
+    )
+}
+
 fn startup_settings(args: &[String]) -> Result<SettingsStore, SettingsError> {
     let cli = CliOverrides::parse(args)?;
     SettingsStore::from_cli(&cli)
@@ -142,6 +195,44 @@ fn main() {
             return;
         }
         Ok(None) => {}
+        Err(error) => {
+            eprintln!("Mr Crabs: {error}");
+            std::process::exit(2);
+        }
+    }
+
+    match animation_action(&args) {
+        Ok(AnimationAction::None) => {}
+        Ok(AnimationAction::Tui { menu }) => {
+            match mr_crabs_app::animation_tui::run_animation_tui(menu) {
+                Ok(_) => {}
+                Err(error) => {
+                    eprintln!("Mr Crabs: {error}");
+                    std::process::exit(2);
+                }
+            }
+            return;
+        }
+        Ok(AnimationAction::Emit(bytes)) => {
+            match std::fs::OpenOptions::new().write(true).open("/dev/tty") {
+                Ok(mut tty) => {
+                    if let Err(error) = tty.write_all(bytes.as_bytes()) {
+                        eprintln!("Mr Crabs: cannot write animation command to /dev/tty: {error}");
+                        std::process::exit(2);
+                    }
+                }
+                Err(error) => {
+                    eprintln!("Mr Crabs: cannot open /dev/tty: {error}");
+                    std::process::exit(2);
+                }
+            }
+            return;
+        }
+        Ok(AnimationAction::InvalidName(name)) => {
+            println!("{}", animation_menu_text());
+            eprintln!("{}", unknown_animation_message(&name));
+            std::process::exit(2);
+        }
         Err(error) => {
             eprintln!("Mr Crabs: {error}");
             std::process::exit(2);
@@ -406,4 +497,196 @@ mod tests {
         }
     }
 
+    #[test]
+    fn help_contains_plus_animation_tui_menu_and_scope_sentences() {
+        let help = cli_output(&["--help".to_string()])
+            .expect("parse")
+            .expect("help");
+        assert!(
+            help.contains("+animation [menu|list|<name>]"),
+            "help missing +animation space form: {help}"
+        );
+        assert!(
+            help.contains("+animation=<name>"),
+            "help missing +animation equals form: {help}"
+        );
+        assert!(
+            help.contains("+animation <name> switches only the calling window immediately."),
+            "help missing +animation window-scope sentence: {help}"
+        );
+        assert!(
+            help.contains(
+                "Bare +animation and +animation menu open the interactive animation TUI."
+            ),
+            "help missing +animation TUI sentence: {help}"
+        );
+        assert!(
+            help.contains("+animation list prints the plain-text menu."),
+            "help missing +animation list sentence: {help}"
+        );
+    }
+
+    #[test]
+    fn plus_animation_list_prints_plain_menu() {
+        for args in [
+            vec!["+animation".to_string(), "list".to_string()],
+            vec!["+animation=list".to_string()],
+        ] {
+            let menu = cli_output(&args).expect("parse").expect("menu");
+            assert_eq!(menu, animation_menu_text());
+        }
+    }
+
+    #[test]
+    fn plus_animation_tui_and_named_forms_do_not_print_menu() {
+        for args in [
+            vec!["+animation".to_string()],
+            vec!["+animation".to_string(), "menu".to_string()],
+            vec!["+animation=menu".to_string()],
+            vec!["+animation".to_string(), "typewriter".to_string()],
+            vec!["+animation=typewriter".to_string()],
+        ] {
+            assert!(
+                cli_output(&args).expect("parse").is_none(),
+                "TUI/named forms must not print the menu: {args:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn animation_action_routes_bare_and_menu_to_tui() {
+        assert_eq!(
+            animation_action(&["+animation".to_string()]).expect("parse"),
+            AnimationAction::Tui { menu: false },
+            "bare +animation opens the TUI without the preset menu"
+        );
+        for args in [
+            vec!["+animation".to_string(), "menu".to_string()],
+            vec!["+animation=menu".to_string()],
+        ] {
+            assert_eq!(
+                animation_action(&args).expect("parse"),
+                AnimationAction::Tui { menu: true },
+                "+animation menu opens the TUI on the preset menu: {args:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn plus_animation_modes_are_last_wins() {
+        let preset_then_bare = animation_action(&[
+            "+animation=typewriter".to_string(),
+            "+animation".to_string(),
+        ])
+        .expect("parse");
+        assert_eq!(
+            preset_then_bare,
+            AnimationAction::Tui { menu: false },
+            "bare +animation after a preset wins"
+        );
+
+        let bare_then_preset =
+            animation_action(&["+animation".to_string(), "+animation=streaming".to_string()])
+                .expect("parse");
+        assert_eq!(
+            bare_then_preset,
+            AnimationAction::Emit(animation_emit_bytes("streaming")),
+            "preset after bare +animation wins"
+        );
+
+        let tui_then_list = cli_output(&[
+            "+animation".to_string(),
+            "+animation".to_string(),
+            "list".to_string(),
+        ])
+        .expect("parse");
+        assert_eq!(tui_then_list, Some(animation_menu_text()));
+
+        let list_then_menu = animation_action(&[
+            "+animation=list".to_string(),
+            "+animation".to_string(),
+            "menu".to_string(),
+        ])
+        .expect("parse");
+        assert_eq!(
+            list_then_menu,
+            AnimationAction::Tui { menu: true },
+            "+animation menu after +animation list wins"
+        );
+
+        let menu_then_preset = animation_action(&[
+            "+animation".to_string(),
+            "menu".to_string(),
+            "+animation=cursor-trail".to_string(),
+        ])
+        .expect("parse");
+        assert_eq!(
+            menu_then_preset,
+            AnimationAction::Emit(animation_emit_bytes("cursor-trail")),
+            "named preset after +animation menu wins"
+        );
+    }
+
+    #[test]
+    fn animation_action_emits_exact_osc_bytes() {
+        let action =
+            animation_action(&["+animation".to_string(), "typewriter".to_string()]).expect("parse");
+        assert_eq!(
+            action,
+            AnimationAction::Emit("\x1b]1337;mr_crabs_animation=typewriter\x07".to_string())
+        );
+
+        let equals = animation_action(&["+animation=streaming".to_string()]).expect("parse");
+        assert_eq!(
+            equals,
+            AnimationAction::Emit("\x1b]1337;mr_crabs_animation=streaming\x07".to_string())
+        );
+    }
+
+    #[test]
+    fn animation_action_emits_exact_osc_bytes_for_every_preset() {
+        for preset in ANIMATION_PRESETS {
+            let args = vec!["+animation".to_string(), preset.name.to_string()];
+            match animation_action(&args).expect("parse") {
+                AnimationAction::Emit(bytes) => assert_eq!(
+                    bytes,
+                    format!("\x1b]1337;{ANIMATION_OSC_KEY}={}\x07", preset.name),
+                    "exact OSC 1337 bytes for {}",
+                    preset.name
+                ),
+                other => panic!("expected Emit for {}: {other:?}", preset.name),
+            }
+        }
+    }
+
+    #[test]
+    fn animation_action_absent_for_non_live_forms() {
+        assert_eq!(animation_action(&[]).expect("parse"), AnimationAction::None);
+        assert_eq!(
+            animation_action(&["--animation".to_string(), "typewriter".to_string()])
+                .expect("parse"),
+            AnimationAction::None,
+            "--animation stays a startup-config path, not an emit action"
+        );
+        assert_eq!(
+            animation_action(&["+animation".to_string(), "list".to_string()]).expect("parse"),
+            AnimationAction::None,
+            "+animation list stays a plain-text print path, not a live action"
+        );
+    }
+
+    #[test]
+    fn animation_action_keeps_invalid_name_distinct() {
+        let action =
+            animation_action(&["+animation".to_string(), "wiggle".to_string()]).expect("parse");
+        assert_eq!(action, AnimationAction::InvalidName("wiggle".to_string()));
+    }
+
+    #[test]
+    fn unknown_animation_message_matches_registry_error_text() {
+        assert_eq!(
+            unknown_animation_message("wiggle"),
+            "Mr Crabs: invalid config: unknown animation wiggle; expected one of none, streaming, typewriter, cursor-trail, all"
+        );
+    }
 }

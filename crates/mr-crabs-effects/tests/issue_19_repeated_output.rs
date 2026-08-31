@@ -139,13 +139,13 @@ fn repeated_identical_partial_frame_starts_a_fresh_typewriter_reveal() {
             .iter()
             .map(|cell| cell.pos)
             .collect::<Vec<_>>(),
-        vec![CellPos::new(0, 0), CellPos::new(0, 1)]
+        vec![CellPos::new(0, 0)]
     );
-    assert!(effect.pending.is_empty());
-    assert_eq!(model.last_change_ms(), Some(2_000.0));
+    assert_eq!(effect.pending, vec![CellPos::new(0, 1)]);
+    assert_eq!(model.last_change_ms(), Some(2_015.0));
 
     let repeated_expired = frame(size, 4, Vec::new());
-    assert!(model.apply_frame(&repeated_expired, 2_120, true).is_idle());
+    assert!(model.apply_frame(&repeated_expired, 2_135, true).is_idle());
 
     let duplicate_generation = frame(size, 5, vec![row(2, &contents)]);
     assert!(
@@ -200,21 +200,38 @@ fn five_cold_sequential_identical_executions_each_start_a_reveal() {
 
         assert!(effect.text_reveal_allowed, "execution {execution}");
         assert!(effect.needs_frame, "execution {execution}");
-        assert!(effect.revealing.iter().any(|reveal| {
-            reveal.pos == CellPos::new(0, 0) && reveal.change_ms == now_ms as f64
-        }));
         assert!(
-            effect.pending.is_empty(),
-            "execution {execution} must not create a per-cell backlog"
+            effect.revealing.iter().any(|reveal| {
+                reveal.pos == CellPos::new(0, 0) && reveal.change_ms == now_ms as f64
+            }),
+            "execution {execution} must start the first character immediately"
+        );
+        assert_eq!(
+            effect.pending,
+            vec![CellPos::new(0, 1)],
+            "execution {execution} must stagger the second character"
         );
 
+        let in_order = frame(size, sequence + 1, Vec::new());
+        let in_order_effect = model.apply_frame(&in_order, now_ms + 75, true);
+        assert_eq!(
+            in_order_effect
+                .revealing
+                .iter()
+                .map(|reveal| reveal.pos)
+                .collect::<Vec<_>>(),
+            vec![CellPos::new(0, 0), CellPos::new(0, 1)],
+            "execution {execution} must reveal the row in reading order"
+        );
+        assert!(in_order_effect.pending.is_empty());
+
         let expiry_ms = model.last_change_ms().unwrap() as u64 + 600;
-        let expired = frame(size, sequence + 1, Vec::new());
+        let expired = frame(size, sequence + 2, Vec::new());
         assert!(
             model.apply_frame(&expired, expiry_ms, true).is_idle(),
             "execution {execution} must return to zero idle RAF"
         );
-        sequence += 2;
+        sequence += 3;
     }
 }
 
@@ -240,7 +257,7 @@ fn third_overlapping_identical_execution_preserves_active_and_pending_reveals() 
         third_effect.pending,
         vec![CellPos::new(0, 0), CellPos::new(0, 1)]
     );
-    assert_eq!(model.last_change_ms(), Some(1_150.0));
+    assert_eq!(model.last_change_ms(), Some(1_375.0));
 
     let cascade = frame(size, 4, Vec::new());
     let cascade_effect = model.apply_frame(&cascade, 1_450, true);
@@ -257,7 +274,7 @@ fn third_overlapping_identical_execution_preserves_active_and_pending_reveals() 
     assert!(cascade_effect.pending.is_empty());
 
     let expired = frame(size, 5, Vec::new());
-    assert!(model.apply_frame(&expired, 1_750, true).is_idle());
+    assert!(model.apply_frame(&expired, 1_975, true).is_idle());
 }
 
 #[test]
@@ -291,7 +308,7 @@ fn large_partial_bypass_preserves_existing_reveal_and_ignores_new_cells() {
         reveal_positions(effect),
         vec![CellPos::new(0, 0), CellPos::new(0, 1)]
     );
-    assert_eq!(model.last_change_ms(), Some(1_000.0));
+    assert_eq!(model.last_change_ms(), Some(1_075.0));
 }
 
 #[test]
@@ -318,7 +335,7 @@ fn full_bypass_preserves_existing_reveal_for_unchanged_cells() {
         reveal_positions(effect),
         vec![CellPos::new(0, 0), CellPos::new(0, 1)]
     );
-    assert_eq!(model.last_change_ms(), Some(1_000.0));
+    assert_eq!(model.last_change_ms(), Some(1_075.0));
 }
 
 #[test]

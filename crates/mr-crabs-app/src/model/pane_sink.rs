@@ -9,6 +9,7 @@
 use std::collections::VecDeque;
 use std::sync::Arc;
 
+use mr_crabs_protocols::osc::parsers::Iterm2;
 use parking_lot::Mutex;
 
 use mr_crabs_protocols::reports::{DeviceAttributes, Size};
@@ -16,6 +17,8 @@ use mr_crabs_protocols::semantic_prompt::SemanticPrompt;
 use mr_crabs_protocols::sink::{ClipboardEvent, ProtocolSink};
 
 use super::geometry::SurfaceGeometry;
+use crate::animation_control::{AnimationControl, AnimationReply};
+use crate::settings::ANIMATION_OSC_KEY;
 
 /// Bound applied independently to each owner-local queue.
 const QUEUE_CAP: usize = 64;
@@ -25,6 +28,14 @@ pub const XTVERSION: &str = "Mr Crabs";
 
 /// XTGETTCAP `TN` payload.
 pub const TERMINFO_NAME: &str = "xterm-ghostty";
+
+/// A parsed animation command together with its request terminator and the
+/// pane that owns its reply path.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AnimationRequest {
+    pub control: AnimationControl,
+    pub terminator: crate::animation_control::OscTerminator,
+}
 
 /// Title, working-directory, and semantic-prompt notifications for this pane.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -41,6 +52,7 @@ struct PaneSinkState {
     clipboards: VecDeque<ClipboardEvent>,
     text_area: Option<Size>,
     terminfo_name: String,
+    animation: VecDeque<AnimationRequest>,
 }
 
 /// Shared, pane-owned [`ProtocolSink`]. Cloning shares the same queues.
@@ -90,6 +102,21 @@ impl PaneProtocolSink {
         }
     }
 
+    pub fn drain_animation_controls(&self) -> Vec<AnimationRequest> {
+        self.state.lock().animation.drain(..).collect()
+    }
+
+    pub fn write_animation_reply_with_terminator(
+        &self,
+        reply: AnimationReply,
+        terminator: crate::animation_control::OscTerminator,
+    ) {
+        push_bounded(
+            &mut self.state.lock().replies,
+            reply.encode_with_terminator(terminator),
+        );
+    }
+
     pub fn drain_events(&self) -> Vec<PaneSinkEvent> {
         self.state.lock().events.drain(..).collect()
     }
@@ -112,6 +139,27 @@ fn push_bounded<T>(queue: &mut VecDeque<T>, item: T) {
     queue.push_back(item);
 }
 
+fn animation_payload_from_pairs(pairs: &[(String, String)]) -> Option<String> {
+    let start = pairs
+        .iter()
+        .rposition(|(key, _)| key == ANIMATION_OSC_KEY)?;
+    let value = &pairs[start].1;
+    if value != "state" && value != "save" {
+        return Some(value.clone());
+    }
+    let mut payload = value.clone();
+    for (key, val) in &pairs[start + 1..] {
+        if key != "text" && key != "trail" {
+            continue;
+        }
+        payload.push(';');
+        payload.push_str(key);
+        payload.push('=');
+        payload.push_str(val);
+    }
+    Some(payload)
+}
+
 impl ProtocolSink for PaneProtocolSink {
     fn write_pty(&mut self, bytes: &[u8]) {
         push_bounded(&mut self.state.lock().replies, bytes.to_vec());
@@ -130,11 +178,27 @@ impl ProtocolSink for PaneProtocolSink {
             PaneSinkEvent::Pwd(url.to_owned()),
         );
     }
-
-    fn semantic_prompt(&mut self, cmd: &SemanticPrompt) {
+    fn iterm2(&mut self, command: &Iterm2) {
+        // ProtocolSink::iterm2 loses the OSC terminator. Query replies
+        // therefore use Bell. `parse_kv` also splits `state;`/`save;`
+        // fields into extra pairs, so reconstruct the payload from the
+        // last `mr_crabs_animation` key plus that command's own fields.
+        let Some(payload) = animation_payload_from_pairs(&command.pairs) else {
+            return;
+        };
+        let Ok(control) = AnimationControl::parse_payload(&payload) else {
+            return;
+        };
+        if matches!(control, AnimationControl::Save { .. }) {
+            return;
+        }
+        let terminator = crate::animation_control::OscTerminator::Bell;
         push_bounded(
-            &mut self.state.lock().events,
-            PaneSinkEvent::Semantic(cmd.clone()),
+            &mut self.state.lock().animation,
+            AnimationRequest {
+                control,
+                terminator,
+            },
         );
     }
 
@@ -286,6 +350,193 @@ mod tests {
         assert!(
             contains_seq(&bytes, b"\x1b[4;600;1000t"),
             "CSI 14 t: {bytes:?}"
+        );
+    }
+
+    #[test]
+    fn foreign_and_file_osc1337_keys_do_nothing() {
+        let (mut pane, _) = pane_with_writer(1, GridSize::new(80, 24));
+        pane.feed_test_output(b"\x1b]1337;File=inline;name=ignored\x07")
+            .expect("pane_sink fixture feed should succeed");
+        assert!(pane.protocol_sink().drain_animation_controls().is_empty());
+
+        let mut sink = PaneProtocolSink::new();
+        sink.iterm2(&Iterm2 {
+            pairs: vec![
+                ("File".into(), "x".into()),
+                ("name".into(), "foreign".into()),
+            ],
+        });
+        assert!(sink.drain_animation_controls().is_empty());
+    }
+
+    #[test]
+    fn recognized_osc1337_key_is_last_value_and_owner_local() {
+        use crate::animation_control::{AnimationControl, OscTerminator};
+        let size = GridSize::new(80, 24);
+        let (mut left, _) = pane_with_writer(1, size);
+        let (mut right, _) = pane_with_writer(2, size);
+        let osc =
+            format!("\x1b]1337;{ANIMATION_OSC_KEY}=none;File=x;{ANIMATION_OSC_KEY}=typewriter\x07");
+        left.feed_test_output(osc.as_bytes()).expect("feed");
+        right
+            .feed_test_output(format!("\x1b]1337;{ANIMATION_OSC_KEY}=streaming\x07").as_bytes())
+            .expect("feed");
+        assert_eq!(
+            left.protocol_sink().drain_animation_controls(),
+            vec![AnimationRequest {
+                control: AnimationControl::Preset("typewriter".into()),
+                terminator: OscTerminator::Bell,
+            }]
+        );
+        assert_eq!(
+            right.protocol_sink().drain_animation_controls(),
+            vec![AnimationRequest {
+                control: AnimationControl::Preset("streaming".into()),
+                terminator: OscTerminator::Bell,
+            }]
+        );
+    }
+
+    #[test]
+    fn kv_split_state_and_save_fields_are_reconstructed() {
+        use crate::animation_control::{
+            AnimationControl, AnimationTextSetting, AnimationTrailSetting, OscTerminator,
+        };
+
+        let mut sink = PaneProtocolSink::new();
+        sink.iterm2(&Iterm2 {
+            pairs: vec![
+                ("File".into(), "x".into()),
+                (ANIMATION_OSC_KEY.into(), "state".into()),
+                ("text".into(), "inherit".into()),
+                ("trail".into(), "1".into()),
+            ],
+        });
+        assert_eq!(
+            sink.drain_animation_controls(),
+            vec![AnimationRequest {
+                control: AnimationControl::State {
+                    text: AnimationTextSetting::Inherit,
+                    trail: AnimationTrailSetting::On,
+                },
+                terminator: OscTerminator::Bell,
+            }]
+        );
+
+        sink.iterm2(&Iterm2 {
+            pairs: vec![
+                (ANIMATION_OSC_KEY.into(), "save".into()),
+                ("text".into(), "streaming".into()),
+                ("trail".into(), "0".into()),
+            ],
+        });
+        assert!(sink.drain_animation_controls().is_empty());
+    }
+
+    #[test]
+    fn query_and_state_osc_survive_terminal_kv_split() {
+        use crate::animation_control::{
+            AnimationControl, AnimationTextSetting, AnimationTrailSetting, OscTerminator,
+        };
+        let (mut pane, _) = pane_with_writer(1, GridSize::new(80, 24));
+        pane.feed_test_output(b"\x1b]1337;mr_crabs_animation=?\x07")
+            .expect("query");
+        pane.feed_test_output(b"\x1b]1337;mr_crabs_animation=state;text=none;trail=inherit\x07")
+            .expect("state");
+        assert_eq!(
+            pane.protocol_sink().drain_animation_controls(),
+            vec![
+                AnimationRequest {
+                    control: AnimationControl::Query {
+                        terminator: OscTerminator::Bell,
+                    },
+                    terminator: OscTerminator::Bell,
+                },
+                AnimationRequest {
+                    control: AnimationControl::State {
+                        text: AnimationTextSetting::None,
+                        trail: AnimationTrailSetting::Inherit,
+                    },
+                    terminator: OscTerminator::Bell,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn trailing_foreign_fields_keep_preset_state_and_save_valid() {
+        use crate::animation_control::{
+            AnimationControl, AnimationTextSetting, AnimationTrailSetting, OscTerminator,
+        };
+        let mut sink = PaneProtocolSink::new();
+        sink.iterm2(&Iterm2 {
+            pairs: vec![
+                (ANIMATION_OSC_KEY.into(), "typewriter".into()),
+                ("File".into(), "x".into()),
+            ],
+        });
+        sink.iterm2(&Iterm2 {
+            pairs: vec![
+                (ANIMATION_OSC_KEY.into(), "state".into()),
+                ("text".into(), "none".into()),
+                ("trail".into(), "inherit".into()),
+                ("File".into(), "x".into()),
+                ("name".into(), "foreign".into()),
+            ],
+        });
+        sink.iterm2(&Iterm2 {
+            pairs: vec![
+                ("File".into(), "inline".into()),
+                (ANIMATION_OSC_KEY.into(), "save".into()),
+                ("text".into(), "streaming".into()),
+                ("trail".into(), "0".into()),
+                ("name".into(), "foreign".into()),
+            ],
+        });
+        assert_eq!(
+            sink.drain_animation_controls(),
+            vec![
+                AnimationRequest {
+                    control: AnimationControl::Preset("typewriter".into()),
+                    terminator: OscTerminator::Bell,
+                },
+                AnimationRequest {
+                    control: AnimationControl::State {
+                        text: AnimationTextSetting::None,
+                        trail: AnimationTrailSetting::Inherit,
+                    },
+                    terminator: OscTerminator::Bell,
+                },
+            ]
+        );
+
+        let (mut pane, _) = pane_with_writer(1, GridSize::new(80, 24));
+        pane.feed_test_output(b"\x1b]1337;mr_crabs_animation=typewriter;File=x\x07")
+            .expect("preset");
+        pane.feed_test_output(
+            b"\x1b]1337;mr_crabs_animation=state;text=none;trail=inherit;File=x;name=foreign\x07",
+        )
+        .expect("state");
+        pane.feed_test_output(
+            b"\x1b]1337;mr_crabs_animation=save;text=streaming;trail=0;name=foreign\x07",
+        )
+        .expect("save");
+        assert_eq!(
+            pane.protocol_sink().drain_animation_controls(),
+            vec![
+                AnimationRequest {
+                    control: AnimationControl::Preset("typewriter".into()),
+                    terminator: OscTerminator::Bell,
+                },
+                AnimationRequest {
+                    control: AnimationControl::State {
+                        text: AnimationTextSetting::None,
+                        trail: AnimationTrailSetting::Inherit,
+                    },
+                    terminator: OscTerminator::Bell,
+                },
+            ]
         );
     }
 }

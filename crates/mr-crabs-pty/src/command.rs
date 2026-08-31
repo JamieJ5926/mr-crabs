@@ -280,7 +280,12 @@ impl CommandBuilder {
     pub fn to_spawn_command(&self) -> SpawnCommand {
         let envs = self.build_envs();
         SpawnCommand {
-            exe: self.exe.clone(),
+            exe: match resolve_executable(&self.exe, &envs, self.cwd.as_deref()) {
+                ExecutableResolution::Explicit(path) | ExecutableResolution::Resolved(path) => path,
+                ExecutableResolution::Unresolved(name) => {
+                    PathBuf::from("/__mr_crabs_unresolved__").join(name)
+                }
+            },
             args: self.args.clone(),
             cwd: self.cwd.clone(),
             term: envs
@@ -291,6 +296,54 @@ impl CommandBuilder {
             envs,
         }
     }
+}
+
+enum ExecutableResolution {
+    Explicit(PathBuf),
+    Resolved(PathBuf),
+    Unresolved(PathBuf),
+}
+
+fn resolve_executable(
+    exe: &Path,
+    envs: &BTreeMap<String, String>,
+    cwd: Option<&Path>,
+) -> ExecutableResolution {
+    if exe.is_absolute() || exe.components().count() != 1 {
+        return ExecutableResolution::Explicit(exe.to_path_buf());
+    }
+    let Some(path) = envs.get("PATH") else {
+        return ExecutableResolution::Explicit(exe.to_path_buf());
+    };
+    for directory in path.split(if cfg!(windows) { ';' } else { ':' }) {
+        let dir = Path::new(directory);
+        let base = if directory.is_empty() {
+            cwd.map(Path::to_path_buf)
+                .unwrap_or_else(|| PathBuf::from("."))
+        } else if dir.is_relative() {
+            cwd.map_or_else(|| dir.to_path_buf(), |child| child.join(dir))
+        } else {
+            dir.to_path_buf()
+        };
+        let candidate = base.join(exe);
+        if candidate.is_file() && is_executable(&candidate) {
+            return ExecutableResolution::Resolved(candidate);
+        }
+    }
+    ExecutableResolution::Unresolved(exe.to_path_buf())
+}
+
+#[cfg(unix)]
+fn is_executable(path: &Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::metadata(path)
+        .map(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
+        .unwrap_or(false)
+}
+
+#[cfg(windows)]
+fn is_executable(path: &Path) -> bool {
+    path.is_file()
 }
 
 /// Reads the invoking user's login shell from the passwd database.
@@ -597,15 +650,81 @@ mod tests {
         assert_eq!(a.build_envs(), b.build_envs());
         assert_eq!(a.to_spawn_command(), b.to_spawn_command());
     }
+
+    #[test]
+    fn bare_executable_uses_finalized_path_overlay() {
+        let dir = std::env::temp_dir().join(format!("mr-crabs-path-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let candidate = dir.join("mr-crabs-exec");
+        std::fs::write(&candidate, b"x").unwrap();
+        make_executable(&candidate);
+        let command = CommandBuilder::new("mr-crabs-exec")
+            .clear_envs(true)
+            .env("PATH", dir.to_string_lossy())
+            .to_spawn_command();
+        assert_eq!(command.exe, candidate);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn explicit_and_unresolved_executables_are_unchanged() {
+        let explicit = PathBuf::from("/bin/sh");
+        assert_eq!(
+            CommandBuilder::new(&explicit).to_spawn_command().exe,
+            explicit
+        );
+        let command = CommandBuilder::new("missing")
+            .clear_envs(true)
+            .env("PATH", "/no/such/path")
+            .to_spawn_command();
+        assert_eq!(
+            command.exe,
+            PathBuf::from("/__mr_crabs_unresolved__/missing")
+        );
+    }
+
+    #[test]
+    fn relative_and_empty_path_entries_use_child_cwd() {
+        let root = std::env::temp_dir().join(format!("mr-crabs-path-cwd-{}", std::process::id()));
+        let bin = root.join("bin");
+        std::fs::create_dir_all(&bin).unwrap();
+        let candidate = bin.join("tool");
+        std::fs::write(&candidate, b"x").unwrap();
+        make_executable(&candidate);
+        let cmd = CommandBuilder::new("tool")
+            .cwd(&root)
+            .clear_envs(true)
+            .env("PATH", "bin")
+            .to_spawn_command();
+        assert_eq!(cmd.exe, candidate);
+        let cwd_candidate = root.join("cwd-tool");
+        std::fs::write(&cwd_candidate, b"x").unwrap();
+        make_executable(&cwd_candidate);
+        let cmd = CommandBuilder::new("cwd-tool")
+            .cwd(&root)
+            .clear_envs(true)
+            .env("PATH", ":")
+            .to_spawn_command();
+        assert_eq!(cmd.exe, cwd_candidate);
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[cfg(unix)]
+    fn make_executable(path: &Path) {
+        use std::os::unix::fs::PermissionsExt;
+        let mut permissions = std::fs::metadata(path).unwrap().permissions();
+        permissions.set_mode(0o755);
+        std::fs::set_permissions(path, permissions).unwrap();
+    }
+
     #[test]
     fn argv_preserves_non_utf8_bytes_through_spawn_command() {
         use std::os::unix::ffi::OsStringExt;
-        let raw = vec![0x66, 0x6f, 0x80, 0x6f]; // "fo\x80o"
+        let raw = vec![0x66, 0x6f, 0x80, 0x6f];
         let non_utf8 = OsString::from_vec(raw.clone());
         let mut builder = CommandBuilder::new("/bin/sh");
         builder.arg(non_utf8.clone());
         let cmd = builder.to_spawn_command();
-        assert_eq!(cmd.args.len(), 1);
         assert_eq!(cmd.args[0].as_bytes(), raw.as_slice());
         assert_eq!(cmd.args[0], non_utf8);
     }

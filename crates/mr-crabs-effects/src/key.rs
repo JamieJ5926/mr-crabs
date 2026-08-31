@@ -87,8 +87,8 @@ fn cell_paints_glyph(cell: Cell) -> bool {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum RowStampPolicy {
     EveryChangedCell,
-    DrawableGlyphsPerRow,
-    DrawableGlyphsPerRowAndRepeat,
+    DrawableCharacterUnits,
+    DrawableCharacterUnitsAndRepeat,
 }
 
 pub struct ChangeTracker {
@@ -184,9 +184,9 @@ impl ChangeTracker {
     /// Diff one rebuilt row against the previous snapshot and timestamp
     /// changed cells. `anim_ms` is shared by every change in streaming mode.
     /// Typewriter mode consumes one persistent-burst timestamp per changed
-    /// drawable row, so a long line cannot delay later output by one slot per
-    /// glyph. A new row generation with identical final keys re-timestamps
-    /// drawable glyphs together so repeated output still receives one reveal.
+    /// drawable character unit. A wide glyph and its spacer share one timestamp.
+    /// A new row generation with identical final keys re-timestamps drawable
+    /// character units so repeated output still receives a reveal.
     /// Rows absent from the frame are unchanged by definition.
     pub fn update_row(
         &mut self,
@@ -197,7 +197,7 @@ impl ChangeTracker {
         schedule: &mut TypewriterSchedule,
     ) {
         let policy = if schedule.is_active() {
-            RowStampPolicy::DrawableGlyphsPerRowAndRepeat
+            RowStampPolicy::DrawableCharacterUnitsAndRepeat
         } else {
             RowStampPolicy::EveryChangedCell
         };
@@ -218,7 +218,7 @@ impl ChangeTracker {
             cells,
             anim_ms,
             schedule,
-            RowStampPolicy::DrawableGlyphsPerRow,
+            RowStampPolicy::DrawableCharacterUnits,
         );
     }
 
@@ -247,90 +247,92 @@ impl ChangeTracker {
         let Some((base, len)) = self.tracked_row_span(row, cells.len()) else {
             return;
         };
-        let shared_timestamp = (matches!(
-            policy,
-            RowStampPolicy::DrawableGlyphsPerRow | RowStampPolicy::DrawableGlyphsPerRowAndRepeat
-        ) && cells.iter().take(len).enumerate().any(|(x, cell)| {
-            let key_changed = cell_render_key(*cell) != self.snapshot[base + x];
-            let drawable = cell_paints_glyph(*cell)
-                || (cell.flags & Cell::WIDE_SPACER != 0
-                    && x > 0
-                    && cells[x - 1].flags & Cell::WIDE != 0);
-            key_changed && drawable
-        }))
-        .then(|| {
-            if schedule.is_active() {
-                schedule.next_timestamp()
-            } else {
-                anim_ms
-            }
-        });
         let mut last = self.last_change_ms;
         let mut key_changed = false;
         let mut timestamp_changed = false;
-        for (x, cell) in cells.iter().take(len).enumerate() {
-            let i = base + x;
-            let key = cell_render_key(*cell);
-            if key == self.snapshot[i] {
-                continue;
+
+        if matches!(policy, RowStampPolicy::EveryChangedCell) {
+            for (x, cell) in cells.iter().take(len).enumerate() {
+                let i = base + x;
+                let key = cell_render_key(*cell);
+                if key == self.snapshot[i] {
+                    continue;
+                }
+                self.snapshot[i] = key;
+                key_changed = true;
+                self.stamp_change(i, anim_ms, schedule, &mut last);
+                timestamp_changed = true;
             }
-            self.snapshot[i] = key;
-            key_changed = true;
-            let is_glyph_span = cell_paints_glyph(*cell)
-                || (cell.flags & Cell::WIDE_SPACER != 0
-                    && x > 0
-                    && cells[x - 1].flags & Cell::WIDE != 0);
-            match policy {
-                RowStampPolicy::EveryChangedCell => {
-                    self.stamp_change(i, anim_ms, schedule, &mut last);
-                    timestamp_changed = true;
-                }
-                RowStampPolicy::DrawableGlyphsPerRow
-                | RowStampPolicy::DrawableGlyphsPerRowAndRepeat
-                    if is_glyph_span =>
-                {
-                    self.stamp_change_at(
-                        i,
-                        shared_timestamp.expect("drawable row timestamp"),
-                        &mut last,
-                    );
-                    timestamp_changed = true;
-                }
-                RowStampPolicy::DrawableGlyphsPerRow
-                | RowStampPolicy::DrawableGlyphsPerRowAndRepeat => {
-                    if self.change_ms[i] != NEVER_MS {
-                        self.change_times[i] = NEVER_BITS;
-                        self.change_ms[i] = NEVER_MS;
+        } else {
+            let mut x = 0;
+            while x < len {
+                let cell = cells[x];
+                let paired = cell.flags & Cell::WIDE != 0
+                    && x + 1 < len
+                    && cells[x + 1].flags & Cell::WIDE_SPACER != 0;
+                let unit_len = if paired { 2 } else { 1 };
+                let unit_changed = (0..unit_len).any(|offset| {
+                    cell_render_key(cells[x + offset]) != self.snapshot[base + x + offset]
+                });
+
+                if unit_changed {
+                    key_changed = true;
+                    for offset in 0..unit_len {
+                        self.snapshot[base + x + offset] = cell_render_key(cells[x + offset]);
+                    }
+
+                    if cell_paints_glyph(cell) {
+                        let timestamp = if schedule.is_active() {
+                            schedule.next_timestamp()
+                        } else {
+                            anim_ms
+                        };
+                        for offset in 0..unit_len {
+                            self.stamp_change_at(base + x + offset, timestamp, &mut last);
+                        }
                         timestamp_changed = true;
+                    } else {
+                        for offset in 0..unit_len {
+                            let i = base + x + offset;
+                            if self.change_times[i] != NEVER_BITS {
+                                self.change_times[i] = NEVER_BITS;
+                                self.change_ms[i] = NEVER_MS;
+                                timestamp_changed = true;
+                            }
+                        }
                     }
                 }
+
+                x += unit_len;
             }
         }
 
         if !key_changed
             && matches!(
                 policy,
-                RowStampPolicy::EveryChangedCell | RowStampPolicy::DrawableGlyphsPerRowAndRepeat
+                RowStampPolicy::EveryChangedCell | RowStampPolicy::DrawableCharacterUnitsAndRepeat
             )
             && cells.iter().take(len).any(|cell| cell_paints_glyph(*cell))
         {
-            let timestamp = if schedule.is_active() {
-                schedule.next_timestamp()
-            } else {
-                anim_ms
-            };
-            for (x, cell) in cells.iter().take(len).enumerate() {
-                if !cell_paints_glyph(*cell) {
-                    continue;
-                }
-                self.stamp_change_at(base + x, timestamp, &mut last);
-                if cell.flags & Cell::WIDE != 0
+            let mut x = 0;
+            while x < len {
+                let cell = cells[x];
+                let paired = cell.flags & Cell::WIDE != 0
                     && x + 1 < len
-                    && cells[x + 1].flags & Cell::WIDE_SPACER != 0
-                {
-                    self.stamp_change_at(base + x + 1, timestamp, &mut last);
+                    && cells[x + 1].flags & Cell::WIDE_SPACER != 0;
+                let unit_len = if paired { 2 } else { 1 };
+                if cell_paints_glyph(cell) {
+                    let timestamp = if schedule.is_active() {
+                        schedule.next_timestamp()
+                    } else {
+                        anim_ms
+                    };
+                    for offset in 0..unit_len {
+                        self.stamp_change_at(base + x + offset, timestamp, &mut last);
+                    }
+                    timestamp_changed = true;
                 }
-                timestamp_changed = true;
+                x += unit_len;
             }
         }
 
@@ -647,37 +649,102 @@ mod tests {
     }
 
     #[test]
-    fn typewriter_stamps_consume_one_schedule_slot_per_row() {
-        let mut t = ChangeTracker::new(4, 1, 16);
-        let mut sched = TypewriterSchedule::new(15.0);
-        sched.begin_build(1000.0, 120.0);
-        let row = vec![
+    fn typewriter_stamps_one_slot_per_character_unit() {
+        let mut tracker = ChangeTracker::new(5, 1, 16);
+        let mut schedule = TypewriterSchedule::new(15.0);
+        schedule.begin_build(1000.0, 120.0);
+        let row = [
             cell(65, 0, 0),
             cell(66, 0, 0),
+            cell('界' as u32, 0, Cell::WIDE),
+            cell(32, 0, Cell::WIDE_SPACER),
             cell(67, 0, 0),
-            cell(32, 0, 0),
         ];
-        t.update_row(0, 1, &row, 1000.0, &mut sched);
-        assert_eq!(t.change_ms_at(0), 1000.0);
-        assert_eq!(t.change_ms_at(1), 1000.0);
-        assert_eq!(t.change_ms_at(2), 1000.0);
-        assert_eq!(t.change_ms_at(3), NEVER_MS);
-        assert_eq!(t.last_change_ms(), 1000.0);
+        tracker.update_row(0, 1, &row, 1000.0, &mut schedule);
 
-        let row2 = vec![
-            cell(65, 0, 0),
-            cell(90, 0, 0),
-            cell(67, 0, 0),
-            cell(32, 0, 0),
-        ];
-        t.update_row(0, 2, &row2, 2000.0, &mut sched);
-        assert_eq!(t.change_ms_at(1), 1015.0);
-        assert_eq!(t.change_ms_at(0), 1000.0);
-        assert_eq!(t.last_change_ms(), 1015.0);
+        assert_eq!(tracker.change_ms_at(0), 1000.0);
+        assert_eq!(tracker.change_ms_at(1), 1015.0);
+        assert_eq!(tracker.change_ms_at(2), 1030.0);
+        assert_eq!(tracker.change_ms_at(3), 1030.0);
+        assert_eq!(tracker.bits_at(2), tracker.bits_at(3));
+        assert_eq!(tracker.change_ms_at(4), 1045.0);
+        assert_eq!(tracker.last_change_ms(), 1045.0);
+        assert_eq!(schedule.next_ms(), 1060.0);
     }
 
     #[test]
-    fn full_reconcile_shares_one_timestamp_per_drawable_row() {
+    fn identical_replay_staggers_character_units_without_splitting_wide_cells() {
+        let mut tracker = ChangeTracker::new(4, 1, 16);
+        let mut schedule = TypewriterSchedule::new(15.0);
+        schedule.begin_build(1000.0, 120.0);
+        let row = [
+            cell(65, 0, 0),
+            cell('界' as u32, 0, Cell::WIDE),
+            cell(32, 0, Cell::WIDE_SPACER),
+            cell(66, 0, 0),
+        ];
+        tracker.update_row(0, 1, &row, 1000.0, &mut schedule);
+        tracker.update_row(0, 2, &row, 1100.0, &mut schedule);
+
+        assert_eq!(tracker.change_ms_at(0), 1045.0);
+        assert_eq!(tracker.change_ms_at(1), 1060.0);
+        assert_eq!(tracker.change_ms_at(2), 1060.0);
+        assert_eq!(tracker.bits_at(1), tracker.bits_at(2));
+        assert_eq!(tracker.change_ms_at(3), 1075.0);
+        assert_eq!(schedule.next_ms(), 1090.0);
+    }
+
+    #[test]
+    fn changed_wide_spacer_restamps_the_whole_character() {
+        let mut tracker = ChangeTracker::new(3, 1, 16);
+        let mut schedule = TypewriterSchedule::new(15.0);
+        schedule.begin_build(1000.0, 120.0);
+        let row = [
+            cell('界' as u32, 0, Cell::WIDE),
+            cell(32, 0, Cell::WIDE_SPACER),
+            cell(65, 0, 0),
+        ];
+        tracker.update_row(0, 1, &row, 1000.0, &mut schedule);
+
+        let changed = [
+            cell('界' as u32, 0, Cell::WIDE),
+            cell(32, 1, Cell::WIDE_SPACER),
+            cell(65, 0, 0),
+        ];
+        tracker.update_row(0, 2, &changed, 1100.0, &mut schedule);
+
+        assert_eq!(tracker.change_ms_at(0), 1030.0);
+        assert_eq!(tracker.change_ms_at(1), 1030.0);
+        assert_eq!(tracker.bits_at(0), tracker.bits_at(1));
+        assert_eq!(tracker.change_ms_at(2), 1015.0);
+        assert_eq!(schedule.next_ms(), 1045.0);
+    }
+
+    #[test]
+    fn orphan_wide_spacer_consumes_no_schedule_slot() {
+        let mut tracker = ChangeTracker::new(3, 1, 16);
+        let mut schedule = TypewriterSchedule::new(15.0);
+        schedule.begin_build(1000.0, 120.0);
+        tracker.update_row(
+            0,
+            1,
+            &[
+                cell(65, 0, 0),
+                cell(32, 0, Cell::WIDE_SPACER),
+                cell(66, 0, 0),
+            ],
+            1000.0,
+            &mut schedule,
+        );
+
+        assert_eq!(tracker.change_ms_at(0), 1000.0);
+        assert_eq!(tracker.change_ms_at(1), NEVER_MS);
+        assert_eq!(tracker.change_ms_at(2), 1015.0);
+        assert_eq!(schedule.next_ms(), 1030.0);
+    }
+
+    #[test]
+    fn full_reconcile_staggers_drawable_character_units() {
         let mut tracker = ChangeTracker::new(4, 1, 16);
         let mut schedule = TypewriterSchedule::new(15.0);
         schedule.begin_build(1000.0, 120.0);
@@ -694,14 +761,14 @@ mod tests {
             &mut schedule,
         );
         assert_eq!(tracker.change_ms_at(0), 1000.0);
-        assert_eq!(tracker.change_ms_at(1), 1000.0);
-        assert_eq!(tracker.change_ms_at(2), 1000.0);
+        assert_eq!(tracker.change_ms_at(1), 1015.0);
+        assert_eq!(tracker.change_ms_at(2), 1030.0);
         assert_eq!(tracker.change_ms_at(3), NEVER_MS);
-        assert_eq!(tracker.last_change_ms(), 1000.0);
+        assert_eq!(tracker.last_change_ms(), 1030.0);
     }
 
     #[test]
-    fn full_reconcile_schedule_advances_only_for_changed_drawable_rows() {
+    fn full_reconcile_schedule_advances_for_each_changed_character() {
         let mut tracker = ChangeTracker::new(4, 3, 16);
         let mut schedule = TypewriterSchedule::new(20.0);
         schedule.begin_build(1000.0, 120.0);
@@ -732,11 +799,11 @@ mod tests {
             &mut schedule,
         );
         assert_eq!(tracker.change_ms_at(0), 1000.0);
-        assert_eq!(tracker.change_ms_at(1), 1000.0);
+        assert_eq!(tracker.change_ms_at(1), 1020.0);
         assert_eq!(tracker.change_ms_at(4), NEVER_MS);
-        assert_eq!(tracker.change_ms_at(8), 1020.0);
-        assert_eq!(tracker.change_ms_at(9), 1020.0);
-        assert_eq!(tracker.last_change_ms(), 1020.0);
+        assert_eq!(tracker.change_ms_at(8), 1040.0);
+        assert_eq!(tracker.change_ms_at(9), 1060.0);
+        assert_eq!(tracker.last_change_ms(), 1060.0);
     }
 
     #[test]

@@ -16,6 +16,10 @@ use mr_crabs_protocols::sink::ClipboardEvent;
 use mr_crabs_pty::OutputWake;
 use mr_crabs_terminal::{FrameDelta, GridSize};
 
+use crate::animation_control::{
+    AnimationControl, AnimationReply, AnimationSelection, AnimationSnapshot, AnimationTextSetting,
+    AnimationTrailSetting, OverlaySource,
+};
 use crate::diagnostics::{
     DiagnosticEvent, DiagnosticFrameEvent, DiagnosticPumpEvent, DiagnosticTrace,
 };
@@ -41,8 +45,17 @@ use super::geometry::SurfaceGeometry;
 use super::pane::{PaneModel, PtySpawnConfig, SearchApply};
 use super::split::{PaneId, SplitAxis, SplitDirection};
 use super::tab::{ClosePaneOutcome, TabId, TabModel};
-use super::window::{TabCloseOutcome, WindowId, WindowModel, WindowPumpStats};
-/// The result of dispatching one action.
+use super::window::{
+    MOLT_DURATION_MS, StartupPresentation, TabCloseOutcome, WindowId, WindowModel, WindowPumpStats,
+};
+
+/// Process-wide monotonic milliseconds. The single clock epoch for startup
+/// presentation timing; the shell's animation scheduler ticks with it too.
+pub fn monotonic_ms() -> u64 {
+    static START: std::sync::LazyLock<std::time::Instant> =
+        std::sync::LazyLock::new(std::time::Instant::now);
+    u64::try_from(START.elapsed().as_millis()).unwrap_or(u64::MAX)
+}
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ActionResult {
     pub performed: bool,
@@ -118,6 +131,32 @@ pub struct AppModel {
     next_window: u64,
     next_tab: u64,
     next_pane: u64,
+}
+
+/// Prepend `exe`'s parent directory onto inherited PATH for a child env map.
+/// Child-only: does not mutate process env. Duplicate parent dirs are skipped.
+/// If `join_paths` fails, inherited PATH is left unchanged.
+fn prepend_child_exe_dir_to_path(env: &mut BTreeMap<String, String>, exe: &std::path::Path) {
+    let Some(parent) = exe.parent() else {
+        return;
+    };
+    if parent.as_os_str().is_empty() {
+        return;
+    }
+    let inherited = std::env::var_os("PATH");
+    let mut dirs: Vec<std::path::PathBuf> = inherited
+        .as_ref()
+        .map(|value| std::env::split_paths(value).collect())
+        .unwrap_or_default();
+    if !dirs.iter().any(|dir| dir == parent) {
+        dirs.insert(0, parent.to_path_buf());
+    }
+    match std::env::join_paths(dirs) {
+        Ok(joined) => {
+            env.insert("PATH".to_string(), joined.to_string_lossy().into_owned());
+        }
+        Err(_) => {}
+    }
 }
 
 pub(crate) fn minimum_fetch_deadline(
@@ -351,6 +390,7 @@ impl AppModel {
                 settings.cursor_blink,
             );
             if let Ok(exe) = std::env::current_exe() {
+                prepend_child_exe_dir_to_path(&mut env, &exe);
                 env.insert("MR_CRABS_BIN".to_string(), exe.display().to_string());
             }
             let config = PtySpawnConfig {
@@ -388,6 +428,32 @@ impl AppModel {
         self.new_window_with(size)
     }
 
+    /// Apply the startup animation/fetch configuration to a fresh pane and
+    /// derive the window-level presentation. Rustfetch is retained only when
+    /// the startup command is actually active (Rustfetch kind, fetch enabled,
+    /// non-empty command); otherwise the presentation stays suppressed.
+    fn apply_startup_config(&self, pane: &mut PaneModel) -> StartupPresentation {
+        let settings = self.settings.current();
+        let kind = settings.startup_animation_kind();
+        let startup_fetch_active = kind == mr_crabs_config::StartupAnimation::Rustfetch
+            && settings.startup_fetch
+            && !settings.startup_fetch_command.is_empty();
+        if startup_fetch_active {
+            pane.set_startup_command(Some(settings.startup_fetch_command.clone()));
+        }
+        if !settings.fetch_gif_path.is_empty() {
+            pane.set_fetch_gif_path(Some(std::path::PathBuf::from(
+                settings.fetch_gif_path.clone(),
+            )));
+        }
+        match kind {
+            mr_crabs_config::StartupAnimation::Rustfetch if !startup_fetch_active => {
+                StartupPresentation::None
+            }
+            _ => StartupPresentation::from_config(kind, monotonic_ms()),
+        }
+    }
+
     /// Open a new window at a specific grid.
     pub fn new_window_with(&mut self, size: GridSize) -> Option<WindowId> {
         if !size.is_valid() {
@@ -396,17 +462,10 @@ impl AppModel {
         let window_id = self.alloc_window_id();
         let tab_id = self.alloc_tab_id();
         let mut pane = self.new_pane(size, None);
-        let settings = self.settings.current();
-        if settings.startup_fetch && !settings.startup_fetch_command.is_empty() {
-            pane.set_startup_command(Some(settings.startup_fetch_command.clone()));
-        }
-        if !settings.fetch_gif_path.is_empty() {
-            pane.set_fetch_gif_path(Some(std::path::PathBuf::from(
-                settings.fetch_gif_path.clone(),
-            )));
-        }
+        let startup_presentation = self.apply_startup_config(&mut pane);
         let pane_id = pane.id;
         let mut window = WindowModel::new(window_id, tab_id, pane_id, size).ok()?;
+        window.startup_presentation = startup_presentation;
         window
             .tabs
             .get_mut(&tab_id)
@@ -427,17 +486,10 @@ impl AppModel {
         let window_id = self.alloc_window_id();
         let tab_id = self.alloc_tab_id();
         let mut pane = self.new_pane(size, cwd);
-        let settings = self.settings.current();
-        if settings.startup_fetch && !settings.startup_fetch_command.is_empty() {
-            pane.set_startup_command(Some(settings.startup_fetch_command.clone()));
-        }
-        if !settings.fetch_gif_path.is_empty() {
-            pane.set_fetch_gif_path(Some(std::path::PathBuf::from(
-                settings.fetch_gif_path.clone(),
-            )));
-        }
+        let startup_presentation = self.apply_startup_config(&mut pane);
         let pane_id = pane.id;
         let mut window = WindowModel::new(window_id, tab_id, pane_id, size).ok()?;
+        window.startup_presentation = startup_presentation;
         window
             .tabs
             .get_mut(&tab_id)
@@ -466,8 +518,15 @@ impl AppModel {
             .grid()
             .unwrap_or(self.settings.current().default_grid);
         let tab_id = self.alloc_tab_id();
-        let pane = self.new_pane(size, cwd);
+        let mut pane = self.new_pane(size, cwd);
         let pane_id = pane.id;
+        let effective = self
+            .windows
+            .get(&window_id)
+            .map(|window| window.effective_animation(self.settings.current().animation_defaults()));
+        if let Some(animation) = effective {
+            pane.core.set_animation_defaults(animation);
+        }
         let mut tab = TabModel::new(tab_id, pane_id, size).ok()?;
         tab.panes.insert(pane_id, pane);
         self.windows.get_mut(&window_id)?.add_tab(tab);
@@ -597,6 +656,8 @@ impl AppModel {
                 stats.error = error;
             }
         }
+        self.drain_animation_controls();
+
         let close_on_exit = self.settings.current().close_on_exit;
         let mut close = Vec::new();
         for window in self.windows.values() {
@@ -625,21 +686,21 @@ impl AppModel {
                 frames: stats.frames,
                 pending: stats.pending,
             }));
-            if let Some(pane) = self.focused_pane() {
-                if let Some(frame) = pane.frame() {
-                    trace.push(DiagnosticEvent::Frame(DiagnosticFrameEvent {
-                        pane_id: pane.id,
-                        sequence: frame.sequence,
-                        damage: frame.damage,
-                        cursor_row: frame.cursor.row,
-                        cursor_col: frame.cursor.col,
-                        cursor_shape: frame.cursor.shape,
-                        cursor_visible: frame.cursor.visible,
-                        cursor_blinking: frame.cursor.blinking,
-                        cursor_wrap_pending: frame.cursor.wrap_pending,
-                        alternate_screen: frame.viewport.alternate_screen,
-                    }));
-                }
+            if let Some(pane) = self.focused_pane()
+                && let Some(frame) = pane.frame()
+            {
+                trace.push(DiagnosticEvent::Frame(DiagnosticFrameEvent {
+                    pane_id: pane.id,
+                    sequence: frame.sequence,
+                    damage: frame.damage,
+                    cursor_row: frame.cursor.row,
+                    cursor_col: frame.cursor.col,
+                    cursor_shape: frame.cursor.shape,
+                    cursor_visible: frame.cursor.visible,
+                    cursor_blinking: frame.cursor.blinking,
+                    cursor_wrap_pending: frame.cursor.wrap_pending,
+                    alternate_screen: frame.viewport.alternate_screen,
+                }));
             }
         }
         stats
@@ -653,6 +714,36 @@ impl AppModel {
                     .map(super::pane::PaneModel::next_fetch_deadline_ms)
             })
         }))
+    }
+
+    /// Next animation-frame deadline for any window's molt presentation:
+    /// the earlier of the completion instant and the next ~60 Hz step.
+    pub fn next_molt_deadline_ms(&self, now_ms: u64) -> Option<u64> {
+        self.windows
+            .values()
+            .filter_map(|window| match window.startup_presentation {
+                StartupPresentation::MoltActive { started_ms } => {
+                    let end = started_ms + MOLT_DURATION_MS;
+                    (now_ms < end).then(|| end.min(now_ms + super::window::MOLT_FRAME_INTERVAL_MS))
+                }
+                _ => None,
+            })
+            .min()
+    }
+
+    /// Advance every window's molt presentation past `now_ms`; reports
+    /// whether a repaint is due. Intermediate fade frames repaint on every
+    /// tick while a molt is active; completion flips the state one final
+    /// time and then reports false.
+    pub fn tick_molt_animations(&mut self, now_ms: u64) -> bool {
+        let mut changed = false;
+        for window in self.windows.values_mut() {
+            let before = window.startup_presentation;
+            window.startup_presentation.tick_molt(now_ms);
+            changed |= window.startup_presentation != before
+                || window.startup_presentation.molt_needs_frames(now_ms);
+        }
+        changed
     }
 
     pub fn tick_fetch_animations(&mut self, now_ms: u64) -> bool {
@@ -692,12 +783,20 @@ impl AppModel {
     }
 
     // ── input ──
-
     /// Write bytes to a pane's session; fails closed when the pane is
     /// detached, shut down, or the bounded queue is full. The PTY reader
     /// wakes the application when echo or command output enters its bounded
     /// queue, so successful writes do not schedule speculative frames.
     pub fn write_to_pane(&mut self, pane_id: PaneId, bytes: &[u8]) -> bool {
+        self.write_to_pane_with_submission(pane_id, bytes, false)
+    }
+
+    pub fn write_to_pane_with_submission(
+        &mut self,
+        pane_id: PaneId,
+        bytes: &[u8],
+        submitted_enter: bool,
+    ) -> bool {
         let Some((window_id, tab_id)) = self.locate_pane(pane_id) else {
             return false;
         };
@@ -713,7 +812,33 @@ impl AppModel {
         if pane.session.write(bytes).is_err() {
             return false;
         }
+        if submitted_enter {
+            let was = window.startup_presentation;
+            window.startup_presentation.dismiss_on_enter();
+            if was == StartupPresentation::RustfetchRetained {
+                pane.dismiss_startup_fetch();
+            }
+        }
         true
+    }
+    /// Write a paste payload with bounded backpressure so a temporarily full
+    /// PTY queue does not drop the entire clipboard contents.
+    pub fn write_paste_to_pane(&mut self, pane_id: PaneId, bytes: &[u8]) -> bool {
+        let Some((window_id, tab_id)) = self.locate_pane(pane_id) else {
+            return false;
+        };
+        let Some(window) = self.windows.get_mut(&window_id) else {
+            return false;
+        };
+        let Some(tab) = window.tabs.get_mut(&tab_id) else {
+            return false;
+        };
+        let Some(pane) = tab.panes.get_mut(&pane_id) else {
+            return false;
+        };
+        pane.session
+            .write_with_timeout(bytes, Duration::from_millis(100))
+            .is_ok()
     }
 
     /// Drain OSC 52 requests from every pane while retaining the pane identity
@@ -733,6 +858,154 @@ impl AppModel {
             }
         }
         requests
+    }
+
+    fn drain_animation_controls(&mut self) {
+        let mut requests = Vec::new();
+        for window in self.windows.values_mut() {
+            let window_id = window.id;
+            for tab in window.tabs.values_mut() {
+                for pane in tab.panes.values_mut() {
+                    requests.extend(
+                        pane.protocol_sink()
+                            .drain_animation_controls()
+                            .into_iter()
+                            .map(|request| (window_id, pane.id, request)),
+                    );
+                }
+            }
+        }
+        for (window_id, pane_id, request) in requests {
+            self.handle_animation_control(window_id, pane_id, request.control, request.terminator);
+            if let Some((located_window, tab_id)) = self.locate_pane(pane_id)
+                && let Some(pane) = self
+                    .windows
+                    .get_mut(&located_window)
+                    .and_then(|window| window.tabs.get_mut(&tab_id))
+                    .and_then(|tab| tab.panes.get_mut(&pane_id))
+            {
+                let _ = pane.flush_pty_replies();
+            }
+        }
+    }
+
+    fn animation_snapshot(&self, window_id: WindowId) -> Option<AnimationSnapshot> {
+        let window = self.windows.get(&window_id)?;
+        let global = self.settings.current().animation_defaults();
+        let overlay = window.animation_overlay;
+        Some(AnimationSnapshot {
+            selection: AnimationSelection {
+                text: crate::animation_control::TextAnimationChoice::from_config(
+                    overlay.text_animation.unwrap_or(global.text_animation),
+                ),
+                cursor_trail: overlay.cursor_trail.unwrap_or(global.cursor_trail),
+            },
+            text_source: if overlay.text_animation.is_some() {
+                OverlaySource::Override
+            } else {
+                OverlaySource::Global
+            },
+            trail_source: if overlay.cursor_trail.is_some() {
+                OverlaySource::Override
+            } else {
+                OverlaySource::Global
+            },
+            save_available: false,
+        })
+    }
+
+    fn pane_animation_reply(
+        &self,
+        pane_id: PaneId,
+        reply: AnimationReply,
+        terminator: crate::animation_control::OscTerminator,
+    ) {
+        if let Some((window_id, tab_id)) = self.locate_pane(pane_id)
+            && let Some(pane) = self
+                .windows
+                .get(&window_id)
+                .and_then(|w| w.tabs.get(&tab_id))
+                .and_then(|t| t.panes.get(&pane_id))
+        {
+            pane.protocol_sink()
+                .write_animation_reply_with_terminator(reply, terminator);
+        }
+    }
+
+    fn apply_animation_state(
+        &mut self,
+        window_id: WindowId,
+        text: AnimationTextSetting,
+        trail: AnimationTrailSetting,
+    ) -> bool {
+        let Some(window) = self.windows.get_mut(&window_id) else {
+            return false;
+        };
+        window.animation_overlay.text_animation = match text {
+            AnimationTextSetting::None => Some(mr_crabs_config::TextAnimation::Disabled),
+            AnimationTextSetting::Streaming => Some(mr_crabs_config::TextAnimation::Streaming),
+            AnimationTextSetting::Typewriter => Some(mr_crabs_config::TextAnimation::Typewriter),
+            AnimationTextSetting::Inherit => None,
+        };
+        window.animation_overlay.cursor_trail = match trail {
+            AnimationTrailSetting::Off => Some(false),
+            AnimationTrailSetting::On => Some(true),
+            AnimationTrailSetting::Inherit => None,
+        };
+        self.apply_window_animation(window_id)
+    }
+
+    fn apply_window_animation(&mut self, window_id: WindowId) -> bool {
+        let base = self.settings.current().animation_defaults();
+        let Some(window) = self.windows.get_mut(&window_id) else {
+            return false;
+        };
+        let effective = window.effective_animation(base);
+        for tab in window.tabs.values_mut() {
+            for pane in tab.panes.values_mut() {
+                pane.core.set_animation_defaults(effective);
+            }
+        }
+        self.generation += 1;
+        true
+    }
+
+    fn handle_animation_control(
+        &mut self,
+        window_id: WindowId,
+        pane_id: PaneId,
+        control: AnimationControl,
+        terminator: crate::animation_control::OscTerminator,
+    ) {
+        match control {
+            AnimationControl::Preset(name) => {
+                self.apply_window_animation_preset(window_id, &name);
+            }
+            AnimationControl::Query { .. } => {
+                if let Some(snapshot) = self.animation_snapshot(window_id) {
+                    self.pane_animation_reply(
+                        pane_id,
+                        AnimationReply::Snapshot(snapshot),
+                        terminator,
+                    );
+                }
+            }
+            AnimationControl::State { text, trail } => {
+                self.apply_animation_state(window_id, text, trail);
+            }
+            AnimationControl::Save { .. } => {}
+        }
+    }
+
+    pub fn apply_window_animation_preset(&mut self, window_id: WindowId, name: &str) -> bool {
+        let Some(preset) = crate::settings::animation_preset(name) else {
+            return false;
+        };
+        let Some(window) = self.windows.get_mut(&window_id) else {
+            return false;
+        };
+        window.animation_overlay.apply_preset(preset);
+        self.apply_window_animation(window_id)
     }
 
     /// Commit a measured surface geometry through every split-derived pane.
@@ -780,6 +1053,7 @@ impl AppModel {
                 }
             }
             window.is_quick_terminal = true;
+            window.startup_presentation = StartupPresentation::suppressed();
             window.title = "Quick Terminal".to_string();
             self.quick_terminal.window_id = Some(window_id);
             self.quick_terminal.visible = true;
@@ -973,9 +1247,10 @@ impl AppModel {
         self.settings.apply_runtime_value(key, value)?;
         let animation = self.settings.current().animation_defaults();
         for window in self.windows.values_mut() {
+            let effective = window.effective_animation(animation);
             for tab in window.tabs.values_mut() {
                 for pane in tab.panes.values_mut() {
-                    pane.core.set_animation_defaults(animation);
+                    pane.core.set_animation_defaults(effective);
                 }
             }
         }
@@ -1103,16 +1378,23 @@ impl AppModel {
                 // default grid for an unmeasured window (never a literal
                 // grid).
                 let size = self
-                    .active_tab()
-                    .and_then(|tab| tab.focused_pane())
-                    .map(|pane| pane.last_size)
-                    .or_else(|| {
-                        self.windows
-                            .get(&window_id)
-                            .and_then(|window| window.grid())
+                    .windows
+                    .get(&window_id)
+                    .and_then(|window| {
+                        window
+                            .active_tab()
+                            .and_then(|tab| tab.focused_pane())
+                            .map(|pane| pane.last_size)
+                            .or_else(|| window.grid())
                     })
                     .unwrap_or(self.settings.current().default_grid);
-                let pane = self.new_pane(size, None);
+                let mut pane = self.new_pane(size, None);
+                let animation = self.windows.get(&window_id).map(|window| {
+                    window.effective_animation(self.settings.current().animation_defaults())
+                });
+                if let Some(animation) = animation {
+                    pane.core.set_animation_defaults(animation);
+                }
                 let result = self
                     .windows
                     .get_mut(&window_id)
@@ -1211,9 +1493,10 @@ impl AppModel {
                     let settings = self.settings.current();
                     let animation = settings.animation_defaults();
                     for window in self.windows.values_mut() {
+                        let effective = window.effective_animation(animation);
                         for tab in window.tabs.values_mut() {
                             for pane in tab.panes.values_mut() {
-                                pane.core.set_animation_defaults(animation);
+                                pane.core.set_animation_defaults(effective);
                                 pane.core.set_default_cursor_blink(settings.cursor_blink);
                                 pane.core
                                     .set_scrollback_lines(settings.scrollback_lines as usize);
@@ -1234,12 +1517,7 @@ impl AppModel {
                     crate::updates::UpdateStatus::Disabled { reason } => {
                         format!("updates disabled: {reason}")
                     }
-                    crate::updates::UpdateStatus::UpToDate { version } => {
-                        format!("up to date ({version})")
-                    }
-                    crate::updates::UpdateStatus::UpdateAvailable { version, notes } => {
-                        format!("update available: {version} ({notes})")
-                    }
+                    _ => "update check completed".to_string(),
                 };
                 self.last_update_check = Some(result);
                 ActionResult::performed(note)
@@ -1345,10 +1623,133 @@ impl Drop for AppModel {
 mod tests {
     use super::*;
     use crate::model::geometry::PaddingPx;
+    use mr_crabs_config::{ConfigOverlay, SettingKey};
     use mr_crabs_element::{CellMetrics, PixelExtent};
+
+    fn path_dirs(value: &str) -> Vec<std::path::PathBuf> {
+        std::env::split_paths(std::ffi::OsStr::new(value)).collect()
+    }
+
+    #[test]
+    fn prepend_child_exe_dir_to_path_inserts_parent_first() {
+        let exe = std::path::Path::new("/opt/mr-crabs/bin/mr-crabs");
+        let mut env = BTreeMap::new();
+        prepend_child_exe_dir_to_path(&mut env, exe);
+        let path = env.get("PATH").expect("PATH inserted");
+        let dirs = path_dirs(path);
+        assert_eq!(
+            dirs.first().map(std::path::PathBuf::as_path),
+            Some(std::path::Path::new("/opt/mr-crabs/bin"))
+        );
+        assert_eq!(
+            dirs.iter()
+                .filter(|dir| dir.as_path() == std::path::Path::new("/opt/mr-crabs/bin"))
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn prepend_child_exe_dir_to_path_skips_duplicate_parent() {
+        let exe = std::path::Path::new("/opt/mr-crabs/bin/mr-crabs");
+        let mut env = BTreeMap::new();
+        prepend_child_exe_dir_to_path(&mut env, exe);
+        prepend_child_exe_dir_to_path(&mut env, exe);
+        let path = env.get("PATH").expect("PATH inserted");
+        let dirs = path_dirs(path);
+        assert_eq!(
+            dirs.iter()
+                .filter(|dir| dir.as_path() == std::path::Path::new("/opt/mr-crabs/bin"))
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn prepend_child_exe_dir_to_path_noop_without_parent() {
+        let mut env = BTreeMap::new();
+        prepend_child_exe_dir_to_path(&mut env, std::path::Path::new("mr-crabs"));
+        assert!(!env.contains_key("PATH"));
+    }
 
     fn headless() -> AppModel {
         AppModel::headless()
+    }
+
+    fn animation_osc(name: &str) -> Vec<u8> {
+        format!(
+            "\x1b]1337;{}={name}\x07",
+            crate::settings::ANIMATION_OSC_KEY
+        )
+        .into_bytes()
+    }
+
+    fn feed_animation_osc_to_focused(model: &mut AppModel, name: &str) {
+        model
+            .focused_pane_mut()
+            .expect("focused pane")
+            .feed_test_output(&animation_osc(name))
+            .expect("animation OSC");
+        model.pump(64);
+    }
+
+    fn window_pane_animations(
+        model: &AppModel,
+        window_id: WindowId,
+    ) -> Vec<(mr_crabs_config::TextAnimation, bool)> {
+        model
+            .window(window_id)
+            .expect("window")
+            .tabs
+            .values()
+            .flat_map(|tab| {
+                tab.panes.values().map(|pane| {
+                    let animation = pane.core.animation_defaults();
+                    (animation.text_animation, animation.cursor_trail)
+                })
+            })
+            .collect()
+    }
+
+    fn attach_focused_writer(model: &mut AppModel) -> std::sync::mpsc::Receiver<Vec<u8>> {
+        let (writer_tx, writer_rx) = std::sync::mpsc::sync_channel(16);
+        let size = model.settings.current().default_grid;
+        let pane = model.focused_pane_mut().expect("focused pane");
+        pane.session = crate::model::pane::PaneSession::from_receivers_with_writer(
+            size,
+            None,
+            None,
+            Some(writer_tx),
+        );
+        writer_rx
+    }
+
+    fn take_writes(rx: &std::sync::mpsc::Receiver<Vec<u8>>) -> Vec<u8> {
+        let mut out = Vec::new();
+        while let Ok(chunk) = rx.try_recv() {
+            out.extend_from_slice(&chunk);
+        }
+        out
+    }
+
+    fn feed_osc_to_focused(model: &mut AppModel, bytes: &[u8]) {
+        model
+            .focused_pane_mut()
+            .expect("focused pane")
+            .feed_test_output(bytes)
+            .expect("animation OSC");
+        model.pump(64);
+    }
+
+    fn unique_config_path(name: &str) -> std::path::PathBuf {
+        std::env::temp_dir().join(format!(
+            "mr-crabs-animation-host-{name}-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("time")
+                .as_nanos()
+        ))
     }
 
     #[test]
@@ -2415,6 +2816,435 @@ mod tests {
         assert_eq!(
             new_pane.core.animation_defaults().text_animation,
             TextAnimation::Typewriter
+        );
+    }
+
+    #[test]
+    fn animation_osc_is_isolated_across_windows() {
+        use mr_crabs_config::TextAnimation;
+        let mut model = headless();
+        let first = model.active_window.expect("first window");
+        let second = model.new_window().expect("second window");
+        model.set_active_window(first);
+        feed_animation_osc_to_focused(&mut model, "typewriter");
+
+        let first_panes = window_pane_animations(&model, first);
+        assert!(!first_panes.is_empty());
+        for (text, trail) in first_panes {
+            assert_eq!(text, TextAnimation::Typewriter);
+            assert!(trail);
+        }
+        let second_panes = window_pane_animations(&model, second);
+        assert!(!second_panes.is_empty());
+        for (text, trail) in second_panes {
+            assert_eq!(text, TextAnimation::Streaming);
+            assert!(trail);
+        }
+        assert_eq!(
+            model
+                .window(first)
+                .expect("first")
+                .animation_overlay
+                .text_animation,
+            Some(TextAnimation::Typewriter)
+        );
+        assert_eq!(
+            model
+                .window(second)
+                .expect("second")
+                .animation_overlay
+                .text_animation,
+            None
+        );
+    }
+
+    #[test]
+    fn animation_osc_propagates_to_every_pane_in_the_owner_window() {
+        use mr_crabs_config::TextAnimation;
+        let mut model = headless();
+        let window_id = model.active_window.expect("window");
+        let first = model.focused_pane_id().expect("first pane");
+        model.dispatch(AppAction::NewSplitRight);
+        let second = model.focused_pane_id().expect("second pane");
+        assert_ne!(first, second);
+        model.focus_pane(first);
+        feed_animation_osc_to_focused(&mut model, "none");
+
+        let panes = window_pane_animations(&model, window_id);
+        assert_eq!(panes.len(), 2);
+        for (text, trail) in panes {
+            assert_eq!(text, TextAnimation::Disabled);
+            assert!(!trail);
+        }
+    }
+
+    #[test]
+    fn animation_osc_partial_preset_merges_over_existing_overlay() {
+        use mr_crabs_config::TextAnimation;
+        let mut model = headless();
+        let window_id = model.active_window.expect("window");
+        feed_animation_osc_to_focused(&mut model, "none");
+        feed_animation_osc_to_focused(&mut model, "cursor-trail");
+
+        let overlay = model.window(window_id).expect("window").animation_overlay;
+        assert_eq!(overlay.text_animation, Some(TextAnimation::Disabled));
+        assert_eq!(overlay.cursor_trail, Some(true));
+        for (text, trail) in window_pane_animations(&model, window_id) {
+            assert_eq!(text, TextAnimation::Disabled);
+            assert!(trail);
+        }
+    }
+
+    #[test]
+    fn animation_osc_overlay_survives_settings_reload() {
+        use mr_crabs_config::TextAnimation;
+        let mut model = headless();
+        let window_id = model.active_window.expect("window");
+        feed_animation_osc_to_focused(&mut model, "typewriter");
+        model
+            .settings
+            .reload_json(
+                r#"{"text_animation": "none", "cursor_trail": false}"#,
+                "test",
+            )
+            .expect("reload");
+        let result = model.dispatch(AppAction::ReloadConfig);
+        assert!(result.performed);
+
+        assert_eq!(model.settings.current().text_animation, "none");
+        assert!(!model.settings.current().cursor_trail);
+        assert_eq!(
+            model
+                .window(window_id)
+                .expect("window")
+                .animation_overlay
+                .text_animation,
+            Some(TextAnimation::Typewriter)
+        );
+        assert_eq!(
+            model
+                .window(window_id)
+                .expect("window")
+                .animation_overlay
+                .cursor_trail,
+            None
+        );
+        for (text, trail) in window_pane_animations(&model, window_id) {
+            assert_eq!(text, TextAnimation::Typewriter);
+            assert!(!trail);
+        }
+    }
+
+    #[test]
+    fn animation_osc_is_inherited_by_new_tabs_and_splits() {
+        use mr_crabs_config::TextAnimation;
+        let mut model = headless();
+        let window_id = model.active_window.expect("window");
+        feed_animation_osc_to_focused(&mut model, "typewriter");
+
+        let tab_id = model.new_tab(window_id).expect("new tab");
+        let tab = model
+            .window(window_id)
+            .expect("window")
+            .tab(tab_id)
+            .expect("inserted tab");
+        assert_eq!(tab.pane_count(), 1);
+        let new_tab_animation = tab
+            .panes
+            .values()
+            .next()
+            .expect("new tab pane")
+            .core
+            .animation_defaults();
+        assert_eq!(new_tab_animation.text_animation, TextAnimation::Typewriter);
+        assert!(new_tab_animation.cursor_trail);
+
+        model.dispatch(AppAction::NewSplitRight);
+        let panes = window_pane_animations(&model, window_id);
+        assert!(panes.len() >= 3);
+        for (text, trail) in panes {
+            assert_eq!(text, TextAnimation::Typewriter);
+            assert!(trail);
+        }
+    }
+
+    #[test]
+    fn animation_query_reply_uses_bell_and_reports_save_unavailable() {
+        let mut model = headless();
+        let rx = attach_focused_writer(&mut model);
+        feed_osc_to_focused(&mut model, b"\x1b]1337;mr_crabs_animation=?\x07");
+        let bytes = take_writes(&rx);
+        assert_eq!(
+            bytes,
+            AnimationReply::Snapshot(AnimationSnapshot {
+                selection: AnimationSelection {
+                    text: crate::animation_control::TextAnimationChoice::Streaming,
+                    cursor_trail: true,
+                },
+                text_source: OverlaySource::Global,
+                trail_source: OverlaySource::Global,
+                save_available: false,
+            })
+            .encode()
+        );
+    }
+
+    #[test]
+    fn animation_state_inherit_restores_global_and_query_reports_sources() {
+        use mr_crabs_config::TextAnimation;
+        let mut model = headless();
+        let window_id = model.active_window.expect("window");
+        let rx = attach_focused_writer(&mut model);
+        feed_animation_osc_to_focused(&mut model, "typewriter");
+        for (text, trail) in window_pane_animations(&model, window_id) {
+            assert_eq!(text, TextAnimation::Typewriter);
+            assert!(trail);
+        }
+        feed_osc_to_focused(
+            &mut model,
+            b"\x1b]1337;mr_crabs_animation=state;text=inherit;trail=inherit\x07",
+        );
+        for (text, trail) in window_pane_animations(&model, window_id) {
+            assert_eq!(text, TextAnimation::Streaming);
+            assert!(trail);
+        }
+        let overlay = model.window(window_id).expect("window").animation_overlay;
+        assert_eq!(overlay.text_animation, None);
+        assert_eq!(overlay.cursor_trail, None);
+        feed_osc_to_focused(&mut model, b"\x1b]1337;mr_crabs_animation=?\x07");
+        let bytes = take_writes(&rx);
+        assert!(
+            bytes
+                .windows(b"text_src=g;trail_src=g;save=0".len())
+                .any(|w| w == b"text_src=g;trail_src=g;save=0"),
+            "query must report global sources: {bytes:?}"
+        );
+    }
+
+    #[test]
+    fn animation_save_from_pty_is_silently_ignored_without_write() {
+        use mr_crabs_config::ConfigOverlay;
+        let path = unique_config_path("save-untrusted");
+        let original = r#"{"theme":"dark","text_animation":"streaming"}"#;
+        std::fs::write(&path, original).expect("seed config");
+        let store = crate::settings::SettingsStore::from_layers(
+            ConfigOverlay::default(),
+            ConfigOverlay::default(),
+            ConfigOverlay::default(),
+            None,
+            None,
+            crate::settings::SettingsSource::Path(path.clone()),
+            Some(path.clone()),
+        );
+        let mut model = AppModel::with_platform_settings_and_output_wake(
+            crate::platform::PlatformCapabilities::headless(),
+            store,
+            None,
+        );
+        let rx = attach_focused_writer(&mut model);
+        feed_osc_to_focused(
+            &mut model,
+            b"\x1b]1337;mr_crabs_animation=save;text=none;trail=0\x07",
+        );
+        assert_eq!(take_writes(&rx), Vec::<u8>::new());
+        assert_eq!(
+            std::fs::read_to_string(&path).expect("read saved"),
+            original
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn animation_save_from_pty_leaves_config_unchanged_despite_higher_priority_layers() {
+        use mr_crabs_config::ConfigOverlay;
+        let path = unique_config_path("save-precedence");
+        let original = r#"{"theme":"dark","text_animation":"streaming"}"#;
+        std::fs::write(&path, original).expect("seed config");
+        let store = crate::settings::SettingsStore::from_layers(
+            ConfigOverlay::default(),
+            ConfigOverlay {
+                text_animation: Some("typewriter".into()),
+                ..ConfigOverlay::default()
+            },
+            ConfigOverlay {
+                cursor_trail: Some(true),
+                ..ConfigOverlay::default()
+            },
+            None,
+            None,
+            crate::settings::SettingsSource::Path(path.clone()),
+            Some(path.clone()),
+        );
+        let mut model = AppModel::with_platform_settings_and_output_wake(
+            crate::platform::PlatformCapabilities::headless(),
+            store,
+            None,
+        );
+        let first = model.active_window.expect("first window");
+        let second = model.new_window().expect("second window");
+        let _third = model.new_window().expect("third window");
+        model.set_active_window(first);
+        feed_animation_osc_to_focused(&mut model, "streaming");
+        model.set_active_window(second);
+        feed_animation_osc_to_focused(&mut model, "typewriter");
+        model.set_active_window(first);
+        let rx = attach_focused_writer(&mut model);
+        feed_osc_to_focused(
+            &mut model,
+            b"\x1b]1337;mr_crabs_animation=save;text=none;trail=0\x07",
+        );
+        assert_eq!(take_writes(&rx), Vec::<u8>::new());
+        assert_eq!(
+            std::fs::read_to_string(&path).expect("read saved"),
+            original
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn tick_molt_animations_repaints_every_active_frame_and_completes() {
+        let mut model = headless();
+        let window_id = model.active_window.expect("window");
+        let started = 10_000;
+        model
+            .window_mut(window_id)
+            .expect("window")
+            .startup_presentation = StartupPresentation::MoltActive {
+            started_ms: started,
+        };
+
+        for offset in [32u64, 48, 300, MOLT_DURATION_MS - 16] {
+            assert!(model.tick_molt_animations(started + offset));
+            assert_eq!(
+                model.window(window_id).unwrap().startup_presentation,
+                StartupPresentation::MoltActive {
+                    started_ms: started
+                }
+            );
+        }
+        assert!(model.tick_molt_animations(started + MOLT_DURATION_MS));
+        assert_eq!(
+            model.window(window_id).unwrap().startup_presentation,
+            StartupPresentation::MoltComplete
+        );
+        assert!(!model.tick_molt_animations(started + MOLT_DURATION_MS + 16));
+        assert_eq!(
+            model.next_molt_deadline_ms(started + MOLT_DURATION_MS + 16),
+            None
+        );
+    }
+
+    #[test]
+    fn startup_fetch_disabled_or_empty_is_not_retained() {
+        fn store_for(overlay: ConfigOverlay) -> crate::settings::SettingsStore {
+            crate::settings::SettingsStore::from_layers(
+                overlay,
+                ConfigOverlay::default(),
+                ConfigOverlay::default(),
+                None,
+                None,
+                crate::settings::SettingsSource::Json("{}".to_string()),
+                None,
+            )
+        }
+
+        for overlay in [
+            ConfigOverlay {
+                startup_fetch: Some(false),
+                ..ConfigOverlay::default()
+            },
+            ConfigOverlay {
+                startup_fetch_command: Some(String::new()),
+                ..ConfigOverlay::default()
+            },
+        ] {
+            let mut model = AppModel::with_platform_settings_and_output_wake(
+                crate::platform::PlatformCapabilities::headless(),
+                store_for(overlay),
+                None,
+            );
+            let window_id = model.new_window().expect("window");
+            assert_eq!(
+                model.window(window_id).unwrap().startup_presentation,
+                StartupPresentation::None
+            );
+            assert!(
+                model
+                    .focused_pane()
+                    .expect("pane")
+                    .pending_startup_command()
+                    .is_none()
+            );
+            model.shutdown_all();
+        }
+
+        let mut overlay = ConfigOverlay::default();
+        overlay
+            .set(SettingKey::StartupFetch, "true")
+            .expect("fetch");
+        overlay
+            .set(SettingKey::StartupFetchCommand, "printf GUIBOOT")
+            .expect("command");
+        let mut model = AppModel::with_platform_settings_and_output_wake(
+            crate::platform::PlatformCapabilities::headless(),
+            store_for(overlay),
+            None,
+        );
+        let window_id = model.new_window().expect("window");
+        assert_eq!(
+            model.window(window_id).unwrap().startup_presentation,
+            StartupPresentation::RustfetchRetained
+        );
+        model.shutdown_all();
+    }
+
+    #[test]
+    fn submitted_enter_dismisses_across_encoder_modes_but_raw_cr_does_not() {
+        let mut model = headless();
+        let pane_id = model.focused_pane_id().expect("pane");
+        let window_id = model.active_window.expect("window");
+        model
+            .window_mut(window_id)
+            .expect("window")
+            .startup_presentation = StartupPresentation::RustfetchRetained;
+        let (reader_tx, writer_rx) = install_fake_session(&mut model);
+        drop(reader_tx);
+
+        // Raw CR write (an IME or programmatic payload) never dismisses.
+        assert!(model.write_to_pane(pane_id, b"\r"));
+        assert_eq!(
+            model.window(window_id).unwrap().startup_presentation,
+            StartupPresentation::RustfetchRetained
+        );
+        assert_eq!(writer_rx.try_recv(), Ok(b"\r".to_vec()), "raw CR forwarded");
+
+        // Logical Enter in every encoder encoding dismisses, bytes forwarded.
+
+        for bytes in [
+            b"\r".as_slice(),       // legacy CR and numpad-enter
+            b"\x1bOM".as_slice(),   // SS3 keypad application mode
+            b"\x1b[13u".as_slice(), // kitty functional enter
+            b"\x1b[57414u",         // kitty keypad enter
+        ] {
+            assert!(
+                model.write_to_pane_with_submission(pane_id, bytes, true),
+                "write {bytes:?}"
+            );
+            assert_eq!(writer_rx.try_recv(), Ok(bytes.to_vec()), "forwarded");
+        }
+        assert_eq!(
+            model.window(window_id).unwrap().startup_presentation,
+            StartupPresentation::RustfetchDismissed,
+            "submitted Enter dismisses the retained presentation"
+        );
+
+        // A paste payload containing CR must not dismiss Molt either.
+        model.window_mut(window_id).unwrap().startup_presentation =
+            StartupPresentation::MoltActive { started_ms: 0 };
+        assert!(model.write_paste_to_pane(pane_id, b"line\r\n"));
+        assert_eq!(
+            model.window(window_id).unwrap().startup_presentation,
+            StartupPresentation::MoltActive { started_ms: 0 }
         );
     }
 }

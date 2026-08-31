@@ -38,7 +38,6 @@ use mr_crabs_element::{
     CellMetrics, EffectsConfig, GraphicsOverlay, PixelExtent, TerminalElement, TerminalPalette,
 };
 use mr_crabs_history::SelectionGesture;
-#[cfg(test)]
 use mr_crabs_input::Key;
 use mr_crabs_input::{
     ClipboardBackend, ClipboardController, ClipboardKind, ClipboardPermission,
@@ -314,9 +313,14 @@ impl Render for WindowView {
         //    cached) and derive the surface geometry from the drawable
         //    viewport, committing it through the single model authority.
         //    Nothing here guesses from window bounds or a hardcoded grid.
-        let (settings, settings_generation) = {
+        let (settings, settings_generation, animation) = {
             let shell = self.model.read(cx);
-            (shell.settings.current(), shell.settings.generation)
+            let settings = shell.settings.current();
+            let animation = shell
+                .window(self.window_id)
+                .map(|window| window.effective_animation(settings.animation_defaults()))
+                .unwrap_or_else(|| settings.animation_defaults());
+            (settings, shell.settings.generation, animation)
         };
         let terminal_palette = match settings.theme.as_str() {
             "light" => TerminalPalette::light(settings.background_opacity),
@@ -423,6 +427,19 @@ impl Render for WindowView {
         let palette = self.model.read(cx).palette.clone();
         let secure_input = self.model.read(cx).secure_input.is_enabled();
         let trace_for_paint = self.model.read(cx).diagnostic_trace();
+        // Startup molt fade: full-window mask whose alpha dissolves over
+        // MOLT_DURATION_MS; the shell's animation scheduler keeps repainting
+        // until the presentation completes.
+        let molt_alpha = self
+            .model
+            .read(cx)
+            .window(self.window_id)
+            .and_then(|window| {
+                window
+                    .startup_presentation
+                    .molt_alpha(crate::model::app_model::monotonic_ms())
+            })
+            .filter(|alpha| *alpha > 0.0);
         let focused_dock = bundles.iter().find_map(|bundle| {
             if !bundle.focused {
                 return None;
@@ -488,7 +505,7 @@ impl Render for WindowView {
                     )
                     .with_font_size(px(settings.font_size))
                     .with_palette(terminal_palette)
-                    .with_effects(EffectsConfig::from(settings.animation_defaults()))
+                    .with_effects(EffectsConfig::from(animation))
                     .with_graphics(bundle.graphics)
                     .with_input_sink(move |text| {
                         let _ = ime_tx.send((ime_pane_id, text.to_owned()));
@@ -614,6 +631,16 @@ impl Render for WindowView {
                 route_drop_paths(&drop_model, mouse_pane_id, paths, cx);
             });
             root = root.child(surface.child(element));
+        }
+
+        if let Some(alpha) = molt_alpha {
+            root = root.child(
+                div()
+                    .absolute()
+                    .size_full()
+                    .bg(gpui::black())
+                    .opacity(alpha),
+            );
         }
 
         // Focused-pane semantic dock: mask + 1px separator + 55px dock + 31px
@@ -1499,7 +1526,7 @@ fn handle_key_event(
                     {
                         pane.scroll_viewport_down(usize::MAX);
                     }
-                    shell_model.write_to_pane(pane_id, &bytes);
+                    let _ = shell_model.write_paste_to_pane(pane_id, &bytes);
                 }
             }
             model_cx.stop_propagation();
@@ -1519,16 +1546,18 @@ fn handle_key_event(
         };
         if let Some(pane_id) = shell_model.focused_pane_id() {
             if let Some(bytes) = command_backspace_bytes(&event.keystroke, action) {
-                write_terminal_bytes(shell_model, pane_id, bytes);
+                write_terminal_bytes_with_enter(shell_model, pane_id, bytes, false);
                 model_cx.stop_propagation();
                 return;
             }
             if let Some(input) = to_input_key_event(&event.keystroke, action) {
+                let submitted_enter = matches!(input.key, Key::Enter | Key::NumpadEnter)
+                    && action != InputKeyAction::Release;
                 let bytes = shell_model
                     .focused_pane()
                     .map(|pane| encode_live_key(&pane.core, &input))
                     .unwrap_or_default();
-                write_terminal_bytes(shell_model, pane_id, &bytes);
+                write_terminal_bytes_with_enter(shell_model, pane_id, &bytes, submitted_enter);
                 if !bytes.is_empty() {
                     model_cx.stop_propagation();
                 }
@@ -1576,7 +1605,12 @@ fn handle_key_release(model: &Entity<AppModel>, event: &KeyUpEvent, cx: &mut App
     });
 }
 
-fn write_terminal_bytes(shell_model: &mut AppModel, pane_id: PaneId, bytes: &[u8]) {
+fn write_terminal_bytes_with_enter(
+    shell_model: &mut AppModel,
+    pane_id: PaneId,
+    bytes: &[u8],
+    submitted_enter: bool,
+) {
     if bytes.is_empty() {
         return;
     }
@@ -1585,7 +1619,11 @@ fn write_terminal_bytes(shell_model: &mut AppModel, pane_id: PaneId, bytes: &[u8
     {
         pane.scroll_viewport_down(usize::MAX);
     }
-    shell_model.write_to_pane(pane_id, bytes);
+    if submitted_enter {
+        shell_model.write_to_pane_with_submission(pane_id, bytes, true);
+    } else {
+        shell_model.write_to_pane(pane_id, bytes);
+    }
 }
 
 /// Convert a GPUI keystroke to the shell keystroke string used by the

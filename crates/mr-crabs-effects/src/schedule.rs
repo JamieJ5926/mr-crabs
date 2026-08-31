@@ -76,9 +76,10 @@ impl TypewriterSchedule {
     }
 
     /// Begin a rebuild. If this rebuild starts a fresh burst, reset `next`
-    /// to the given current time; otherwise the burst continues and `next`
-    /// is left untouched so this rebuild's changed cells are timestamped
-    /// after the previous rebuild's. No-op when the schedule is idle.
+    /// to the given current time. A continuing burst keeps its place in the
+    /// cascade but never hands out a timestamp earlier than the present, so
+    /// paced rows cannot enter partway through their reveal. No-op when the
+    /// schedule is idle.
     pub fn begin_build(&mut self, now_ms: f64, duration_ms: f64) {
         if !self.is_active() {
             return;
@@ -87,6 +88,7 @@ impl TypewriterSchedule {
             && now_ms < self.last_ms + duration_ms
             && self.next_ms <= now_ms + MAX_AHEAD_MS
         {
+            self.next_ms = self.next_ms.max(now_ms);
             return;
         }
         self.next_ms = now_ms;
@@ -181,6 +183,38 @@ mod tests {
         let first = s.next_timestamp();
         assert_eq!(first, now);
         assert!(first < last);
+    }
+
+    #[test]
+    fn paced_continuation_never_starts_before_now() {
+        let mut s = TypewriterSchedule::new(15.0);
+        s.begin_build(1000.0, 800.0);
+        assert_eq!(s.next_timestamp(), 1000.0);
+
+        s.begin_build(1300.0, 800.0);
+        assert_eq!(s.next_timestamp(), 1300.0);
+    }
+
+    #[test]
+    fn fast_continuation_preserves_future_cascade() {
+        let mut s = TypewriterSchedule::new(15.0);
+        s.begin_build(1000.0, 800.0);
+        assert_eq!(s.next_timestamp(), 1000.0);
+
+        s.begin_build(1005.0, 800.0);
+        assert_eq!(s.next_timestamp(), 1015.0);
+    }
+
+    #[test]
+    fn max_ahead_still_resets_to_now() {
+        let mut s = TypewriterSchedule::new(15.0);
+        s.begin_build(1000.0, 800.0);
+        for _ in 0..80 {
+            _ = s.next_timestamp();
+        }
+
+        s.begin_build(1100.0, 800.0);
+        assert_eq!(s.next_timestamp(), 1100.0);
     }
 
     #[test]

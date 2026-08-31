@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use mr_crabs_config::{
     AnimationDefaults, ChildTerminfo, CloseOnExitPolicy, ConfigOverlay, EffectiveConfig,
-    SettingKey, TextAnimation,
+    SettingKey, StartupAnimation, TextAnimation,
 };
 use mr_crabs_terminal::GridSize;
 use serde::{Deserialize, Serialize};
@@ -114,6 +114,9 @@ fn default_startup_fetch_command() -> String {
 fn default_fetch_gif_path() -> String {
     mr_crabs_config::DEFAULT_FETCH_GIF_PATH.to_string()
 }
+fn default_startup_animation() -> String {
+    mr_crabs_config::DEFAULT_STARTUP_ANIMATION.to_string()
+}
 
 /// Typed shell settings. Unknown JSON fields are ignored; every field
 /// defaults to the Ghostty-compatible value shown in the field docs.
@@ -191,6 +194,9 @@ pub struct AppSettings {
     /// Path to a GIF for animated fetch; empty disables animation.
     #[serde(default = "default_fetch_gif_path")]
     pub fetch_gif_path: String,
+    /// New-window startup presentation: `"none"`, `"rustfetch"`, or `"molt"`.
+    #[serde(default = "default_startup_animation")]
+    pub startup_animation: String,
     /// Shell keybindings (keyboard-only operation).
     #[serde(default)]
     pub keybindings: Vec<KeyBindingDef>,
@@ -238,6 +244,7 @@ impl AppSettings {
             allow_osc52_read: effective.allow_osc52_read,
             startup_fetch: effective.startup_fetch,
             startup_fetch_command: effective.startup_fetch_command.clone(),
+            startup_animation: effective.startup_animation.clone(),
             fetch_gif_path: effective.fetch_gif_path.clone(),
             keybindings,
         }
@@ -246,6 +253,9 @@ impl AppSettings {
     /// Map the shell text-animation setting onto the config-crate enum.
     pub fn text_animation_kind(&self) -> TextAnimation {
         TextAnimation::parse(&self.text_animation)
+    }
+    pub fn startup_animation_kind(&self) -> StartupAnimation {
+        self.effective_config().startup_animation()
     }
 
     /// Build the Mr Crabs animation defaults for terminal elements.
@@ -278,6 +288,7 @@ impl AppSettings {
             allow_osc52_read: self.allow_osc52_read,
             startup_fetch: self.startup_fetch,
             startup_fetch_command: self.startup_fetch_command.clone(),
+            startup_animation: self.startup_animation.clone(),
             fetch_gif_path: self.fetch_gif_path.clone(),
         }
     }
@@ -380,6 +391,13 @@ pub const ANIMATION_PRESETS: [AnimationPreset; 5] = [
         cursor_trail: Some(true),
     },
 ];
+/// OSC 1337 key consumed by the app animation path.
+pub const ANIMATION_OSC_KEY: &str = "mr_crabs_animation";
+
+/// Look up a named animation preset from [`ANIMATION_PRESETS`].
+pub fn animation_preset(name: &str) -> Option<&'static AnimationPreset> {
+    ANIMATION_PRESETS.iter().find(|preset| preset.name == name)
+}
 
 fn animation_preset_names() -> String {
     ANIMATION_PRESETS
@@ -389,20 +407,33 @@ fn animation_preset_names() -> String {
         .join(", ")
 }
 
-fn animation_preset(name: &str) -> Option<&'static AnimationPreset> {
-    ANIMATION_PRESETS.iter().find(|preset| preset.name == name)
-}
-
-/// Headless `--animation` / `--animation list` menu, derived from [`ANIMATION_PRESETS`].
+/// Headless `--animation` / `+animation` menu, derived from [`ANIMATION_PRESETS`].
 pub fn animation_menu_text() -> String {
     let mut out = String::from("Available animations:\n");
     for preset in ANIMATION_PRESETS {
         out.push_str(&format!("  {}  {}\n", preset.name, preset.description));
     }
     out.push('\n');
-    out.push_str("Usage: mr-crabs --animation <name>\n");
-    out.push_str("Cmd+Shift+P toggles them at runtime.\n");
+    out.push_str("Usage: mr-crabs --animation <name> for startup\n");
+    out.push_str("       mr-crabs +animation <name> for the current window\n");
+    out.push_str("Cmd+Shift+P opens the command palette.\n");
     out
+}
+
+/// Interactive full-screen mode requested by a `+animation` TUI form.
+///
+/// Plus modes (TUI, plain-text menu, live preset) are last-wins and
+/// mutually exclusive: [`apply_plus_animation_arg`] clears the previous
+/// mode before recording the next form.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum AnimationTuiMode {
+    /// No interactive TUI requested.
+    #[default]
+    None,
+    /// Bare `+animation`: open the TUI on the current animation state.
+    Bare,
+    /// `+animation menu`: open the TUI on the preset menu.
+    Menu,
 }
 
 /// Parsed CLI: optional config file plus explicit field overrides.
@@ -417,6 +448,9 @@ pub struct CliOverrides {
     pub version: bool,
     pub help: bool,
     pub animation_menu: bool,
+    pub animation_action: Option<String>,
+    /// Interactive TUI requested by the last `+animation` form, if any.
+    pub animation_tui: AnimationTuiMode,
 }
 impl CliOverrides {
     /// Parse Ghostty-style `--flag=value`, `--flag value`, and boolean `--flag`.
@@ -447,6 +481,22 @@ impl CliOverrides {
             }
             if arg == "--help" || arg == "-h" {
                 cli.help = true;
+                index += 1;
+                continue;
+            }
+            if arg == "+animation" {
+                let next = args.get(index + 1).map(String::as_str);
+                if next.is_some_and(|value| !value.starts_with('-') && !value.starts_with('+')) {
+                    apply_plus_animation_arg(&mut cli, next);
+                    index += 2;
+                } else {
+                    apply_plus_animation_arg(&mut cli, None);
+                    index += 1;
+                }
+                continue;
+            }
+            if let Some(value) = arg.strip_prefix("+animation=") {
+                apply_plus_animation_arg(&mut cli, Some(value));
                 index += 1;
                 continue;
             }
@@ -504,8 +554,7 @@ impl CliOverrides {
                 }
                 if flag == "animation" {
                     let next = args.get(index + 1).map(String::as_str);
-                    if next
-                        .is_some_and(|value| !value.starts_with('-') && !value.starts_with('+'))
+                    if next.is_some_and(|value| !value.starts_with('-') && !value.starts_with('+'))
                     {
                         apply_animation_arg(&mut cli, next)?;
                         index += 2;
@@ -566,6 +615,18 @@ fn apply_animation_arg(cli: &mut CliOverrides, value: Option<&str>) -> Result<()
     }
 }
 
+fn apply_plus_animation_arg(cli: &mut CliOverrides, value: Option<&str>) {
+    cli.animation_menu = false;
+    cli.animation_action = None;
+    cli.animation_tui = AnimationTuiMode::None;
+    match value {
+        None => cli.animation_tui = AnimationTuiMode::Bare,
+        Some("menu") => cli.animation_tui = AnimationTuiMode::Menu,
+        Some("list") => cli.animation_menu = true,
+        Some(name) => cli.animation_action = Some(name.to_owned()),
+    }
+}
+
 fn apply_animation_preset(cli: &mut CliOverrides, name: &str) -> Result<(), SettingsError> {
     let preset = animation_preset(name).ok_or_else(|| {
         SettingsError::Invalid(format!(
@@ -618,6 +679,7 @@ struct PartialAppSettings {
     allow_osc52_read: Option<bool>,
     startup_fetch: Option<bool>,
     startup_fetch_command: Option<String>,
+    startup_animation: Option<String>,
     fetch_gif_path: Option<String>,
     keybindings: Option<Vec<KeyBindingDef>>,
 }
@@ -648,6 +710,7 @@ impl PartialAppSettings {
             allow_osc52_read: self.allow_osc52_read,
             startup_fetch: self.startup_fetch,
             startup_fetch_command: self.startup_fetch_command,
+            startup_animation: self.startup_animation,
             fetch_gif_path: self.fetch_gif_path,
         };
         (overlay, self.keybindings)
@@ -1465,6 +1528,122 @@ mod tests {
     }
 
     #[test]
+    fn cli_plus_animation_named_action_is_retained_without_startup_overlay() {
+        let valid = CliOverrides::parse(&["+animation".into(), "typewriter".into()])
+            .expect("parse valid action");
+        assert_eq!(valid.animation_action.as_deref(), Some("typewriter"));
+        assert!(!valid.animation_menu);
+        assert!(valid.overlay.is_empty());
+
+        let invalid = CliOverrides::parse(&["+animation".into(), "wiggle".into()])
+            .expect("retain invalid action");
+        assert_eq!(invalid.animation_action.as_deref(), Some("wiggle"));
+        assert!(!invalid.animation_menu);
+        assert!(invalid.overlay.is_empty());
+    }
+
+    #[test]
+    fn cli_plus_animation_list_sets_plain_menu_without_overlay() {
+        for args in [
+            vec!["+animation".into(), "list".into()],
+            vec!["+animation=list".into()],
+        ] {
+            let cli = CliOverrides::parse(&args).expect("parse +animation list");
+            assert!(cli.animation_menu, "{args:?} sets the plain-text menu");
+            assert_eq!(cli.animation_tui, AnimationTuiMode::None);
+            assert!(cli.animation_action.is_none());
+            assert!(cli.overlay.is_empty());
+        }
+    }
+
+    #[test]
+    fn cli_plus_animation_bare_and_menu_set_tui_without_overlay() {
+        let bare = CliOverrides::parse(&["+animation".into()]).expect("parse bare");
+        assert_eq!(bare.animation_tui, AnimationTuiMode::Bare);
+        assert!(!bare.animation_menu);
+        assert!(bare.animation_action.is_none());
+        assert!(bare.overlay.is_empty());
+
+        for args in [
+            vec!["+animation".into(), "menu".into()],
+            vec!["+animation=menu".into()],
+        ] {
+            let cli = CliOverrides::parse(&args).expect("parse +animation menu");
+            assert_eq!(cli.animation_tui, AnimationTuiMode::Menu, "{args:?}");
+            assert!(!cli.animation_menu);
+            assert!(cli.animation_action.is_none());
+            assert!(cli.overlay.is_empty());
+        }
+    }
+
+    #[test]
+    fn cli_plus_animation_forms_are_last_wins() {
+        let cli = CliOverrides::parse(&[
+            "+animation".into(),
+            "typewriter".into(),
+            "+animation".into(),
+        ])
+        .expect("parse");
+        assert_eq!(cli.animation_tui, AnimationTuiMode::Bare);
+        assert!(cli.animation_action.is_none());
+        assert!(!cli.animation_menu);
+
+        let cli = CliOverrides::parse(&[
+            "+animation".into(),
+            "+animation".into(),
+            "typewriter".into(),
+        ])
+        .expect("parse");
+        assert_eq!(cli.animation_action.as_deref(), Some("typewriter"));
+        assert_eq!(cli.animation_tui, AnimationTuiMode::None);
+        assert!(!cli.animation_menu);
+
+        let cli = CliOverrides::parse(&["+animation".into(), "list".into(), "+animation".into()])
+            .expect("parse");
+        assert_eq!(cli.animation_tui, AnimationTuiMode::Bare);
+        assert!(!cli.animation_menu);
+
+        let cli = CliOverrides::parse(&["+animation".into(), "+animation".into(), "list".into()])
+            .expect("parse");
+        assert!(cli.animation_menu);
+        assert_eq!(cli.animation_tui, AnimationTuiMode::None);
+        assert!(cli.animation_action.is_none());
+
+        let cli = CliOverrides::parse(&[
+            "+animation".into(),
+            "menu".into(),
+            "+animation".into(),
+            "streaming".into(),
+        ])
+        .expect("parse");
+        assert_eq!(cli.animation_action.as_deref(), Some("streaming"));
+        assert_eq!(cli.animation_tui, AnimationTuiMode::None);
+        assert!(!cli.animation_menu);
+
+        let cli = CliOverrides::parse(&["--animation".into(), "+animation".into()]).expect("parse");
+        assert_eq!(cli.animation_tui, AnimationTuiMode::Bare);
+        assert!(!cli.animation_menu);
+    }
+
+    #[test]
+    fn animation_menu_text_covers_startup_runtime_and_palette() {
+        let mut expected = String::from("Available animations:\n");
+        for preset in ANIMATION_PRESETS {
+            expected.push_str(&format!("  {}  {}\n", preset.name, preset.description));
+        }
+        expected.push('\n');
+        expected.push_str("Usage: mr-crabs --animation <name> for startup\n");
+        expected.push_str("       mr-crabs +animation <name> for the current window\n");
+        expected.push_str("Cmd+Shift+P opens the command palette.\n");
+        assert_eq!(animation_menu_text(), expected);
+    }
+
+    #[test]
+    fn animation_osc_key_is_stable() {
+        assert_eq!(ANIMATION_OSC_KEY, "mr_crabs_animation");
+    }
+
+    #[test]
     fn startup_fetch_json_overrides_and_defaults() {
         let settings = AppSettings::from_json(
             r#"{"startup_fetch": false, "startup_fetch_command": "fastfetch"}"#,
@@ -1486,6 +1665,37 @@ mod tests {
             effective.startup_fetch_command,
             mr_crabs_config::DEFAULT_STARTUP_FETCH_COMMAND
         );
+    }
+
+    #[test]
+    fn startup_animation_json_cli_and_defaults() {
+        let settings =
+            AppSettings::from_json(r#"{"startup_animation": "molt"}"#).expect("valid json");
+        assert_eq!(settings.startup_animation, "molt");
+        assert_eq!(settings.startup_animation_kind(), StartupAnimation::Molt);
+
+        let defaults = AppSettings::default();
+        assert_eq!(
+            defaults.startup_animation,
+            mr_crabs_config::DEFAULT_STARTUP_ANIMATION
+        );
+        assert_eq!(
+            defaults.startup_animation_kind(),
+            StartupAnimation::Rustfetch
+        );
+
+        let cli = CliOverrides::parse(&["--startup-animation".to_string(), "none".to_string()])
+            .expect("cli");
+        assert_eq!(cli.overlay.startup_animation.as_deref(), Some("none"));
+        let mut overlay = ConfigOverlay::default();
+        overlay.startup_animation = Some("rustfetch".into());
+        overlay.merge(cli.overlay);
+        let effective = EffectiveConfig::resolve(
+            &ConfigOverlay::default(),
+            &overlay,
+            &ConfigOverlay::default(),
+        );
+        assert_eq!(effective.startup_animation(), StartupAnimation::None);
     }
 
     fn unique_stamp() -> u128 {

@@ -1068,8 +1068,10 @@ impl TerminalProtocol {
             Command::KittyTextSizing(_)
             | Command::KittyDnd(_)
             | Command::KittyClipboard(_)
-            | Command::Iterm2(_)
             | Command::ContextSignal(_) => {}
+            Command::Iterm2(command) => {
+                self.sink.iterm2(&command);
+            }
         }
     }
 
@@ -2218,6 +2220,53 @@ mod snapshot_payload_tests {
         assert_eq!(
             NormalizedSnapshot::decode_payload(&bytes),
             Err(DecodeError::TruncatedRecord)
+        );
+    }
+}
+
+#[cfg(test)]
+mod iterm2_dispatch_tests {
+    use super::*;
+    use mr_crabs_protocols::osc::parsers::Iterm2;
+    use std::sync::{Arc, Mutex};
+    #[derive(Clone)]
+    struct Sink {
+        commands: Arc<Mutex<Vec<Iterm2>>>,
+    }
+
+    impl ProtocolSink for Sink {
+        fn iterm2(&mut self, command: &Iterm2) {
+            self.commands
+                .lock()
+                .expect("sink mutex poisoned")
+                .push(command.clone());
+        }
+    }
+
+    #[test]
+    fn forwards_i_term2_pairs_without_interpretation() {
+        let commands = Arc::new(Mutex::new(Vec::new()));
+        let mut protocol = TerminalProtocol::new(&GridSize::new(80, 24)).expect("protocol");
+        protocol.set_sink(Box::new(Sink {
+            commands: Arc::clone(&commands),
+        }));
+        protocol.feed(
+            b"\x1b]1337;mr_crabs_animation=all\x07\x1b]1337;Foreign=value;File=name=x.png\x07",
+        );
+
+        assert_eq!(
+            *commands.lock().expect("commands mutex poisoned"),
+            vec![
+                Iterm2 {
+                    pairs: vec![("mr_crabs_animation".into(), "all".into())],
+                },
+                Iterm2 {
+                    pairs: vec![
+                        ("Foreign".into(), "value".into()),
+                        ("File".into(), "name=x.png".into()),
+                    ],
+                },
+            ]
         );
     }
 }

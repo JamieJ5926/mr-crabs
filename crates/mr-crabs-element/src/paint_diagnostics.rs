@@ -66,7 +66,6 @@ pub(crate) fn diagnostic_event(
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn raf_reason_comes_from_cursor_and_effects_requests() {
         for (cursor, effects, expected) in [
@@ -87,7 +86,6 @@ mod tests {
             assert_eq!(event.raf_reason, expected);
         }
     }
-
     #[test]
     fn event_preserves_actual_paint_outcome() {
         let event = diagnostic_event(

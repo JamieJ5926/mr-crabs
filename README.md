@@ -51,16 +51,52 @@ file. A missing `--config-file` path is a startup error.
 
 ## Animations
 
-`--animation` prints a preset menu and exits, or launches with a named overlay.
+In a running Mr Crabs window, `mr-crabs +animation <name>` switches that
+window immediately. Other windows keep their current animation.
+
+```bash
+mr-crabs +animation typewriter
+mr-crabs +animation list
+mr-crabs +animation
+mr-crabs +animation menu
+```
+
+Bare `+animation` and `+animation menu` open the interactive TUI on
+`/dev/tty`. The TUI queries the host and previews live overlay state.
+Persistent save over PTY OSC is unavailable until a trusted host channel
+exists. `+animation list` prints the preset menu and
+exits. Named presets: `none` (off), `streaming` (left-to-right reveal,
+default), `typewriter` (row-staggered reveal), `cursor-trail` (fading
+cursor glow), `all` (typewriter plus trail). Unknown names print the
+same menu, write an error to stderr, and exit 2.
+
+`--animation` still launches with a named overlay. Bare `--animation`
+and `--animation list` print the same menu:
 
 ```bash
 ./target/release/mr-crabs --animation
 ./target/release/mr-crabs --animation typewriter
 ```
 
-Presets: `none` (off), `streaming` (left-to-right reveal, default), `typewriter` (row-staggered reveal), `cursor-trail` (fading cursor glow), `all` (typewriter plus trail).
+`--animation` is shorthand for `--text-animation` and `--cursor-trail`.
+A later explicit flag wins. `+animation` does not change that startup
+overlay.
 
-`Cmd+Shift+P` toggles animations at runtime. `--animation` is plain `--text-animation`/`--cursor-trail` shorthand; the later flag wins.
+`startup-animation` chooses the new-window presentation: `none`,
+`rustfetch` (default), or `molt`. `none` skips the presentation.
+`rustfetch` stays on screen until you submit Enter; that Enter still
+reaches the PTY. `molt` is a short full-terminal dissolve over the live
+shell. Legacy `startup-fetch` / `startup-fetch-command` remain compatible.
+
+
+`mr-crabs +rustfetch` replays rustfetch in the calling window. New panes
+prepend the running `mr-crabs` executable directory onto the child PATH
+and set `MR_CRABS_BIN`, so `+rustfetch` resolves without changing user
+or process environment, wrappers, or dotfiles.
+
+
+`Cmd+Shift+P` opens the command palette, where users choose animation
+actions.
 
 ## License
 
