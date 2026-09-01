@@ -47,7 +47,6 @@ use mr_crabs_input::{
 use mr_crabs_terminal::FrameDelta;
 
 use crate::accessibility_policy::AccessibilityPolicy;
-use crate::theme::{WindowMaterial, resolve_chrome};
 use crate::model::app_model::AppModel;
 use crate::model::geometry::{PaddingPx, SurfaceGeometry};
 use crate::model::input_dock::{
@@ -58,6 +57,7 @@ use crate::model::presentation::{ConversationEvent, SurfaceMode};
 use crate::model::split::{GridRect, PaneId};
 use crate::model::window::WindowId;
 use crate::palette::PaletteState;
+use crate::theme::{WindowMaterial, resolve_chrome};
 use crate::ui::input_dock::{
     InputDockOverlayView, InputDockTokens, ModalImeSender, compose_input_dock_layout,
     dock_hit_consumes, input_dock_footer, input_dock_mask, input_dock_overlay,
@@ -457,19 +457,17 @@ impl Render for WindowView {
         let palette = self.model.read(cx).palette.clone();
         let secure_input = self.model.read(cx).secure_input.is_enabled();
         let trace_for_paint = self.model.read(cx).diagnostic_trace();
-        // Startup molt fade: full-window mask whose alpha dissolves over
-        // MOLT_DURATION_MS; the shell's animation scheduler keeps repainting
-        // until the presentation completes.
-        let molt_alpha = self
+        let molt_layout = self
             .model
             .read(cx)
             .window(self.window_id)
             .and_then(|window| {
-                window
-                    .startup_presentation
-                    .molt_alpha(crate::model::app_model::monotonic_ms())
-            })
-            .filter(|alpha| *alpha > 0.0);
+                window.startup_presentation.molt_layout(
+                    crate::model::app_model::monotonic_ms(),
+                    f32::from(viewport.width),
+                    f32::from(viewport.height),
+                )
+            });
         let focused_dock = bundles.iter().find_map(|bundle| {
             if !bundle.focused {
                 return None;
@@ -535,7 +533,10 @@ impl Render for WindowView {
                     )
                     .with_font_size(px(settings.font_size))
                     .with_palette(terminal_palette)
-                    .with_effects(effects_config_from_animation(animation, self.accessibility_policy))
+                    .with_effects(effects_config_from_animation(
+                        animation,
+                        self.accessibility_policy,
+                    ))
                     .with_graphics(bundle.graphics)
                     .with_input_sink(move |text| {
                         let _ = ime_tx.send((ime_pane_id, text.to_owned()));
@@ -663,14 +664,97 @@ impl Render for WindowView {
             root = root.child(surface.child(element));
         }
 
-        if let Some(alpha) = molt_alpha {
-            root = root.child(
-                div()
-                    .absolute()
-                    .size_full()
-                    .bg(gpui::black())
-                    .opacity(alpha),
-            );
+        if let Some(layout) = molt_layout {
+            let width = f32::from(viewport.width);
+            let height = f32::from(viewport.height);
+            let hole_right = layout.hole_left + layout.hole_width;
+            let hole_bottom = layout.hole_top + layout.hole_height;
+            if layout.hole_top > 0.0 {
+                root = root.child(
+                    div()
+                        .absolute()
+                        .left(px(0.0))
+                        .top(px(0.0))
+                        .w(px(width))
+                        .h(px(layout.hole_top))
+                        .bg(gpui::black()),
+                );
+            }
+            let bottom_h = height - hole_bottom;
+            if bottom_h > 0.0 {
+                root = root.child(
+                    div()
+                        .absolute()
+                        .left(px(0.0))
+                        .top(px(hole_bottom))
+                        .w(px(width))
+                        .h(px(bottom_h))
+                        .bg(gpui::black()),
+                );
+            }
+            if layout.hole_left > 0.0 && layout.hole_height > 0.0 {
+                root = root.child(
+                    div()
+                        .absolute()
+                        .left(px(0.0))
+                        .top(px(layout.hole_top))
+                        .w(px(layout.hole_left))
+                        .h(px(layout.hole_height))
+                        .bg(gpui::black()),
+                );
+            }
+            let right_w = width - hole_right;
+            if right_w > 0.0 && layout.hole_height > 0.0 {
+                root = root.child(
+                    div()
+                        .absolute()
+                        .left(px(hole_right))
+                        .top(px(layout.hole_top))
+                        .w(px(right_w))
+                        .h(px(layout.hole_height))
+                        .bg(gpui::black()),
+                );
+            }
+            if layout.glow_alpha > 0.0 && layout.hole_width > 2.0 && layout.hole_height > 2.0 {
+                let glow = gpui::hsla(0.55, 0.85, 0.72, layout.glow_alpha);
+                let edge = 2.0_f32;
+                root = root.child(
+                    div()
+                        .absolute()
+                        .left(px(layout.hole_left))
+                        .top(px(layout.hole_top))
+                        .w(px(layout.hole_width))
+                        .h(px(edge))
+                        .bg(glow),
+                );
+                root = root.child(
+                    div()
+                        .absolute()
+                        .left(px(layout.hole_left))
+                        .top(px(hole_bottom - edge))
+                        .w(px(layout.hole_width))
+                        .h(px(edge))
+                        .bg(glow),
+                );
+                root = root.child(
+                    div()
+                        .absolute()
+                        .left(px(layout.hole_left))
+                        .top(px(layout.hole_top))
+                        .w(px(edge))
+                        .h(px(layout.hole_height))
+                        .bg(glow),
+                );
+                root = root.child(
+                    div()
+                        .absolute()
+                        .left(px(hole_right - edge))
+                        .top(px(layout.hole_top))
+                        .w(px(edge))
+                        .h(px(layout.hole_height))
+                        .bg(glow),
+                );
+            }
         }
 
         // Focused-pane semantic dock: mask + 1px separator + 55px dock + 31px
@@ -2958,15 +3042,11 @@ mod tests {
     fn reduce_motion_disables_cursor_trail_without_changing_user_config() {
         let mut animation = mr_crabs_config::AnimationDefaults::default();
         animation.cursor_trail = true;
-        let off = effects_config_from_animation(
-            animation,
-            AccessibilityPolicy::from_flags(true, false),
-        );
+        let off =
+            effects_config_from_animation(animation, AccessibilityPolicy::from_flags(true, false));
         assert!(!off.cursor_trail);
-        let on = effects_config_from_animation(
-            animation,
-            AccessibilityPolicy::from_flags(false, false),
-        );
+        let on =
+            effects_config_from_animation(animation, AccessibilityPolicy::from_flags(false, false));
         assert!(on.cursor_trail);
     }
 

@@ -1303,9 +1303,21 @@ mod tests {
             .reload_json(r#"{"background_blur": 4}"#, "good")
             .expect("seed");
         let generation = store.generation;
-        assert!(store.reload_json(r#"{"background_blur": -1}"#, "neg").is_err());
-        assert!(store.reload_json(r#"{"background_blur": 1.5}"#, "float").is_err());
-        assert!(store.reload_json(r#"{"background_blur": "blur"}"#, "str").is_err());
+        assert!(
+            store
+                .reload_json(r#"{"background_blur": -1}"#, "neg")
+                .is_err()
+        );
+        assert!(
+            store
+                .reload_json(r#"{"background_blur": 1.5}"#, "float")
+                .is_err()
+        );
+        assert!(
+            store
+                .reload_json(r#"{"background_blur": "blur"}"#, "str")
+                .is_err()
+        );
         assert_eq!(store.generation, generation);
         assert_eq!(store.current().background_blur, 4);
     }
@@ -1739,10 +1751,7 @@ mod tests {
             defaults.startup_animation,
             mr_crabs_config::DEFAULT_STARTUP_ANIMATION
         );
-        assert_eq!(
-            defaults.startup_animation_kind(),
-            StartupAnimation::Rustfetch
-        );
+        assert_eq!(defaults.startup_animation_kind(), StartupAnimation::Molt);
 
         let cli = CliOverrides::parse(&["--startup-animation".to_string(), "none".to_string()])
             .expect("cli");

@@ -41,9 +41,19 @@ impl AnimationOverlay {
     }
 }
 
-pub const MOLT_DURATION_MS: u64 = 600;
+pub const MOLT_DURATION_MS: u64 = 900;
 /// Target cadence for molt fade frames (~60 Hz).
 pub const MOLT_FRAME_INTERVAL_MS: u64 = 16;
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MoltLayout {
+    pub eased: f32,
+    pub hole_left: f32,
+    pub hole_top: f32,
+    pub hole_width: f32,
+    pub hole_height: f32,
+    pub glow_alpha: f32,
+}
 
 /// Window-local startup presentation. Enter always forwards; dismiss is
 /// a side-effect of a submitted Enter.
@@ -81,18 +91,29 @@ impl StartupPresentation {
         }
     }
 
-    pub fn molt_alpha(&self, now_ms: u64) -> Option<f32> {
-        match *self {
-            Self::MoltActive { started_ms } => {
-                let elapsed = now_ms.saturating_sub(started_ms);
-                if elapsed >= MOLT_DURATION_MS {
-                    Some(0.0)
-                } else {
-                    Some(1.0 - elapsed as f32 / MOLT_DURATION_MS as f32)
-                }
-            }
-            _ => None,
+    pub fn molt_layout(&self, now_ms: u64, width_px: f32, height_px: f32) -> Option<MoltLayout> {
+        let Self::MoltActive { started_ms } = *self else {
+            return None;
+        };
+        if width_px <= 0.0 || height_px <= 0.0 {
+            return None;
         }
+        let elapsed = now_ms.saturating_sub(started_ms);
+        if elapsed >= MOLT_DURATION_MS {
+            return None;
+        }
+        let t = (elapsed as f32 / MOLT_DURATION_MS as f32).clamp(0.0, 1.0);
+        let eased = (t * std::f32::consts::FRAC_PI_2).sin();
+        let hole_width = eased * width_px;
+        let hole_height = eased * height_px;
+        Some(MoltLayout {
+            eased,
+            hole_left: (width_px - hole_width) * 0.5,
+            hole_top: (height_px - hole_height) * 0.5,
+            hole_width,
+            hole_height,
+            glow_alpha: ((eased * std::f32::consts::PI).sin() * 0.55).clamp(0.0, 0.55),
+        })
     }
 
     pub fn molt_needs_frames(&self, now_ms: u64) -> bool {
@@ -618,5 +639,66 @@ mod tests {
             merged.cursor_trail_opacity,
             AnimationDefaults::default().cursor_trail_opacity
         );
+    }
+
+    #[test]
+    fn molt_layout_zero() {
+        let pres = StartupPresentation::MoltActive { started_ms: 1_000 };
+        let layout = pres.molt_layout(1_000, 200.0, 100.0).expect("t0");
+        assert_eq!(layout.eased, 0.0);
+        assert_eq!(layout.hole_width, 0.0);
+        assert_eq!(layout.hole_height, 0.0);
+        assert_eq!(layout.glow_alpha, 0.0);
+    }
+
+    #[test]
+    fn molt_layout_mid() {
+        let pres = StartupPresentation::MoltActive { started_ms: 0 };
+        let mid = MOLT_DURATION_MS / 2;
+        let layout = pres.molt_layout(mid, 200.0, 100.0).expect("mid");
+        assert!(
+            layout.eased > 0.5,
+            "sine-out must lead linear at mid, got {}",
+            layout.eased
+        );
+        assert!(layout.hole_width > 0.0 && layout.hole_width < 200.0);
+        assert!(layout.hole_height > 0.0 && layout.hole_height < 100.0);
+        assert!((layout.hole_left - (200.0 - layout.hole_width) * 0.5).abs() < 0.01);
+        assert!(layout.glow_alpha > 0.4);
+    }
+
+    #[test]
+    fn molt_layout_complete() {
+        let mut pres = StartupPresentation::MoltActive { started_ms: 10 };
+        assert!(
+            pres.molt_layout(10 + MOLT_DURATION_MS, 200.0, 100.0)
+                .is_none()
+        );
+        pres.tick_molt(10 + MOLT_DURATION_MS);
+        assert_eq!(pres, StartupPresentation::MoltComplete);
+    }
+
+    #[test]
+    fn molt_layout_near_completion_stays_in_bounds() {
+        let pres = StartupPresentation::MoltActive { started_ms: 0 };
+        let layout = pres
+            .molt_layout(MOLT_DURATION_MS - 1, 200.0, 100.0)
+            .expect("near end");
+        assert!(layout.eased > 0.99);
+        assert!(layout.eased <= 1.0);
+        assert!(layout.hole_width > 198.0 && layout.hole_width <= 200.0);
+        assert!(layout.hole_height > 99.0 && layout.hole_height <= 100.0);
+        assert!(layout.glow_alpha >= 0.0 && layout.glow_alpha <= 0.55);
+        assert!(layout.hole_left >= 0.0 && layout.hole_top >= 0.0);
+    }
+
+    #[test]
+    fn molt_layout_sine() {
+        let pres = StartupPresentation::MoltActive { started_ms: 0 };
+        let mid = pres
+            .molt_layout(MOLT_DURATION_MS / 2, 100.0, 100.0)
+            .expect("mid");
+        assert!(mid.eased > 0.5);
+        assert!(mid.eased < 1.0);
     }
 }

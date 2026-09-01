@@ -20,6 +20,15 @@ pub struct FetchLayout {
     pub logo_width: usize,
 }
 
+pub fn logo_only_bytes(layout: &FetchLayout) -> Vec<u8> {
+    let mut out = String::new();
+    for line in &layout.lines {
+        out.push_str(&line.logo);
+        out.push('\n');
+    }
+    out.into_bytes()
+}
+
 fn ansi_sequence_end(bytes: &[u8], start: usize) -> usize {
     let mut index = start + 1;
     if index >= bytes.len() {
@@ -191,7 +200,6 @@ pub fn frame_bytes(layout: &FetchLayout, phase: usize) -> Vec<u8> {
                 out.push_str(&format!("\x1b[38;2;{r};{g};{b}m{ch}\x1b[0m"));
             }
         }
-        out.push_str(&line.info);
         out.push('\n');
     }
     out.into_bytes()
@@ -202,6 +210,7 @@ pub fn animation_frames(layout: &FetchLayout) -> Vec<Vec<u8>> {
 }
 
 pub fn animation_chunks(layout: &FetchLayout, original: &str) -> Vec<Vec<u8>> {
+    let _ = original;
     let height = layout.lines.len();
     let prefix = format!("\x1b[{height}A\r").into_bytes();
     let mut chunks = Vec::with_capacity(FRAME_COUNT + 1);
@@ -216,9 +225,10 @@ pub fn animation_chunks(layout: &FetchLayout, original: &str) -> Vec<Vec<u8>> {
             chunks.push(chunk);
         }
     }
-    let mut last = Vec::with_capacity(prefix.len() + original.len());
+    let logo = logo_only_bytes(layout);
+    let mut last = Vec::with_capacity(prefix.len() + logo.len());
     last.extend_from_slice(&prefix);
-    last.extend_from_slice(original.as_bytes());
+    last.extend_from_slice(&logo);
     chunks.push(last);
     chunks
 }
@@ -257,7 +267,6 @@ fn positioned_frame(layout: &FetchLayout, phase: usize, top: u16, left: u16) -> 
                 out.extend_from_slice(format!("\x1b[38;2;{r};{g};{b}m{ch}\x1b[0m").as_bytes());
             }
         }
-        out.extend_from_slice(line.info.as_bytes());
         out.extend_from_slice(b"\x1b[0m");
     }
     out
@@ -275,7 +284,6 @@ fn dimmed_frame(layout: &FetchLayout, level: u8, top: u16, left: u16) -> Vec<u8>
             .as_bytes(),
         );
         out.extend_from_slice(line.logo.as_bytes());
-        out.extend_from_slice(visible_text(&line.info).as_bytes());
         out.extend_from_slice(b"\x1b[0m");
     }
     out
@@ -286,7 +294,7 @@ pub fn centered_animation_chunks(layout: &FetchLayout, rows: u16, cols: u16) -> 
     let width = layout
         .lines
         .iter()
-        .map(|line| visible_width(&line.logo) + visible_width(&line.info))
+        .map(|line| visible_width(&line.logo))
         .max()
         .unwrap_or(0) as u16;
     let top = ((rows.saturating_sub(height)) / 2).saturating_add(1);
@@ -304,7 +312,6 @@ pub fn centered_animation_chunks(layout: &FetchLayout, rows: u16, cols: u16) -> 
         final_frame
             .extend_from_slice(format!("\x1b[{};{}H\x1b[0m", top as usize + row, left).as_bytes());
         final_frame.extend_from_slice(line.logo.as_bytes());
-        final_frame.extend_from_slice(line.info.as_bytes());
         final_frame.extend_from_slice(b"\x1b[0m");
     }
     let prompt_row = top.saturating_add(height).min(rows);
@@ -324,7 +331,7 @@ pub fn fits_centered_terminal(layout: &FetchLayout, rows: u16, cols: u16) -> boo
     layout
         .lines
         .iter()
-        .all(|line| visible_width(&line.logo) + visible_width(&line.info) + 2 <= cols as usize)
+        .all(|line| visible_width(&line.logo) + 2 <= cols as usize)
 }
 
 fn terminal_size() -> Option<(u16, u16)> {
@@ -435,19 +442,22 @@ pub fn run_animated_fetch_and_exit() -> ! {
     match captured {
         None => std::process::exit(0),
         Some(original) => {
+            let layout = parse_fetch_layout(&original);
             if !is_tty {
-                let _ = std::io::stdout().write_all(original.as_bytes());
+                let bytes = layout
+                    .as_ref()
+                    .map(logo_only_bytes)
+                    .unwrap_or_else(|| original.into_bytes());
+                let _ = std::io::stdout().write_all(&bytes);
                 let _ = std::io::stdout().flush();
                 std::process::exit(0);
             }
-            let Some(layout) = parse_fetch_layout(&original) else {
+            let Some(layout) = layout else {
                 let _ = std::io::stdout().write_all(original.as_bytes());
                 let _ = std::io::stdout().flush();
                 std::process::exit(0);
             };
             if layout.lines.is_empty() {
-                let _ = std::io::stdout().write_all(original.as_bytes());
-                let _ = std::io::stdout().flush();
                 std::process::exit(0);
             }
             let terminal = terminal_size();
@@ -455,7 +465,7 @@ pub fn run_animated_fetch_and_exit() -> ! {
                 .map(|(rows, cols)| fits_centered_terminal(&layout, rows, cols))
                 .unwrap_or(false);
             if !animate {
-                let _ = std::io::stdout().write_all(original.as_bytes());
+                let _ = std::io::stdout().write_all(&logo_only_bytes(&layout));
                 let _ = std::io::stdout().flush();
                 std::process::exit(0);
             }
@@ -510,12 +520,11 @@ mod tests {
         let layout = parse_fetch_layout(&out).expect("layout");
         let frame = frame_bytes(&layout, 0);
         let text = String::from_utf8(frame).unwrap();
+        let visible = visible_text(&text);
         assert!(text.contains("\x1b[38;2;"));
-        for line in &layout.lines {
-            if line.info.contains("jamie@host") {
-                assert!(text.contains("jamie@host"));
-            }
-        }
+        assert!(visible.contains(".:'"));
+        assert!(!visible.contains("jamie@host"));
+        assert!(!visible.contains("Darwin"));
     }
 
     #[test]
@@ -619,7 +628,8 @@ mod tests {
         let final_frame = String::from_utf8(chunks.last().expect("final frame").clone())
             .expect("final frame text");
         for line in &layout.lines {
-            assert!(final_frame.contains(&format!("{}{}", line.logo, line.info)));
+            assert!(final_frame.contains(&line.logo));
+            assert!(!final_frame.contains(&line.info) || line.info.is_empty());
         }
     }
 
@@ -651,7 +661,8 @@ mod tests {
             logo_width: 2,
         };
         assert!(fits_centered_terminal(&layout, 4, 5));
-        assert!(!fits_centered_terminal(&layout, 4, 4));
+        assert!(fits_centered_terminal(&layout, 4, 4));
+        assert!(!fits_centered_terminal(&layout, 4, 3));
         let final_frame = String::from_utf8(
             centered_animation_chunks(&layout, 4, 5)
                 .last()
@@ -661,7 +672,7 @@ mod tests {
         .expect("final frame text");
         assert_eq!(
             final_frame,
-            "\x1b[2;2H\x1b[0m中e\u{0301}\x1b[0m\x1b[3;1H\x1b[0m\x1b[?25h"
+            "\x1b[2;2H\x1b[0m中\x1b[0m\x1b[3;1H\x1b[0m\x1b[?25h"
         );
     }
 
@@ -681,8 +692,10 @@ mod tests {
             logo_width: 1,
         };
         let frame = String::from_utf8(positioned_frame(&layout, 0, 2, 3)).expect("frame");
-        assert!(frame.contains("\x1b[31mone\x1b[0m\x1b[3;3H\x1b[0m"));
-        assert!(frame.ends_with("two\x1b[0m"));
+        assert!(frame.contains("\x1b[2;3H\x1b[0m"));
+        assert!(frame.contains("\x1b[3;3H\x1b[0m"));
+        assert!(!frame.contains("one"));
+        assert!(!frame.contains("two"));
     }
 
     #[test]
@@ -690,7 +703,7 @@ mod tests {
         let out = sample_output();
         let layout = parse_fetch_layout(&out).expect("layout");
         assert!(!fits_centered_terminal(&layout, 8, 80));
-        assert!(!fits_centered_terminal(&layout, 24, 20));
+        assert!(!fits_centered_terminal(&layout, 24, 18));
         assert!(fits_centered_terminal(&layout, 24, 80));
     }
 
@@ -704,7 +717,7 @@ mod tests {
         let fade = String::from_utf8(dimmed_frame(&layout, 40, 9, 10)).expect("fade");
         assert!(fade.contains("\x1b[38;2;40;40;40m"));
         assert!(!fade.contains("\x1b[38;2;255;0;0m"));
-        assert!(fade.contains("OS: Darwin (aarch64)"));
+        assert!(!fade.contains("OS: Darwin (aarch64)"));
     }
 
     #[test]
@@ -723,8 +736,8 @@ mod tests {
                 .clone(),
         )
         .expect("final frame text");
-        assert!(final_frame.starts_with("\x1b[9;17H\x1b[0m"));
-        assert!(final_frame.contains("\x1b[38;2;255;0;0m------------------------------\x1b[0m"));
+        assert!(final_frame.starts_with("\x1b[9;32H\x1b[0m"));
+        assert!(!final_frame.contains("\x1b[38;2;255;0;0m------------------------------\x1b[0m"));
         assert!(final_frame.ends_with("\x1b[0m\x1b[16;1H\x1b[0m\x1b[?25h"));
         assert!(!final_frame.contains("\x1b[2K"));
     }
@@ -799,13 +812,14 @@ mod tests {
             );
         }
         assert!(
-            chunks.last().unwrap().ends_with(out.as_bytes()),
-            "last chunk ends with exact original"
+            chunks.last().unwrap().ends_with(&logo_only_bytes(&layout)),
+            "last chunk ends with logo only"
         );
         assert_eq!(
             chunks.last().unwrap()[prefix.len()..],
-            out.as_bytes().to_vec()
+            logo_only_bytes(&layout)
         );
+        assert!(!String::from_utf8_lossy(chunks.last().unwrap()).contains("jamie@host"));
     }
 
     #[test]

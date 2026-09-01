@@ -31,8 +31,8 @@ pub const DEFAULT_FETCH_GIF_PATH: &str = "";
 pub const DEFAULT_STARTUP_FETCH: bool = true;
 /// POSIX command run on the PTY before the interactive shell starts.
 pub const DEFAULT_STARTUP_FETCH_COMMAND: &str = "sleep 0.5; \"$MR_CRABS_BIN\" +animated-fetch";
-/// New-window startup presentation: `none`, `rustfetch`, or `molt`.
-pub const DEFAULT_STARTUP_ANIMATION: &str = "rustfetch";
+/// New-window startup presentation: `none`, `rustfetch`, or `molt`. Default is `molt`.
+pub const DEFAULT_STARTUP_ANIMATION: &str = "molt";
 pub const TERM_GHOSTTY: &str = "xterm-ghostty";
 pub const TERM_FALLBACK: &str = "xterm-256color";
 pub const COLORTERM_TRUECOLOR: &str = "truecolor";
@@ -324,7 +324,9 @@ impl SettingKey {
             Self::StartupFetchCommand => {
                 "POSIX command run on the PTY before the interactive shell starts."
             }
-            Self::StartupAnimation => "New-window startup presentation: none, rustfetch, or molt.",
+            Self::StartupAnimation => {
+                "New-window startup presentation: none, rustfetch, or molt. Default is molt."
+            }
             Self::FetchGifPath => "Path to a GIF for animated fetch; empty disables animation.",
         }
     }
@@ -617,9 +619,9 @@ pub struct EffectiveConfig {
 
 impl EffectiveConfig {
     /// The parsed startup presentation for this effective config. Unknown
-    /// stored values fall back to the legacy `rustfetch` behavior.
+    /// stored values fall back to the default `molt` presentation.
     pub fn startup_animation(&self) -> StartupAnimation {
-        StartupAnimation::parse(&self.startup_animation).unwrap_or(StartupAnimation::Rustfetch)
+        StartupAnimation::parse(&self.startup_animation).unwrap_or(StartupAnimation::Molt)
     }
 }
 
@@ -988,6 +990,24 @@ mod tests {
     }
 
     #[test]
+    fn test_default_startup_animation_is_molt() {
+        assert_eq!(DEFAULT_STARTUP_ANIMATION, "molt");
+        assert_eq!(
+            EffectiveConfig::defaults().startup_animation(),
+            StartupAnimation::Molt
+        );
+    }
+
+    #[test]
+    fn unknown_stored_startup_animation_falls_back_to_molt() {
+        let mut overlay = ConfigOverlay::default();
+        assert!(overlay.set(SettingKey::StartupAnimation, "wiggle").is_err());
+        let mut cfg = EffectiveConfig::defaults();
+        cfg.startup_animation = "wiggle".into();
+        assert_eq!(cfg.startup_animation(), StartupAnimation::Molt);
+    }
+
+    #[test]
     fn theme_and_background_opacity_validate_supported_paint_values() {
         let mut overlay = ConfigOverlay::default();
         overlay
@@ -1024,9 +1044,7 @@ mod tests {
     #[test]
     fn background_blur_rejects_negatives_and_non_integers() {
         let mut overlay = ConfigOverlay::default();
-        overlay
-            .set(SettingKey::BackgroundBlur, "20")
-            .expect("blur");
+        overlay.set(SettingKey::BackgroundBlur, "20").expect("blur");
         assert_eq!(overlay.background_blur, Some(20));
         assert!(overlay.set(SettingKey::BackgroundBlur, "-1").is_err());
         assert!(overlay.set(SettingKey::BackgroundBlur, "1.5").is_err());

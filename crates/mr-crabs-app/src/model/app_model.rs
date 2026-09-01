@@ -1913,8 +1913,18 @@ mod tests {
             .expect("normal pane");
         assert_eq!(
             original_pane.pending_startup_command(),
-            Some(mr_crabs_config::DEFAULT_STARTUP_FETCH_COMMAND),
-            "normal terminals keep the default startup fetch"
+            None,
+            "molt default does not queue rustfetch"
+        );
+        assert!(
+            matches!(
+                model
+                    .window(original_window)
+                    .expect("normal window")
+                    .startup_presentation,
+                StartupPresentation::MoltActive { .. }
+            ),
+            "normal windows use the molt startup"
         );
 
         assert!(model.toggle_quick_terminal());
@@ -2579,6 +2589,9 @@ mod tests {
         overlay
             .set(SettingKey::StartupFetchCommand, "printf GUIBOOT")
             .expect("command");
+        overlay
+            .set(SettingKey::StartupAnimation, "rustfetch")
+            .expect("rustfetch");
         let store = crate::settings::SettingsStore::from_layers(
             overlay,
             ConfigOverlay::default(),
@@ -3164,9 +3177,12 @@ mod tests {
                 None,
             );
             let window_id = model.new_window().expect("window");
-            assert_eq!(
-                model.window(window_id).unwrap().startup_presentation,
-                StartupPresentation::None
+            assert!(
+                matches!(
+                    model.window(window_id).unwrap().startup_presentation,
+                    StartupPresentation::MoltActive { .. }
+                ),
+                "fetch off still runs molt"
             );
             assert!(
                 model
@@ -3185,6 +3201,9 @@ mod tests {
         overlay
             .set(SettingKey::StartupFetchCommand, "printf GUIBOOT")
             .expect("command");
+        overlay
+            .set(SettingKey::StartupAnimation, "rustfetch")
+            .expect("rustfetch");
         let mut model = AppModel::with_platform_settings_and_output_wake(
             crate::platform::PlatformCapabilities::headless(),
             store_for(overlay),
