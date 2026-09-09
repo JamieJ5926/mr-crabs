@@ -8,6 +8,7 @@ pub mod menus;
 pub mod shell;
 pub mod wake;
 pub mod workspace;
+pub mod tab_chrome;
 
 pub use shell::AppShell;
 pub use wake::{drain_scheduled, install_wake, new_output_wake, spawn_wake_task};

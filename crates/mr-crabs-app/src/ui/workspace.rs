@@ -63,6 +63,7 @@ use crate::ui::input_dock::{
     dock_hit_consumes, input_dock_footer, input_dock_mask, input_dock_overlay,
     input_dock_separator,
 };
+use crate::ui::tab_chrome::{TAB_ROW_HEIGHT_PX, render_tab_bar, tab_entries};
 use crate::ui::input_surface::{
     encode_ime, encode_live_focus, encode_live_key, encode_live_mouse, encode_live_paste,
 };
@@ -394,12 +395,15 @@ impl Render for WindowView {
                 pane.lifecycle == crate::model::pane::PtyLifecycle::Pending
                     || pane.should_reserve_dock_chrome()
             });
+        // CrabsTabs seam: the tab strip owns the top TAB_ROW_HEIGHT_PX, so the
+        // committed pane grid excludes it. Every window-space `top` below adds
+        // the same offset back, keeping paint and hit areas consistent.
         let geometry = metrics.and_then(|metrics| {
             settings_padding(settings.padding_x, settings.padding_y).and_then(|padding| {
                 SurfaceGeometry::from_viewport_with_dock_reserve(
                     PixelExtent {
                         width: f32::from(viewport.width),
-                        height: f32::from(viewport.height),
+                        height: (f32::from(viewport.height) - TAB_ROW_HEIGHT_PX).max(0.0),
                     },
                     metrics,
                     padding,
@@ -432,6 +436,16 @@ impl Render for WindowView {
         if !title.is_empty() {
             window.set_window_title(&prefixed_window_title(&title));
         }
+        // 3b. Tab strip (CrabsTabs seam): titles + active state + click.
+        //     Panes below are offset by TAB_ROW_HEIGHT_PX (see geometry extent
+        //     and window-space tops); this binding only computes the strip.
+        let tab_bar = self.model.read(cx).window(self.window_id).map(|window_model| {
+            render_tab_bar(
+                &tab_entries(window_model),
+                self.window_id,
+                self.model.clone(),
+            )
+        });
 
         // 4. Compose every pane in the active tab from immutable model state.
         //    Invalid surface geometry paints shell layers only; no guessed grid
@@ -502,7 +516,8 @@ impl Render for WindowView {
             (
                 f32::from(bundle.geometry.padding.left)
                     + f32::from(bundle.rect.x) * bundle.pane_geometry.metrics.width,
-                f32::from(bundle.geometry.padding.top)
+                TAB_ROW_HEIGHT_PX
+                    + f32::from(bundle.geometry.padding.top)
                     + f32::from(bundle.rect.y) * bundle.pane_geometry.metrics.height,
                 bundle.pane_geometry.content.width,
                 bundle.pane_geometry.content.height,
@@ -528,10 +543,16 @@ impl Render for WindowView {
             .on_key_up(move |event, _, cx| {
                 handle_key_release(&key_up_model, event, cx);
             });
+        // CrabsTabs seam hunk B: tab strip paints the reserved top row; panes
+        // below are absolute-positioned under it (see offset `top`).
+        if let Some(tab_bar) = tab_bar {
+            root = root.child(tab_bar);
+        }
         for bundle in bundles {
             let left = f32::from(bundle.geometry.padding.left)
                 + f32::from(bundle.rect.x) * bundle.pane_geometry.metrics.width;
-            let top = f32::from(bundle.geometry.padding.top)
+            let top = TAB_ROW_HEIGHT_PX
+                + f32::from(bundle.geometry.padding.top)
                 + f32::from(bundle.rect.y) * bundle.pane_geometry.metrics.height;
             let ime_tx = self.ime_tx.clone();
             let ime_pane_id = bundle.pane_id;
@@ -814,13 +835,14 @@ impl Render for WindowView {
                 } = focused;
                 let left = f32::from(geometry.padding.left)
                     + f32::from(rect.x) * pane_geometry.metrics.width;
-                let top = f32::from(geometry.padding.top)
+                let top = TAB_ROW_HEIGHT_PX
+                    + f32::from(geometry.padding.top)
                     + f32::from(rect.y) * pane_geometry.metrics.height;
                 let tokens = InputDockTokens::for_palette(terminal_palette);
                 if let Some(layout) = compose_input_dock_layout(
                     PixelExtent {
                         width: f32::from(viewport.width),
-                        height: f32::from(viewport.height),
+                        height: (f32::from(viewport.height) - TAB_ROW_HEIGHT_PX).max(0.0),
                     },
                     PointF { x: left, y: top },
                     pane_geometry,
@@ -1080,7 +1102,7 @@ impl Render for WindowView {
             root = root.child(
                 div()
                     .absolute()
-                    .top(px(8.0))
+                    .top(px(8.0 + TAB_ROW_HEIGHT_PX))
                     .right(px(8.0))
                     .id(ElementId::Name(SharedString::from("secure-input-badge")))
                     .child("Secure Input"),
