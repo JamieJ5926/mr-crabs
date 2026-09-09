@@ -292,11 +292,12 @@ impl RestoreStore {
         if state.version != SHELL_STATE_VERSION {
             return Err(RestoreError::UnsupportedVersion(state.version));
         }
-        model.windows.clear();
-        model.window_order.clear();
-        model.active_window = None;
-        model.quit_requested = false;
-
+        // Phase 1: build every window into locals. Any validation failure
+        // below returns with the model untouched, so a corrupt snapshot can
+        // never destroy the live (or fresh) model. Pane construction reads
+        // settings/platform but mutates no model structure.
+        let mut built = Vec::with_capacity(state.windows.len());
+        let mut order = Vec::with_capacity(state.windows.len());
         let mut max_window = 0u64;
         let mut max_tab = 0u64;
         let mut max_pane = 0u64;
@@ -341,17 +342,26 @@ impl RestoreStore {
                 active_tab,
                 window_state.is_quick_terminal,
             )?;
+            order.push(window.id);
+            built.push(window);
+        }
+        let active_window = state
+            .active_window
+            .filter(|index| *index < order.len())
+            .map(|index| order[index]);
+
+        // Phase 2: infallible commit.
+        model.windows.clear();
+        model.window_order.clear();
+        for window in built {
             model.window_order.push(window.id);
             model.windows.insert(window.id, window);
         }
-
-        model.active_window = state
-            .active_window
-            .filter(|index| *index < model.window_order.len())
-            .map(|index| model.window_order[index]);
+        model.active_window = active_window;
         if model.active_window.is_none() && !model.window_order.is_empty() {
             model.active_window = model.window_order.last().copied();
         }
+        model.quit_requested = false;
         model.reserve_ids(max_window, max_tab, max_pane);
         model.generation += 1;
         self.restore_count += 1;

@@ -799,4 +799,50 @@ mod tests {
         assert_eq!(model.windows.len(), 1);
         std::fs::remove_dir_all(&dir).expect("cleanup");
     }
+
+    #[test]
+    fn restore_entry_keeps_fresh_model_on_semantically_invalid_file() {
+        // Version-correct but semantically invalid: the split tree points at
+        // a pane missing from the pane map. A failed apply must leave the
+        // fresh model intact, not an emptied one.
+        let dir = restore_temp_path("semantic");
+        std::fs::create_dir_all(&dir).expect("mkdir");
+        let source = AppModel::headless();
+        let mut saver = RestoreStore::at(path.clone());
+        saver.save(&source).expect("save");
+        let mut raw: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).expect("read"))
+                .expect("parse");
+        raw["windows"][0]["tabs"][0]["tree"] =
+            serde_json::json!({"kind": "leaf", "value": 999});
+        let bytes = serde_json::to_string(&raw).expect("render");
+        std::fs::write(&path, &bytes).expect("write");
+
+        let mut model = AppModel::headless();
+        let fresh_tabs = model.active_window().expect("fresh window").tabs.len();
+        let fresh_panes = model
+            .active_window()
+            .expect("fresh window")
+            .tabs
+            .values()
+            .map(|tab| tab.pane_count())
+            .sum::<usize>();
+        model.restore = RestoreStore::at(path.clone());
+        restore_shell_state_from(&mut model, &path);
+        assert_eq!(model.windows.len(), 1, "fresh window survives failed apply");
+        let window = model.active_window().expect("fresh window");
+        assert_eq!(window.tabs.len(), fresh_tabs);
+        assert_eq!(
+            window.tabs.values().map(|tab| tab.pane_count()).sum::<usize>(),
+            fresh_panes,
+            "fresh panes survive failed apply"
+        );
+        assert_eq!(model.restore.restore_count, 0);
+        assert_eq!(
+            std::fs::read_to_string(&path).expect("read"),
+            bytes,
+            "invalid file left untouched"
+        );
+        std::fs::remove_dir_all(&dir).expect("cleanup");
+    }
 }
