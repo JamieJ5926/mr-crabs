@@ -15,6 +15,8 @@ use mr_crabs_terminal::{
     RowDelta, Style, TerminalMode, TerminalViewport, batch_runs,
 };
 
+use mr_crabs_config::PromptPresentation;
+
 use super::pane::{PaneId, PaneModel};
 
 /// Derived dock visibility. Never stored as a line buffer.
@@ -142,6 +144,10 @@ pub const CHEVRON_GAP: f32 = 21.0;
 pub const CARET_W: f32 = 2.0;
 pub const CHEVRON_W: f32 = 16.0;
 
+/// Reserve dock chrome from static presentation configuration.
+pub fn should_reserve_dock_chrome(alt_screen: bool, prompt: PromptPresentation) -> bool {
+    prompt == PromptPresentation::Dock && !alt_screen
+}
 /// Rebuild the dock snapshot for `pane`. Fail-closed to Hidden.
 pub fn derive_input_dock(pane: &PaneModel, palette_open: bool) -> InputDockSnapshot {
     let hidden = |source: DockSourceSpan, cursor: DockCursor, prompt_kind: Option<PromptKind>| {
@@ -173,6 +179,9 @@ pub fn derive_input_dock(pane: &PaneModel, palette_open: bool) -> InputDockSnaps
         wrap_pending: cursor.wrap_pending,
     };
 
+    if pane.prompt_presentation() == PromptPresentation::Inline {
+        return hidden(fallback_span, fallback_cursor, semantic.prompt_kind);
+    }
     if palette_open {
         return hidden(fallback_span, fallback_cursor, semantic.prompt_kind);
     }
@@ -485,6 +494,7 @@ fn osc7_basename(pwd: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use mr_crabs_element::PixelExtent;
     use mr_crabs_protocols::shell::{SemanticContent, SemanticPromptState};
     use mr_crabs_terminal::{CursorSnapshot, GridSize};
 
@@ -502,6 +512,93 @@ mod tests {
             combining_marks: Vec::new(),
             hyperlinks: Vec::new(),
             modes: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn dock_not_alt_reserves_chrome() {
+        assert!(should_reserve_dock_chrome(false, PromptPresentation::Dock));
+        let metrics = CellMetrics::new(10.0, 20.0).expect("valid metrics");
+        let geo = crate::model::geometry::SurfaceGeometry::from_viewport_with_dock_reserve(
+            PixelExtent {
+                width: 800.0,
+                height: 480.0,
+            },
+            metrics,
+            crate::model::geometry::PaddingPx::default(),
+            should_reserve_dock_chrome(false, PromptPresentation::Dock),
+        )
+        .expect("geometry");
+        assert_eq!(geo.content.height, 480.0 - CHROME_TOTAL);
+    }
+
+    #[test]
+    fn alt_screen_reserves_nothing_when_latched() {
+        assert!(!should_reserve_dock_chrome(true, PromptPresentation::Dock));
+        let metrics = CellMetrics::new(10.0, 20.0).expect("valid metrics");
+        let full = crate::model::geometry::SurfaceGeometry::from_viewport(
+            PixelExtent {
+                width: 800.0,
+                height: 480.0,
+            },
+            metrics,
+            crate::model::geometry::PaddingPx::default(),
+        )
+        .expect("full");
+        let reserved = crate::model::geometry::SurfaceGeometry::from_viewport_with_dock_reserve(
+            PixelExtent {
+                width: 800.0,
+                height: 480.0,
+            },
+            metrics,
+            crate::model::geometry::PaddingPx::default(),
+            should_reserve_dock_chrome(true, PromptPresentation::Dock),
+        )
+        .expect("reserved");
+        assert_eq!(reserved.content.height, full.content.height);
+        assert_eq!(reserved.grid.rows, full.grid.rows);
+    }
+
+    #[test]
+    fn dock_reserves_chrome_regardless_of_osc133() {
+        assert!(should_reserve_dock_chrome(false, PromptPresentation::Dock));
+        assert!(!should_reserve_dock_chrome(true, PromptPresentation::Dock));
+        let metrics = CellMetrics::new(10.0, 20.0).expect("valid metrics");
+        let geo = crate::model::geometry::SurfaceGeometry::from_viewport_with_dock_reserve(
+            PixelExtent {
+                width: 800.0,
+                height: 480.0,
+            },
+            metrics,
+            crate::model::geometry::PaddingPx::default(),
+            should_reserve_dock_chrome(false, PromptPresentation::Dock),
+        )
+        .expect("geometry");
+        assert_eq!(geo.content.height, 480.0 - CHROME_TOTAL);
+    }
+
+    #[test]
+    fn dock_reserve_policy_is_fixed_point() {
+        for alt in [false, true] {
+            let first = should_reserve_dock_chrome(alt, PromptPresentation::Dock);
+            let second = should_reserve_dock_chrome(alt, PromptPresentation::Dock);
+            assert_eq!(first, second, "alt={alt}");
+            let metrics = CellMetrics::new(10.0, 20.0).expect("valid metrics");
+            let viewport = PixelExtent {
+                width: 800.0,
+                height: 480.0,
+            };
+            let padding = crate::model::geometry::PaddingPx::default();
+            let a = crate::model::geometry::SurfaceGeometry::from_viewport_with_dock_reserve(
+                viewport, metrics, padding, first,
+            )
+            .expect("first");
+            let b = crate::model::geometry::SurfaceGeometry::from_viewport_with_dock_reserve(
+                viewport, metrics, padding, second,
+            )
+            .expect("second");
+            assert_eq!(a.content.height, b.content.height);
+            assert_eq!(a.grid.rows, b.grid.rows);
         }
     }
 
@@ -588,6 +685,76 @@ mod tests {
         let mut pane = PaneModel::detached(PaneId::new(1), GridSize::new(80, 24)).expect("pane");
         pane.feed_test_output(b"\x1b]133;A\x07").expect("feed");
         assert_eq!(derive_input_dock(&pane, true).state, InputDockState::Hidden);
+    }
+
+    fn eligible_osc133_pane() -> PaneModel {
+        let mut pane = PaneModel::detached(PaneId::new(1), GridSize::new(80, 24)).expect("pane");
+        pane.feed_test_output(b"\x1b]133;A\x07$ \x1b]133;B\x07ls")
+            .expect("feed");
+        pane
+    }
+
+    #[test]
+    fn inline_prompt_hides_dock_even_with_eligible_osc133() {
+        let mut pane = eligible_osc133_pane();
+        pane.set_prompt_presentation(PromptPresentation::Inline);
+        assert_eq!(
+            derive_input_dock(&pane, false).state,
+            InputDockState::Hidden
+        );
+    }
+
+    #[test]
+    fn dock_prompt_still_activates_with_eligible_osc133() {
+        let mut pane = eligible_osc133_pane();
+        pane.set_prompt_presentation(PromptPresentation::Dock);
+        assert_eq!(
+            derive_input_dock(&pane, false).state,
+            InputDockState::ShellInputActive
+        );
+    }
+
+    #[test]
+    fn inline_prompt_reserves_no_dock_chrome() {
+        assert!(!should_reserve_dock_chrome(false, PromptPresentation::Inline));
+        let mut pane = eligible_osc133_pane();
+        pane.set_prompt_presentation(PromptPresentation::Inline);
+        assert!(!pane.should_reserve_dock_chrome());
+        let metrics = CellMetrics::new(10.0, 20.0).expect("valid metrics");
+        let geo = crate::model::geometry::SurfaceGeometry::from_viewport_with_dock_reserve(
+            PixelExtent {
+                width: 800.0,
+                height: 480.0,
+            },
+            metrics,
+            crate::model::geometry::PaddingPx::default(),
+            pane.should_reserve_dock_chrome(),
+        )
+        .expect("geometry");
+        assert_eq!(geo.content.height, 480.0);
+    }
+
+    #[test]
+    fn switching_prompt_presentation_flips_derived_dock_both_ways() {
+        let mut pane = eligible_osc133_pane();
+        pane.set_prompt_presentation(PromptPresentation::Dock);
+        assert_eq!(
+            derive_input_dock(&pane, false).state,
+            InputDockState::ShellInputActive
+        );
+        assert!(pane.should_reserve_dock_chrome());
+        pane.set_prompt_presentation(PromptPresentation::Inline);
+        assert_eq!(
+            derive_input_dock(&pane, false).state,
+            InputDockState::Hidden
+        );
+        assert!(!pane.should_reserve_dock_chrome());
+        pane.set_prompt_presentation(PromptPresentation::Dock);
+        assert_eq!(
+            derive_input_dock(&pane, false).state,
+            InputDockState::ShellInputActive
+        );
+        assert!(pane.should_reserve_dock_chrome());
     }
 
     #[test]

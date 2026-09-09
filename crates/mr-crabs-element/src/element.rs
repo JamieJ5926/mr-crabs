@@ -226,8 +226,6 @@ struct PreparedEffects<'a> {
     config: EffectsConfig,
     cell: CellPx,
     fx: &'a EffectsFrame,
-    focused: bool,
-    now_ms: u64,
 }
 
 fn conceal_color(
@@ -852,8 +850,6 @@ impl TerminalElement {
             config,
             cell,
             fx,
-            focused,
-            now_ms,
         })
     }
 

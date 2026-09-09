@@ -83,18 +83,16 @@ mod macos {
 
     fn msg_send_id(receiver: Id, sel: Sel) -> Id {
         unsafe {
-            let send: unsafe extern "C" fn(Id, Sel) -> Id = std::mem::transmute(
-                objc_msgSend as unsafe extern "C" fn(),
-            );
+            let send: unsafe extern "C" fn(Id, Sel) -> Id =
+                std::mem::transmute(objc_msgSend as unsafe extern "C" fn());
             send(receiver, sel)
         }
     }
 
     fn msg_send_bool(receiver: Id, sel: Sel) -> bool {
         unsafe {
-            let send: unsafe extern "C" fn(Id, Sel) -> ObjcBool = std::mem::transmute(
-                objc_msgSend as unsafe extern "C" fn(),
-            );
+            let send: unsafe extern "C" fn(Id, Sel) -> ObjcBool =
+                std::mem::transmute(objc_msgSend as unsafe extern "C" fn());
             send(receiver, sel) != 0
         }
     }

@@ -27,12 +27,14 @@ pub const DEFAULT_TEXT_ANIMATION: &str = "streaming";
 pub const DEFAULT_TEXT_ANIMATION_DURATION_MS: u64 = 120;
 pub const DEFAULT_TEXT_ANIMATION_INTENSITY: f32 = 1.0;
 pub const DEFAULT_FETCH_GIF_PATH: &str = "";
-/// Whether new windows auto-run the startup fetch command.
+/// Whether new windows auto-run the startup fetch.
 pub const DEFAULT_STARTUP_FETCH: bool = true;
-/// POSIX command run on the PTY before the interactive shell starts.
-pub const DEFAULT_STARTUP_FETCH_COMMAND: &str = "sleep 0.5; \"$MR_CRABS_BIN\" +animated-fetch";
-/// New-window startup presentation: `none`, `rustfetch`, or `molt`. Default is `molt`.
+/// New-window startup presentation: `none`, `fetch`, or `molt`. Default is `molt`.
 pub const DEFAULT_STARTUP_ANIMATION: &str = "molt";
+pub const DEFAULT_PROMPT_PRESENTATION: &str = "dock";
+pub const DEFAULT_STARTUP_ART: &str = "native";
+pub const DEFAULT_FETCH_ARRANGEMENT: &str = "below";
+
 pub const TERM_GHOSTTY: &str = "xterm-ghostty";
 pub const TERM_FALLBACK: &str = "xterm-256color";
 pub const COLORTERM_TRUECOLOR: &str = "truecolor";
@@ -69,11 +71,9 @@ impl TextAnimation {
 pub enum StartupAnimation {
     /// No startup presentation.
     None,
-    /// Run the startup fetch command; the retained output is dismissed by
-    /// the first forwarded Enter.
+    /// Run the startup fetch; the retained output is dismissed by the first forwarded Enter.
     #[default]
-    Rustfetch,
-    /// Full-window background mask dissolving over 600 ms; forwarded Enter
+    Fetch,
     /// dismisses it immediately.
     Molt,
 }
@@ -82,22 +82,222 @@ impl StartupAnimation {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::None => "none",
-            Self::Rustfetch => "rustfetch",
+            Self::Fetch => "fetch",
             Self::Molt => "molt",
         }
     }
 
-    /// Strict parse; unknown values are rejected so typos never silently
-    /// change startup behavior.
+    /// Strict parse; unknown values are rejected so typos never silently change startup behavior.
     pub fn parse(value: &str) -> Result<Self, String> {
         match value {
             "none" => Ok(Self::None),
-            "rustfetch" => Ok(Self::Rustfetch),
+            "fetch" => Ok(Self::Fetch),
             "molt" => Ok(Self::Molt),
             other => Err(format!("invalid startup-animation value {other:?}")),
         }
     }
 }
+
+/// Prompt chrome: the semantic input dock, or the untouched PTY prompt row.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum PromptPresentation {
+    #[default]
+    Dock,
+    Inline,
+}
+
+impl PromptPresentation {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Dock => "dock",
+            Self::Inline => "inline",
+        }
+    }
+
+    pub fn parse(value: &str) -> Result<Self, String> {
+        match value {
+            "dock" => Ok(Self::Dock),
+            "inline" => Ok(Self::Inline),
+            other => Err(format!("invalid prompt-presentation value {other:?}")),
+        }
+    }
+}
+
+/// Startup logo selection. Custom art carries its path in the variant.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub enum StartupArt {
+    None,
+    #[default]
+    Native,
+    Apple,
+    Custom(PathBuf),
+}
+
+impl StartupArt {
+    pub fn as_str(&self) -> String {
+        match self {
+            Self::None => "none".to_string(),
+            Self::Native => "native".to_string(),
+            Self::Apple => "apple".to_string(),
+            Self::Custom(path) => format!("file:{}", path.display()),
+        }
+    }
+
+    pub fn parse(value: &str) -> Result<Self, String> {
+        match value {
+            "none" => Ok(Self::None),
+            "native" => Ok(Self::Native),
+            "apple" => Ok(Self::Apple),
+            other if let Some(path) = other.strip_prefix("file:") => {
+                if path.is_empty() {
+                    return Err("invalid startup-art value: file: requires an absolute path".into());
+                }
+                let buf = PathBuf::from(path);
+                if !buf.is_absolute() {
+                    return Err(format!(
+                        "invalid startup-art value {other:?}: path must be absolute"
+                    ));
+                }
+                Ok(Self::Custom(buf))
+            }
+            other => Err(format!(
+                "invalid startup-art value {other:?}, expected none, native, apple, or file:/absolute/path"
+            )),
+        }
+    }
+}
+
+/// Where the fetch places system information relative to art.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum FetchArrangement {
+    #[default]
+    Below,
+    Beside,
+    Hidden,
+}
+
+impl FetchArrangement {
+    pub fn as_str(self) -> &'static str {
+        match self { Self::Below => "below", Self::Beside => "beside", Self::Hidden => "hidden" }
+    }
+    pub fn parse(value: &str) -> Result<Self, String> {
+        match value { "below" => Ok(Self::Below), "beside" => Ok(Self::Beside), "hidden" => Ok(Self::Hidden), other => Err(format!("invalid fetch-arrangement value {other:?}")) }
+    }
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum StaticStartupArt {
+    None,
+    Apple,
+    Custom(PathBuf),
+}
+
+impl StaticStartupArt {
+    pub fn from_startup_art(art: StartupArt) -> Self {
+        match art {
+            StartupArt::None | StartupArt::Native => Self::None,
+            StartupArt::Apple => Self::Apple,
+            StartupArt::Custom(path) => Self::Custom(path),
+        }
+    }
+}
+
+/// Resolved new-window startup presentation. Animation, art, and info layout
+/// are independent axes so every combination is representable.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct StartupSettings {
+    pub animation: StartupAnimation,
+    pub art: StartupArt,
+    pub arrangement: FetchArrangement,
+}
+
+/// Runtime presentation snapshot consumed by rendering and window construction.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PresentationSettings {
+    pub prompt: PromptPresentation,
+    pub startup: StartupSettings,
+}
+
+impl PresentationSettings {
+    pub fn from_raw(
+        prompt: PromptPresentation,
+        animation: StartupAnimation,
+        art: StartupArt,
+        arrangement: FetchArrangement,
+    ) -> Self {
+        Self {
+            prompt,
+            startup: StartupSettings { animation, art, arrangement },
+        }
+    }
+}
+
+/// Theme-keyed presentation defaults. Explicit user settings always beat these.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PresentationPreset {
+    pub theme: &'static str,
+    pub prompt: PromptPresentation,
+    pub startup_animation: StartupAnimation,
+    pub startup_art: StartupArt,
+    pub fetch_arrangement: FetchArrangement,
+}
+
+/// Canonical theme names that must each have a presentation preset.
+pub const CANONICAL_THEME_NAMES: [&str; 5] = ["auto", "ink", "paper", "harbor", "ember"];
+
+pub const PRESENTATION_PRESETS: [PresentationPreset; 5] = [
+    PresentationPreset {
+        theme: "auto",
+        prompt: PromptPresentation::Dock,
+        startup_animation: StartupAnimation::Molt,
+        startup_art: StartupArt::Native,
+        fetch_arrangement: FetchArrangement::Below,
+    },
+    PresentationPreset {
+        theme: "ink",
+        prompt: PromptPresentation::Dock,
+        startup_animation: StartupAnimation::Molt,
+        startup_art: StartupArt::Native,
+        fetch_arrangement: FetchArrangement::Below,
+    },
+    PresentationPreset {
+        theme: "paper",
+        prompt: PromptPresentation::Inline,
+        startup_animation: StartupAnimation::Molt,
+        startup_art: StartupArt::Native,
+        fetch_arrangement: FetchArrangement::Below,
+    },
+    PresentationPreset {
+        theme: "harbor",
+        prompt: PromptPresentation::Dock,
+        startup_animation: StartupAnimation::Molt,
+        startup_art: StartupArt::Native,
+        fetch_arrangement: FetchArrangement::Below,
+    },
+    PresentationPreset {
+        theme: "ember",
+        prompt: PromptPresentation::Dock,
+        startup_animation: StartupAnimation::Molt,
+        startup_art: StartupArt::Native,
+        fetch_arrangement: FetchArrangement::Below,
+    },
+];
+
+pub fn presentation_preset_for_theme(theme: &str) -> &'static PresentationPreset {
+    let canonical = match theme {
+        "auto" => "auto",
+        "ink" | "dark" => "ink",
+        "paper" | "light" => "paper",
+        "harbor" => "harbor",
+        "ember" => "ember",
+        _ => "auto",
+    };
+    PRESENTATION_PRESETS
+        .iter()
+        .find(|preset| preset.theme == canonical)
+        .unwrap_or(&PRESENTATION_PRESETS[0])
+}
+
+
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct AnimationDefaults {
@@ -178,13 +378,15 @@ pub enum SettingKey {
     AllowOsc52Write,
     AllowOsc52Read,
     StartupFetch,
-    StartupFetchCommand,
     StartupAnimation,
+    PromptPresentation,
+    StartupArt,
+    FetchArrangement,
     FetchGifPath,
 }
 
 impl SettingKey {
-    pub const ALL: [Self; 26] = [
+    pub const ALL: [Self; 28] = [
         Self::FontFamily,
         Self::FontSize,
         Self::LineHeightAdjustPercent,
@@ -208,8 +410,10 @@ impl SettingKey {
         Self::AllowOsc52Write,
         Self::AllowOsc52Read,
         Self::StartupFetch,
-        Self::StartupFetchCommand,
         Self::StartupAnimation,
+        Self::PromptPresentation,
+        Self::StartupArt,
+        Self::FetchArrangement,
         Self::FetchGifPath,
     ];
 
@@ -238,8 +442,10 @@ impl SettingKey {
             Self::AllowOsc52Write => "clipboard-write",
             Self::AllowOsc52Read => "clipboard-read",
             Self::StartupFetch => "startup-fetch",
-            Self::StartupFetchCommand => "startup-fetch-command",
             Self::StartupAnimation => "startup-animation",
+            Self::PromptPresentation => "prompt-presentation",
+            Self::StartupArt => "startup-art",
+            Self::FetchArrangement => "fetch-arrangement",
             Self::FetchGifPath => "fetch-gif-path",
         }
     }
@@ -272,8 +478,10 @@ impl SettingKey {
             "clipboard-write" | "allow-osc52-write" => Some(Self::AllowOsc52Write),
             "clipboard-read" | "allow-osc52-read" => Some(Self::AllowOsc52Read),
             "startup-fetch" => Some(Self::StartupFetch),
-            "startup-fetch-command" => Some(Self::StartupFetchCommand),
             "startup-animation" => Some(Self::StartupAnimation),
+            "prompt-presentation" => Some(Self::PromptPresentation),
+            "startup-art" => Some(Self::StartupArt),
+            "fetch-arrangement" => Some(Self::FetchArrangement),
             "fetch-gif-path" => Some(Self::FetchGifPath),
             _ => None,
         }
@@ -320,12 +528,18 @@ impl SettingKey {
             Self::TextAnimationIntensity => "Text animation intensity.",
             Self::AllowOsc52Write => "Allow OSC 52 writes to the system clipboard.",
             Self::AllowOsc52Read => "Allow OSC 52 reads from the system clipboard.",
-            Self::StartupFetch => "Run the startup fetch command in new windows.",
-            Self::StartupFetchCommand => {
-                "POSIX command run on the PTY before the interactive shell starts."
-            }
+            Self::StartupFetch => "Run the startup fetch in new windows.",
             Self::StartupAnimation => {
-                "New-window startup presentation: none, rustfetch, or molt. Default is molt."
+                "New-window startup presentation: none, fetch, or molt. Default is molt."
+            }
+            Self::PromptPresentation => {
+                "Prompt chrome: dock (semantic input dock) or inline (PTY prompt row). Default is dock."
+            }
+            Self::StartupArt => {
+                "Startup art: none, native, apple, or file:/absolute/path. Default is native."
+            }
+            Self::FetchArrangement => {
+                "Fetch info placement: below, beside, or hidden. Default is below."
             }
             Self::FetchGifPath => "Path to a GIF for animated fetch; empty disables animation.",
         }
@@ -358,8 +572,10 @@ pub struct ConfigOverlay {
     pub allow_osc52_write: Option<bool>,
     pub allow_osc52_read: Option<bool>,
     pub startup_fetch: Option<bool>,
-    pub startup_fetch_command: Option<String>,
     pub startup_animation: Option<String>,
+    pub prompt_presentation: Option<String>,
+    pub startup_art: Option<String>,
+    pub fetch_arrangement: Option<String>,
     pub fetch_gif_path: Option<String>,
 }
 
@@ -438,14 +654,20 @@ impl ConfigOverlay {
         if over.startup_fetch.is_some() {
             self.startup_fetch = over.startup_fetch;
         }
-        if over.startup_fetch_command.is_some() {
-            self.startup_fetch_command = over.startup_fetch_command;
-        }
         if over.fetch_gif_path.is_some() {
             self.fetch_gif_path = over.fetch_gif_path;
         }
         if over.startup_animation.is_some() {
             self.startup_animation = over.startup_animation;
+        }
+        if over.prompt_presentation.is_some() {
+            self.prompt_presentation = over.prompt_presentation;
+        }
+        if over.startup_art.is_some() {
+            self.startup_art = over.startup_art;
+        }
+        if over.fetch_arrangement.is_some() {
+            self.fetch_arrangement = over.fetch_arrangement;
         }
     }
 
@@ -519,17 +741,20 @@ impl ConfigOverlay {
         if let Some(v) = self.startup_fetch {
             dst.startup_fetch = v;
         }
-        if let Some(v) = &self.startup_fetch_command {
-            dst.startup_fetch_command = v.clone();
-            if v.is_empty() {
-                dst.startup_fetch = false;
-            }
-        }
         if let Some(v) = &self.fetch_gif_path {
             dst.fetch_gif_path = v.clone();
         }
         if let Some(v) = &self.startup_animation {
             dst.startup_animation = v.clone();
+        }
+        if let Some(v) = &self.prompt_presentation {
+            dst.prompt_presentation = v.clone();
+        }
+        if let Some(v) = &self.startup_art {
+            dst.startup_art = v.clone();
+        }
+        if let Some(v) = &self.fetch_arrangement {
+            dst.fetch_arrangement = v.clone();
         }
     }
 
@@ -576,15 +801,36 @@ impl ConfigOverlay {
             SettingKey::AllowOsc52Write => self.allow_osc52_write = Some(parse_bool(value)?),
             SettingKey::AllowOsc52Read => self.allow_osc52_read = Some(parse_bool(value)?),
             SettingKey::StartupFetch => self.startup_fetch = Some(parse_bool(value)?),
-            SettingKey::StartupFetchCommand => self.startup_fetch_command = Some(value.to_string()),
             SettingKey::StartupAnimation => {
                 self.startup_animation = Some(StartupAnimation::parse(value)?.as_str().to_string())
+            }
+            SettingKey::PromptPresentation => {
+                self.prompt_presentation =
+                    Some(PromptPresentation::parse(value)?.as_str().to_string())
+            }
+            SettingKey::StartupArt => {
+                self.startup_art = Some(StartupArt::parse(value)?.as_str())
+            }
+            SettingKey::FetchArrangement => {
+                self.fetch_arrangement = Some(FetchArrangement::parse(value)?.as_str().to_string())
             }
             SettingKey::FetchGifPath => self.fetch_gif_path = Some(value.to_string()),
         }
         Ok(())
     }
 }
+
+fn presentation_preset_overlay(theme: &str) -> ConfigOverlay {
+    let preset = presentation_preset_for_theme(theme);
+    ConfigOverlay {
+        prompt_presentation: Some(preset.prompt.as_str().to_string()),
+        startup_animation: Some(preset.startup_animation.as_str().to_string()),
+        startup_art: Some(preset.startup_art.as_str()),
+        fetch_arrangement: Some(preset.fetch_arrangement.as_str().to_string()),
+        ..ConfigOverlay::default()
+    }
+}
+
 
 /// Fully resolved values for every config-owned setting.
 #[derive(Clone, Debug, PartialEq)]
@@ -612,8 +858,10 @@ pub struct EffectiveConfig {
     pub allow_osc52_write: bool,
     pub allow_osc52_read: bool,
     pub startup_fetch: bool,
-    pub startup_fetch_command: String,
     pub startup_animation: String,
+    pub prompt_presentation: String,
+    pub startup_art: String,
+    pub fetch_arrangement: String,
     pub fetch_gif_path: String,
 }
 
@@ -622,6 +870,27 @@ impl EffectiveConfig {
     /// stored values fall back to the default `molt` presentation.
     pub fn startup_animation(&self) -> StartupAnimation {
         StartupAnimation::parse(&self.startup_animation).unwrap_or(StartupAnimation::Molt)
+    }
+
+    pub fn prompt_presentation(&self) -> PromptPresentation {
+        PromptPresentation::parse(&self.prompt_presentation).unwrap_or(PromptPresentation::Dock)
+    }
+
+    pub fn startup_art(&self) -> StartupArt {
+        StartupArt::parse(&self.startup_art).unwrap_or(StartupArt::Native)
+    }
+
+    pub fn fetch_arrangement(&self) -> FetchArrangement {
+        FetchArrangement::parse(&self.fetch_arrangement).unwrap_or(FetchArrangement::Below)
+    }
+
+    pub fn presentation_settings(&self) -> PresentationSettings {
+        PresentationSettings::from_raw(
+            self.prompt_presentation(),
+            self.startup_animation(),
+            self.startup_art(),
+            self.fetch_arrangement(),
+        )
     }
 }
 
@@ -657,21 +926,26 @@ impl EffectiveConfig {
             allow_osc52_write: false,
             allow_osc52_read: false,
             startup_fetch: DEFAULT_STARTUP_FETCH,
-            startup_fetch_command: DEFAULT_STARTUP_FETCH_COMMAND.to_string(),
             startup_animation: DEFAULT_STARTUP_ANIMATION.to_string(),
+            prompt_presentation: DEFAULT_PROMPT_PRESENTATION.to_string(),
+            startup_art: DEFAULT_STARTUP_ART.to_string(),
+            fetch_arrangement: DEFAULT_FETCH_ARRANGEMENT.to_string(),
             fetch_gif_path: DEFAULT_FETCH_GIF_PATH.to_string(),
         }
     }
 
-    /// `defaults < file < cli < runtime`.
+    /// `defaults < theme-preset < file < cli < runtime`.
+    /// A preset seeds presentation only; explicit file/CLI/runtime values win.
     pub fn resolve(file: &ConfigOverlay, cli: &ConfigOverlay, runtime: &ConfigOverlay) -> Self {
+        let mut theme_probe = Self::defaults();
+        file.apply_into(&mut theme_probe);
+        cli.apply_into(&mut theme_probe);
+        runtime.apply_into(&mut theme_probe);
         let mut effective = Self::defaults();
+        presentation_preset_overlay(&theme_probe.theme).apply_into(&mut effective);
         file.apply_into(&mut effective);
         cli.apply_into(&mut effective);
         runtime.apply_into(&mut effective);
-        if effective.startup_fetch_command.is_empty() {
-            effective.startup_fetch = false;
-        }
         effective
     }
 
@@ -710,8 +984,10 @@ impl EffectiveConfig {
             SettingKey::AllowOsc52Write => format!("{}", self.allow_osc52_write),
             SettingKey::AllowOsc52Read => format!("{}", self.allow_osc52_read),
             SettingKey::StartupFetch => format!("{}", self.startup_fetch),
-            SettingKey::StartupFetchCommand => self.startup_fetch_command.clone(),
             SettingKey::StartupAnimation => self.startup_animation.clone(),
+            SettingKey::PromptPresentation => self.prompt_presentation.clone(),
+            SettingKey::StartupArt => self.startup_art.clone(),
+            SettingKey::FetchArrangement => self.fetch_arrangement.clone(),
             SettingKey::FetchGifPath => self.fetch_gif_path.clone(),
         }
     }
@@ -1008,6 +1284,146 @@ mod tests {
     }
 
     #[test]
+    fn prompt_presentation_parser_accepts_values_and_rejects_garbage() {
+        assert_eq!(
+            PromptPresentation::parse("dock").unwrap(),
+            PromptPresentation::Dock
+        );
+        assert_eq!(
+            PromptPresentation::parse("inline").unwrap(),
+            PromptPresentation::Inline
+        );
+        assert!(PromptPresentation::parse("floating").is_err());
+        let mut overlay = ConfigOverlay::default();
+        overlay
+            .set(SettingKey::PromptPresentation, "inline")
+            .expect("inline");
+        assert_eq!(overlay.prompt_presentation.as_deref(), Some("inline"));
+        assert!(overlay.set(SettingKey::PromptPresentation, "floating").is_err());
+    }
+
+    #[test]
+    fn startup_art_parser_accepts_values_and_rejects_garbage() {
+        assert_eq!(StartupArt::parse("none").unwrap(), StartupArt::None);
+        assert_eq!(StartupArt::parse("native").unwrap(), StartupArt::Native);
+        assert_eq!(StartupArt::parse("apple").unwrap(), StartupArt::Apple);
+        assert_eq!(
+            StartupArt::parse("file:/tmp/logo.txt").unwrap(),
+            StartupArt::Custom(PathBuf::from("/tmp/logo.txt"))
+        );
+        assert!(StartupArt::parse("custom").is_err());
+        let mut overlay = ConfigOverlay::default();
+        overlay
+            .set(SettingKey::StartupArt, "apple")
+            .expect("apple");
+        assert_eq!(overlay.startup_art.as_deref(), Some("apple"));
+        assert!(overlay.set(SettingKey::StartupArt, "custom").is_err());
+    }
+
+    #[test]
+    fn startup_art_rejects_relative_custom_path() {
+        let err = StartupArt::parse("file:logo.txt").expect_err("relative");
+        assert!(err.contains("absolute"), "{err}");
+        let mut overlay = ConfigOverlay::default();
+        let err = overlay
+            .set(SettingKey::StartupArt, "file:./art.txt")
+            .expect_err("relative overlay");
+        assert!(err.contains("absolute"), "{err}");
+    }
+
+    #[test]
+    fn fetch_arrangement_parser_accepts_values_and_rejects_garbage() {
+        assert_eq!(
+            FetchArrangement::parse("below").unwrap(),
+            FetchArrangement::Below
+        );
+        assert_eq!(
+            FetchArrangement::parse("beside").unwrap(),
+            FetchArrangement::Beside
+        );
+        assert_eq!(
+            FetchArrangement::parse("hidden").unwrap(),
+            FetchArrangement::Hidden
+        );
+        assert!(FetchArrangement::parse("overlay").is_err());
+        let mut overlay = ConfigOverlay::default();
+        overlay
+            .set(SettingKey::FetchArrangement, "beside")
+            .expect("beside");
+        assert_eq!(overlay.fetch_arrangement.as_deref(), Some("beside"));
+        assert!(overlay.set(SettingKey::FetchArrangement, "overlay").is_err());
+    }
+
+    #[test]
+    fn molt_plus_native_resolves_independent_axes() {
+        let settings = PresentationSettings::from_raw(
+            PromptPresentation::Dock,
+            StartupAnimation::Molt,
+            StartupArt::Native,
+            FetchArrangement::Below,
+        );
+        assert_eq!(settings.startup.animation, StartupAnimation::Molt);
+        assert_eq!(settings.startup.art, StartupArt::Native);
+        assert_eq!(settings.startup.arrangement, FetchArrangement::Below);
+        let effective = EffectiveConfig::defaults();
+        assert_eq!(effective.presentation_settings().startup.animation, StartupAnimation::Molt);
+    }
+
+    #[test]
+    fn explicit_presentation_setting_beats_theme_preset() {
+        let file = ConfigOverlay {
+            theme: Some("paper".into()),
+            prompt_presentation: Some("dock".into()),
+            ..ConfigOverlay::default()
+        };
+        let effective = EffectiveConfig::resolve(
+            &file,
+            &ConfigOverlay::default(),
+            &ConfigOverlay::default(),
+        );
+        assert_eq!(presentation_preset_for_theme("paper").prompt, PromptPresentation::Inline);
+        assert_eq!(effective.prompt_presentation(), PromptPresentation::Dock);
+    }
+
+    #[test]
+    fn default_prompt_presentation_is_dock() {
+        assert_eq!(DEFAULT_PROMPT_PRESENTATION, "dock");
+        assert_eq!(
+            EffectiveConfig::defaults().prompt_presentation(),
+            PromptPresentation::Dock
+        );
+        assert_eq!(
+            EffectiveConfig::defaults().startup_art(),
+            StartupArt::Native
+        );
+        assert_eq!(
+            EffectiveConfig::defaults().fetch_arrangement(),
+            FetchArrangement::Below
+        );
+        let auto = EffectiveConfig::resolve(
+            &ConfigOverlay::default(),
+            &ConfigOverlay::default(),
+            &ConfigOverlay::default(),
+        );
+        assert_eq!(auto.prompt_presentation(), PromptPresentation::Dock);
+        assert_eq!(auto.startup_animation(), StartupAnimation::Molt);
+        assert_eq!(auto.startup_art(), StartupArt::Native);
+        assert_eq!(auto.fetch_arrangement(), FetchArrangement::Below);
+    }
+
+    #[test]
+    fn presentation_preset_table_covers_every_canonical_theme_name() {
+        for name in CANONICAL_THEME_NAMES {
+            assert!(
+                PRESENTATION_PRESETS.iter().any(|preset| preset.theme == name),
+                "missing preset for {name}"
+            );
+        }
+        assert_eq!(PRESENTATION_PRESETS.len(), CANONICAL_THEME_NAMES.len());
+    }
+
+
+    #[test]
     fn theme_and_background_opacity_validate_supported_paint_values() {
         let mut overlay = ConfigOverlay::default();
         overlay
@@ -1154,69 +1570,13 @@ mod tests {
             &ConfigOverlay::default(),
             &runtime,
         );
-        assert!(effective.allow_osc52_write);
-        assert!(effective.allow_osc52_read);
-    }
-
-    #[test]
-    fn startup_fetch_round_trips_and_empty_command_disables() {
-        let defaults = EffectiveConfig::defaults();
-        assert!(defaults.startup_fetch);
-        assert_eq!(
-            defaults.startup_fetch_command,
-            DEFAULT_STARTUP_FETCH_COMMAND
-        );
-
-        let mut overlay = ConfigOverlay::default();
-        overlay
-            .set(SettingKey::StartupFetch, "false")
-            .expect("bool");
-        overlay
-            .set(SettingKey::StartupFetchCommand, "neofetch")
-            .expect("command");
-        let effective = EffectiveConfig::resolve(
-            &overlay,
-            &ConfigOverlay::default(),
-            &ConfigOverlay::default(),
-        );
-        assert!(!effective.startup_fetch);
-        assert_eq!(effective.startup_fetch_command, "neofetch");
-
-        // An explicitly empty command disables the feature.
-        let mut empty = ConfigOverlay::default();
-        empty
-            .set(SettingKey::StartupFetchCommand, "")
-            .expect("empty command");
-        let effective =
-            EffectiveConfig::resolve(&empty, &ConfigOverlay::default(), &ConfigOverlay::default());
-        assert!(!effective.startup_fetch);
-        assert_eq!(effective.startup_fetch_command, "");
-    }
-
-    #[test]
-    fn startup_fetch_cross_layer_empty_command_forces_disabled_even_when_enabled() {
-        let mut file = ConfigOverlay::default();
-        file.set(SettingKey::StartupFetch, "true").expect("true");
-        file.set(SettingKey::StartupFetchCommand, "fastfetch")
-            .expect("cmd");
-        let mut cli = ConfigOverlay::default();
-        cli.set(SettingKey::StartupFetchCommand, "").expect("empty");
-        let effective = EffectiveConfig::resolve(&file, &cli, &ConfigOverlay::default());
-        assert_eq!(effective.startup_fetch_command, "");
         assert!(
-            !effective.startup_fetch,
-            "empty final command must force startup_fetch=false after all overlays"
+            effective.allow_osc52_write,
+            "explicit runtime layer grants write"
         );
-
-        let mut runtime = ConfigOverlay::default();
-        runtime
-            .set(SettingKey::StartupFetch, "true")
-            .expect("runtime true");
-        let effective2 = EffectiveConfig::resolve(&file, &cli, &runtime);
-        assert_eq!(effective2.startup_fetch_command, "");
         assert!(
-            !effective2.startup_fetch,
-            "runtime true must not override empty-command normalization"
+            effective.allow_osc52_read,
+            "explicit runtime layer grants read"
         );
     }
 }

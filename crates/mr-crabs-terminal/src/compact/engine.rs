@@ -2533,7 +2533,10 @@ fn reflow_rows(rows: Vec<CompactRow>, cols: u16) -> Vec<CompactRow> {
             return;
         }
         pending.resize(usize::from(cols), Cell::default());
-        let mut row = CompactRow::new(mem::take(pending), wrapped);
+        let mut row = CompactRow::new(mem::take(pending), false);
+        if wrapped {
+            row.set_wrapped(true);
+        }
         if !extras.is_empty() {
             row.extras = Some(std::sync::Arc::new(mem::take(extras)));
         }
@@ -2541,7 +2544,13 @@ fn reflow_rows(rows: Vec<CompactRow>, cols: u16) -> Vec<CompactRow> {
     };
     for src in rows {
         let src_cols = usize::from(src.cols);
-        for col in 0..src_cols {
+        let copy_cols = if src.wrapped {
+            src_cols
+        } else {
+            usize::from(src.occupancy).min(src_cols)
+        };
+        let empty_unwrapped = !src.wrapped && copy_cols == 0;
+        for col in 0..copy_cols {
             if pending.len() == usize::from(cols) {
                 flush(&mut pending, &mut pending_extras, &mut out, true);
             }
@@ -2557,7 +2566,14 @@ fn reflow_rows(rows: Vec<CompactRow>, cols: u16) -> Vec<CompactRow> {
             pending.push(cell);
         }
         if !src.wrapped {
-            flush(&mut pending, &mut pending_extras, &mut out, false);
+            if pending.is_empty() {
+                out.push(CompactRow::blank(cols));
+            } else {
+                flush(&mut pending, &mut pending_extras, &mut out, false);
+                if empty_unwrapped {
+                    out.push(CompactRow::blank(cols));
+                }
+            }
         }
     }
     flush(&mut pending, &mut pending_extras, &mut out, false);

@@ -15,6 +15,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::{Receiver, SyncSender, TryRecvError};
 use std::time::Duration;
 
+use mr_crabs_config::PromptPresentation;
 use mr_crabs_element::{CellMetrics, GraphicsOverlay, Point as GridPoint, TerminalContext};
 use mr_crabs_history::{
     DEFAULT_SEARCH_LIMIT, ExtractOptions, SearchDirection, SearchMatch, SearchPattern,
@@ -276,6 +277,9 @@ impl PaneSession {
 
     pub fn last_size(&self) -> PtySize {
         self.last_size
+    }
+    pub fn has_reader(&self) -> bool {
+        self.reader.is_some()
     }
 
     /// Write input; fails closed with `WriteError::Closed` on detached or
@@ -877,6 +881,7 @@ pub struct PaneModel {
     terminal_error: Option<TerminalError>,
     fetch_driver: Option<FetchDriver>,
     fetch_gif_path: Option<std::path::PathBuf>,
+    prompt_presentation: PromptPresentation,
 }
 fn drain_graphics_responses(
     queue: &mut std::collections::VecDeque<Vec<u8>>,
@@ -938,6 +943,7 @@ impl PaneModel {
             terminal_error: None,
             fetch_driver: None,
             fetch_gif_path: None,
+            prompt_presentation: PromptPresentation::Dock,
         }
     }
 
@@ -1005,8 +1011,7 @@ impl PaneModel {
             .and_then(|pending| pending.config.startup_command.as_deref())
     }
 
-    /// Clear the retained rustfetch overlay and home the cursor so the
-    /// next shell prompt is not drawn over leftover fetch cells.
+    /// Clear the retained fetch overlay and home the cursor so the next shell prompt is not drawn over leftover fetch cells.
     /// The submitted Enter is still forwarded to the PTY.
     pub fn dismiss_startup_fetch(&mut self) {
         self.fetch_driver = None;
@@ -1525,17 +1530,27 @@ impl PaneModel {
 
         if pending {
             let spawn = self.pending_spawn.take().expect("pending has config");
-            let mut config = spawn.config;
-            config.size = geometry.grid;
             let wake = output_wake.or(spawn.output_wake);
-            let session = PaneSession::spawn_with_output_wake(config, geometry.cell_px, wake)?;
-            self.session = session;
+            if !self.session.has_reader() {
+                let mut config = spawn.config;
+                config.size = geometry.grid;
+                self.session =
+                    PaneSession::spawn_with_output_wake(config, geometry.cell_px, wake.clone())?;
+            }
             self.cell = geometry.cell_px;
             self.metrics = Some(geometry.metrics);
             self.last_size = geometry.grid;
             self.lifecycle = PtyLifecycle::Live;
-            self.rebuild_frame();
+            let drained = self.pump(64);
+            if !drained.changed() {
+                self.rebuild_frame();
+            }
             self.refresh_graphics_context();
+            if drained.changed()
+                && let Some(wake) = wake
+            {
+                wake();
+            }
             return Ok(true);
         }
 
@@ -1882,6 +1897,26 @@ impl PaneModel {
         self.ever_seen_osc133
     }
 
+    /// Chrome reservation depends on alt-screen and prompt presentation only.
+    pub fn should_reserve_dock_chrome(&self) -> bool {
+        let alt_screen = self
+            .latest_frame
+            .as_ref()
+            .is_some_and(|frame| frame.viewport.alternate_screen)
+            || self
+                .core
+                .has_mode(mr_crabs_terminal::TerminalMode::AltScreen);
+        super::input_dock::should_reserve_dock_chrome(alt_screen, self.prompt_presentation)
+    }
+
+    pub fn prompt_presentation(&self) -> PromptPresentation {
+        self.prompt_presentation
+    }
+
+    pub fn set_prompt_presentation(&mut self, prompt: PromptPresentation) {
+        self.prompt_presentation = prompt;
+    }
+
     fn latch_osc133(&mut self) {
         if !self.ever_seen_osc133
             && self.core.semantic_state().content
@@ -2015,6 +2050,56 @@ mod tests {
         pane.session
             .shutdown(Duration::from_millis(200))
             .expect("shutdown");
+    }
+
+    #[test]
+    fn commit_geometry_drains_queued_prompt_on_going_live() {
+        let size = GridSize::new(80, 24);
+        let config = PtySpawnConfig::new(size).with_shell("/bin/sh");
+        let mut pane = PaneModel::pending(PaneId::new(1), config).expect("pending pane");
+        let (tx, rx) = sync_channel::<Vec<u8>>(8);
+        tx.send(b"prompt>".to_vec()).expect("queue prompt");
+        pane.session = PaneSession::from_receivers(size, Some(rx), None);
+        assert_eq!(pane.lifecycle, PtyLifecycle::Pending);
+        assert!(pane.pump(8).chunks == 0, "pending pump is a no-op");
+
+        let woke = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let wake_flag = std::sync::Arc::clone(&woke);
+        let wake: OutputWake = std::sync::Arc::new(move || {
+            wake_flag.store(true, std::sync::atomic::Ordering::SeqCst);
+        });
+        let geometry = SurfaceGeometry::from_viewport(
+            mr_crabs_element::PixelExtent {
+                width: 800.0,
+                height: 480.0,
+            },
+            mr_crabs_element::CellMetrics::new(10.0, 20.0).expect("metrics"),
+            crate::model::geometry::PaddingPx::default(),
+        )
+        .expect("geometry");
+        assert!(pane.commit_geometry(geometry, Some(wake)).expect("commit"));
+        assert_eq!(pane.lifecycle, PtyLifecycle::Live);
+        let frame = pane.frame().expect("first published frame");
+        assert_eq!(frame.cursor.col, 7);
+        assert!(
+            woke.load(std::sync::atomic::Ordering::SeqCst),
+            "going live with queued bytes must signal the existing wake"
+        );
+
+        let woke_again = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let flag = std::sync::Arc::clone(&woke_again);
+        let idle_wake: OutputWake = std::sync::Arc::new(move || {
+            flag.store(true, std::sync::atomic::Ordering::SeqCst);
+        });
+        assert!(
+            !pane
+                .commit_geometry(geometry, Some(idle_wake))
+                .expect("idle")
+        );
+        assert!(
+            !woke_again.load(std::sync::atomic::Ordering::SeqCst),
+            "identical geometry must not wake"
+        );
     }
 
     #[test]

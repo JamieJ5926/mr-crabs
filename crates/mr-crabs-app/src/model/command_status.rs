@@ -151,12 +151,12 @@ pub fn reduce(
     to: StatusView,
     started_at: Instant,
 ) -> StatusTransition {
-    let duration = if from == to || !policy.allows_motion() || !animates_status_edge(from.status, to.status)
-    {
-        Duration::ZERO
-    } else {
-        MOTION_CROSSFADE
-    };
+    let duration =
+        if from == to || !policy.allows_motion() || !animates_status_edge(from.status, to.status) {
+            Duration::ZERO
+        } else {
+            MOTION_CROSSFADE
+        };
     StatusTransition {
         from,
         to,
@@ -171,7 +171,10 @@ fn animates_status_edge(from: LiveCommandStatus, to: LiveCommandStatus) -> bool 
         (
             LiveCommandStatus::AtPrompt | LiveCommandStatus::Editing,
             LiveCommandStatus::Output { .. }
-        ) | (LiveCommandStatus::Output { .. }, LiveCommandStatus::AtPrompt)
+        ) | (
+            LiveCommandStatus::Output { .. },
+            LiveCommandStatus::AtPrompt
+        )
     )
 }
 
@@ -240,7 +243,10 @@ mod tests {
             }
         );
         assert_eq!(v.exit, ExitOutcome::None);
-        assert_eq!(state.command_block_snapshot().phase, CommandBlockPhase::Running);
+        assert_eq!(
+            state.command_block_snapshot().phase,
+            CommandBlockPhase::Running
+        );
         assert_eq!(state.command_block_snapshot().exit_code, None);
     }
 

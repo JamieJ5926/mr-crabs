@@ -43,6 +43,7 @@ pub mod animated_fetch;
 pub mod animation_config;
 pub mod animation_control;
 pub mod animation_tui;
+pub mod art;
 pub mod crash;
 pub mod diagnostics;
 pub mod dock;
@@ -57,6 +58,7 @@ pub mod quick_terminal;
 pub mod restore;
 pub mod secure_input;
 pub mod settings;
+pub mod sysinfo;
 pub mod theme;
 pub mod ui;
 pub mod updates;
@@ -289,7 +291,8 @@ mod tests {
             CommandBlockPhase::Running
         );
         assert_eq!(core.semantic_state().last_exit_code, None);
-        core.feed_terminal_output(b"\x1b]133;D;3\x07").expect("feed");
+        core.feed_terminal_output(b"\x1b]133;D;3\x07")
+            .expect("feed");
         assert_eq!(
             core.command_block_snapshot().phase,
             CommandBlockPhase::Finished

@@ -33,6 +33,7 @@ use mr_crabs_element::{CellMetrics, PixelExtent};
 use mr_crabs_pty::PtySize;
 use mr_crabs_terminal::GridSize;
 
+use super::input_dock::CHROME_TOTAL;
 use super::split::GridRect;
 
 /// Window padding in device-independent pixels, applied before the grid is
@@ -129,6 +130,26 @@ impl SurfaceGeometry {
             cell_px,
             pty_pixels,
         })
+    }
+
+    /// Subtract the semantic dock chrome from the window viewport before
+    /// deriving the grid. `viewport` stays the window extent; only the height
+    /// passed into padding/grid math shrinks.
+    pub fn from_viewport_with_dock_reserve(
+        viewport: PixelExtent,
+        metrics: CellMetrics,
+        padding: PaddingPx,
+        dock_visible: bool,
+    ) -> Option<Self> {
+        let reserved = if dock_visible {
+            PixelExtent {
+                width: viewport.width,
+                height: viewport.height - CHROME_TOTAL,
+            }
+        } else {
+            viewport
+        };
+        Self::from_viewport(reserved, metrics, padding)
     }
 
     /// The derivative surface for one split pane rectangle.
@@ -351,5 +372,40 @@ mod tests {
         // PTY totals agree with the derived per-cell pixels.
         assert_eq!(top.pty_size().to_winsize().ws_xpixel, top.pty_pixels.0);
         assert_eq!(top.pty_size().to_winsize().ws_ypixel, top.pty_pixels.1);
+    }
+
+    #[test]
+    fn dock_visible_reserves_chrome_from_content_height() {
+        let metrics = CellMetrics::new(10.0, 20.0).expect("valid metrics");
+        let padding = PaddingPx::new(10, 10, 20, 20);
+        let viewport = PixelExtent {
+            width: 800.0,
+            height: 480.0,
+        };
+        let hidden =
+            SurfaceGeometry::from_viewport_with_dock_reserve(viewport, metrics, padding, false)
+                .expect("hidden dock geometry");
+        let visible =
+            SurfaceGeometry::from_viewport_with_dock_reserve(viewport, metrics, padding, true)
+                .expect("visible dock geometry");
+        assert_eq!(
+            hidden.content.height,
+            viewport.height - f32::from(padding.top) - f32::from(padding.bottom),
+            "hidden dock: content is viewport minus padding"
+        );
+        assert_eq!(
+            visible.content.height,
+            viewport.height - f32::from(padding.top) - f32::from(padding.bottom) - CHROME_TOTAL,
+            "visible dock: content is viewport minus padding minus 87px chrome"
+        );
+        assert_eq!(hidden.content.height, 440.0);
+        assert_eq!(visible.content.height, 353.0);
+        assert!(
+            visible.grid.rows < hidden.grid.rows,
+            "reserving chrome must drop grid rows: hidden {} visible {}",
+            hidden.grid.rows,
+            visible.grid.rows
+        );
+        assert_eq!(hidden.grid.cols, visible.grid.cols);
     }
 }

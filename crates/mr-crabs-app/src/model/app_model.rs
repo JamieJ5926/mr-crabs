@@ -393,6 +393,13 @@ impl AppModel {
                 prepend_child_exe_dir_to_path(&mut env, &exe);
                 env.insert("MR_CRABS_BIN".to_string(), exe.display().to_string());
             }
+            let presentation = settings.presentation_settings();
+            let startup = &presentation.startup;
+            env.insert("MR_CRABS_STARTUP_ART".to_string(), startup.art.as_str());
+            env.insert(
+                "MR_CRABS_FETCH_ARRANGEMENT".to_string(),
+                startup.arrangement.as_str().to_string(),
+            );
             let config = PtySpawnConfig {
                 size,
                 shell: settings.shell.as_ref().map(PathBuf::from),
@@ -409,6 +416,7 @@ impl AppModel {
                 pane.core.set_default_cursor_blink(settings.cursor_blink);
                 pane.core
                     .set_animation_defaults(settings.animation_defaults());
+                pane.set_prompt_presentation(settings.presentation_settings().prompt);
                 pane.set_terminfo_name(mr_crabs_config::TERM_GHOSTTY);
                 return pane;
             }
@@ -417,6 +425,7 @@ impl AppModel {
         pane.core.set_default_cursor_blink(settings.cursor_blink);
         pane.core
             .set_animation_defaults(settings.animation_defaults());
+        pane.set_prompt_presentation(settings.presentation_settings().prompt);
         pane
     }
 
@@ -428,30 +437,39 @@ impl AppModel {
         self.new_window_with(size)
     }
 
-    /// Apply the startup animation/fetch configuration to a fresh pane and
-    /// derive the window-level presentation. Rustfetch is retained only when
-    /// the startup command is actually active (Rustfetch kind, fetch enabled,
-    /// non-empty command); otherwise the presentation stays suppressed.
+    /// Apply startup fetch and derive the window-level presentation.
     fn apply_startup_config(&self, pane: &mut PaneModel) -> StartupPresentation {
         let settings = self.settings.current();
-        let kind = settings.startup_animation_kind();
-        let startup_fetch_active = kind == mr_crabs_config::StartupAnimation::Rustfetch
-            && settings.startup_fetch
-            && !settings.startup_fetch_command.is_empty();
-        if startup_fetch_active {
-            pane.set_startup_command(Some(settings.startup_fetch_command.clone()));
+        let startup = settings.presentation_settings().startup;
+        let fetch_enabled = settings.startup_fetch
+            && startup.arrangement != mr_crabs_config::FetchArrangement::Hidden;
+        let has_art = crate::art::art_for_startup(&startup.art).is_some();
+        let has_reveal = has_art || fetch_enabled;
+        if fetch_enabled
+            && (startup.animation == mr_crabs_config::StartupAnimation::Fetch
+                || startup.animation == mr_crabs_config::StartupAnimation::Molt)
+        {
+            pane.set_startup_command(Some("sleep 0.5; \"$MR_CRABS_BIN\" +fetch".to_string()));
         }
         if !settings.fetch_gif_path.is_empty() {
-            pane.set_fetch_gif_path(Some(std::path::PathBuf::from(
-                settings.fetch_gif_path.clone(),
-            )));
+            pane.set_fetch_gif_path(Some(std::path::PathBuf::from(settings.fetch_gif_path.clone())));
         }
-        match kind {
-            mr_crabs_config::StartupAnimation::Rustfetch if !startup_fetch_active => {
-                StartupPresentation::None
+        match startup.animation {
+            mr_crabs_config::StartupAnimation::None => StartupPresentation::None,
+            mr_crabs_config::StartupAnimation::Fetch if fetch_enabled => {
+                StartupPresentation::FetchRetained
             }
-            _ => StartupPresentation::from_config(kind, monotonic_ms()),
+            mr_crabs_config::StartupAnimation::Molt if has_reveal => {
+                StartupPresentation::MoltWaiting
+            }
+            _ => StartupPresentation::None,
         }
+    }
+
+    /// The composed fetch block already writes the art into the grid, so the
+    /// molt mask reveals it rather than painting a second copy on top.
+    fn resolve_molt_art(&self) -> Option<crate::art::Art> {
+        None
     }
 
     /// Open a new window at a specific grid.
@@ -466,6 +484,7 @@ impl AppModel {
         let pane_id = pane.id;
         let mut window = WindowModel::new(window_id, tab_id, pane_id, size).ok()?;
         window.startup_presentation = startup_presentation;
+        window.molt_art = self.resolve_molt_art();
         window
             .tabs
             .get_mut(&tab_id)
@@ -490,6 +509,7 @@ impl AppModel {
         let pane_id = pane.id;
         let mut window = WindowModel::new(window_id, tab_id, pane_id, size).ok()?;
         window.startup_presentation = startup_presentation;
+        window.molt_art = self.resolve_molt_art();
         window
             .tabs
             .get_mut(&tab_id)
@@ -636,8 +656,6 @@ impl AppModel {
         }
     }
 
-    /// Drain every pane's bounded reader queue. Each pane clamps its own
-    /// pass to 64 chunks, and exit policy is evaluated after publication.
     pub fn pump(&mut self, cap: usize) -> AppPumpStats {
         let mut stats = AppPumpStats::default();
         for window in self.windows.values_mut() {
@@ -655,6 +673,17 @@ impl AppModel {
             if stats.error.is_none() {
                 stats.error = error;
             }
+            if bytes > 0
+                && matches!(
+                    window.startup_presentation,
+                    StartupPresentation::MoltWaiting
+                )
+            {
+                window.startup_presentation.start_molt(monotonic_ms());
+            }
+        }
+        if stats.changed() {
+            self.generation += 1;
         }
         self.drain_animation_controls();
 
@@ -724,14 +753,14 @@ impl AppModel {
             .filter_map(|window| match window.startup_presentation {
                 StartupPresentation::MoltActive { started_ms } => {
                     let end = started_ms + MOLT_DURATION_MS;
-                    (now_ms < end).then(|| end.min(now_ms + super::window::MOLT_FRAME_INTERVAL_MS))
+                    Some(end.min(now_ms + super::window::MOLT_FRAME_INTERVAL_MS))
                 }
                 _ => None,
             })
             .min()
     }
 
-    /// Advance every window's molt presentation past `now_ms`; reports
+    /// Advance every molt presentation and report
     /// whether a repaint is due. Intermediate fade frames repaint on every
     /// tick while a molt is active; completion flips the state one final
     /// time and then reports false.
@@ -815,7 +844,7 @@ impl AppModel {
         if submitted_enter {
             let was = window.startup_presentation;
             window.startup_presentation.dismiss_on_enter();
-            if was == StartupPresentation::RustfetchRetained {
+            if was == StartupPresentation::FetchRetained {
                 pane.dismiss_startup_fetch();
             }
         }
@@ -1402,6 +1431,7 @@ impl AppModel {
                     .and_then(|tab| tab.insert_split_pane(axis, pane).ok());
                 match result {
                     Some(pane_id) => {
+                        self.generation += 1;
                         ActionResult::performed(format!("split opened pane {}", pane_id.as_u64()))
                     }
                     None => ActionResult::ignored("no focused pane to split"),
@@ -1500,6 +1530,9 @@ impl AppModel {
                                 pane.core.set_default_cursor_blink(settings.cursor_blink);
                                 pane.core
                                     .set_scrollback_lines(settings.scrollback_lines as usize);
+                                pane.set_prompt_presentation(
+                                    settings.presentation_settings().prompt,
+                                );
                             }
                         }
                     }
@@ -1762,6 +1795,62 @@ mod tests {
     }
 
     #[test]
+    fn first_pty_output_on_new_pane_requests_repaint() {
+        use crate::model::pane::{PaneSession, PtyLifecycle};
+        use std::sync::mpsc::sync_channel;
+
+        let mut model = headless();
+        let generation_before = model.generation;
+        model.dispatch(AppAction::NewSplitRight);
+        assert!(
+            model.generation > generation_before,
+            "creating a split must mark the shell as needing paint"
+        );
+
+        let window_id = model.active_window.expect("window");
+        let pane_id = model.focused_pane_id().expect("new split pane");
+        let size = model.focused_pane().expect("pane").last_size;
+        let (reader_tx, reader_rx) = sync_channel::<Vec<u8>>(1);
+        {
+            let pane = model
+                .windows
+                .get_mut(&window_id)
+                .and_then(|window| window.active_tab_mut())
+                .and_then(|tab| tab.panes.get_mut(&pane_id))
+                .expect("split pane");
+            pane.session = PaneSession::from_receivers(size, Some(reader_rx), None);
+            pane.lifecycle = PtyLifecycle::Live;
+        }
+
+        let generation_before_output = model.generation;
+        assert_eq!(model.pump(64).frames, 0, "no output yet");
+        assert_eq!(model.generation, generation_before_output);
+
+        reader_tx.send(b"$ ".to_vec()).expect("queue prompt");
+        let stats = model.pump(64);
+        assert_eq!(stats.chunks, 1);
+        assert_eq!(stats.frames, 1, "first PTY bytes must publish a frame");
+        assert!(
+            model.generation > generation_before_output,
+            "first PTY output must request a repaint"
+        );
+        let frame = model
+            .focused_pane()
+            .and_then(|pane| pane.frame())
+            .expect("published frame");
+        let painted: String = frame
+            .rows
+            .iter()
+            .flat_map(|row| row.cells.iter())
+            .filter_map(|cell| char::from_u32(cell.content).filter(|ch| *ch != '\0'))
+            .collect();
+        assert!(
+            painted.contains('$'),
+            "grid must contain the emitted prompt; painted={painted:?}"
+        );
+    }
+
+    #[test]
     fn headless_shell_starts_with_one_window_one_tab_one_pane() {
         let model = headless();
         assert_eq!(model.windows.len(), 1);
@@ -1913,8 +2002,9 @@ mod tests {
             .expect("normal pane");
         assert_eq!(
             original_pane.pending_startup_command(),
-            None,
-            "molt default does not queue rustfetch"
+            Some("sleep 0.5; \"$MR_CRABS_BIN\" +fetch"),
+            "molt queues the built-in fetch so there is content to reveal; MoltWaiting keeps the \
+             mask unpainted until bytes arrive"
         );
         assert!(
             matches!(
@@ -1922,9 +2012,9 @@ mod tests {
                     .window(original_window)
                     .expect("normal window")
                     .startup_presentation,
-                StartupPresentation::MoltActive { .. }
+                StartupPresentation::MoltWaiting
             ),
-            "normal windows use the molt startup"
+            "a fresh molt window waits for content before starting its clock"
         );
 
         assert!(model.toggle_quick_terminal());
@@ -2586,12 +2676,6 @@ mod tests {
         overlay
             .set(SettingKey::StartupFetch, "true")
             .expect("startup_fetch");
-        overlay
-            .set(SettingKey::StartupFetchCommand, "printf GUIBOOT")
-            .expect("command");
-        overlay
-            .set(SettingKey::StartupAnimation, "rustfetch")
-            .expect("rustfetch");
         let store = crate::settings::SettingsStore::from_layers(
             overlay,
             ConfigOverlay::default(),
@@ -2641,7 +2725,7 @@ mod tests {
                         .iter()
                         .filter_map(|cell| char::from_u32(cell.content))
                         .collect();
-                    if line.contains("GUIBOOT") {
+                    if line.contains("Kernel:") || line.contains('@') {
                         f = true;
                         break;
                     }
@@ -2654,7 +2738,7 @@ mod tests {
             }
             if std::time::Instant::now() > deadline {
                 model.shutdown_all();
-                panic!("GUI-boot startup marker never appeared");
+                panic!("startup fetch content never reached the grid");
             }
             model.pump(8);
             std::thread::sleep(std::time::Duration::from_millis(50));
@@ -3127,6 +3211,7 @@ mod tests {
         };
 
         for offset in [32u64, 48, 300, MOLT_DURATION_MS - 16] {
+            assert!(model.next_molt_deadline_ms(started + offset).is_some());
             assert!(model.tick_molt_animations(started + offset));
             assert_eq!(
                 model.window(window_id).unwrap().startup_presentation,
@@ -3135,6 +3220,11 @@ mod tests {
                 }
             );
         }
+        assert!(
+            model
+                .next_molt_deadline_ms(started + MOLT_DURATION_MS)
+                .is_some()
+        );
         assert!(model.tick_molt_animations(started + MOLT_DURATION_MS));
         assert_eq!(
             model.window(window_id).unwrap().startup_presentation,
@@ -3144,6 +3234,33 @@ mod tests {
         assert_eq!(
             model.next_molt_deadline_ms(started + MOLT_DURATION_MS + 16),
             None
+        );
+    }
+
+    #[test]
+    fn molt_scheduler_requests_frames_until_completion() {
+        let mut model = headless();
+        let window_id = model.active_window.expect("window");
+        let started = 20_000;
+        model.window_mut(window_id).unwrap().startup_presentation =
+            StartupPresentation::MoltActive {
+                started_ms: started,
+            };
+        for now in (started..=started + MOLT_DURATION_MS)
+            .step_by(crate::model::window::MOLT_FRAME_INTERVAL_MS as usize)
+        {
+            assert!(model.next_molt_deadline_ms(now).is_some());
+            model.tick_molt_animations(now);
+        }
+        assert!(
+            model
+                .next_molt_deadline_ms(started + MOLT_DURATION_MS)
+                .is_some()
+        );
+        model.tick_molt_animations(started + MOLT_DURATION_MS);
+        assert_eq!(
+            model.window(window_id).unwrap().startup_presentation,
+            StartupPresentation::MoltComplete
         );
     }
 
@@ -3166,10 +3283,6 @@ mod tests {
                 startup_fetch: Some(false),
                 ..ConfigOverlay::default()
             },
-            ConfigOverlay {
-                startup_fetch_command: Some(String::new()),
-                ..ConfigOverlay::default()
-            },
         ] {
             let mut model = AppModel::with_platform_settings_and_output_wake(
                 crate::platform::PlatformCapabilities::headless(),
@@ -3180,9 +3293,10 @@ mod tests {
             assert!(
                 matches!(
                     model.window(window_id).unwrap().startup_presentation,
-                    StartupPresentation::MoltActive { .. }
+                    StartupPresentation::MoltWaiting
                 ),
-                "fetch off still runs molt"
+                "built-in native art is always available, so molt has content to reveal even \
+                 with the fetch disabled"
             );
             assert!(
                 model
@@ -3199,11 +3313,8 @@ mod tests {
             .set(SettingKey::StartupFetch, "true")
             .expect("fetch");
         overlay
-            .set(SettingKey::StartupFetchCommand, "printf GUIBOOT")
-            .expect("command");
-        overlay
-            .set(SettingKey::StartupAnimation, "rustfetch")
-            .expect("rustfetch");
+            .set(SettingKey::StartupAnimation, "fetch")
+            .expect("fetch");
         let mut model = AppModel::with_platform_settings_and_output_wake(
             crate::platform::PlatformCapabilities::headless(),
             store_for(overlay),
@@ -3212,7 +3323,7 @@ mod tests {
         let window_id = model.new_window().expect("window");
         assert_eq!(
             model.window(window_id).unwrap().startup_presentation,
-            StartupPresentation::RustfetchRetained
+            StartupPresentation::FetchRetained
         );
         model.shutdown_all();
     }
@@ -3225,7 +3336,7 @@ mod tests {
         model
             .window_mut(window_id)
             .expect("window")
-            .startup_presentation = StartupPresentation::RustfetchRetained;
+            .startup_presentation = StartupPresentation::FetchRetained;
         let (reader_tx, writer_rx) = install_fake_session(&mut model);
         drop(reader_tx);
 
@@ -3233,7 +3344,7 @@ mod tests {
         assert!(model.write_to_pane(pane_id, b"\r"));
         assert_eq!(
             model.window(window_id).unwrap().startup_presentation,
-            StartupPresentation::RustfetchRetained
+            StartupPresentation::FetchRetained
         );
         assert_eq!(writer_rx.try_recv(), Ok(b"\r".to_vec()), "raw CR forwarded");
 
@@ -3253,7 +3364,7 @@ mod tests {
         }
         assert_eq!(
             model.window(window_id).unwrap().startup_presentation,
-            StartupPresentation::RustfetchDismissed,
+            StartupPresentation::FetchDismissed,
             "submitted Enter dismisses the retained presentation"
         );
 
