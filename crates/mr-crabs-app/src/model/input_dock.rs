@@ -247,19 +247,21 @@ pub fn derive_input_dock(pane: &PaneModel, palette_open: bool) -> InputDockSnaps
     }
 }
 
-/// Fish/A-only: whole cursor row from col 0. zsh after B: `input_start_col`.
-/// The source row spans to the grid edge so the caret never truncates live input.
+/// Whole prompt row from col 0, whatever OSC 133 B recorded. The dock is the
+/// only surface showing the prompt row (the grid row is masked), so starting
+/// at `input_start_col` hides the prompt glyphs and leaves an empty dock at
+/// idle. The source row spans to the grid edge so the caret never truncates
+/// live input.
 pub fn project_source_span(
     semantic: &SemanticPromptState,
     cols: u16,
     cursor_row: u16,
 ) -> DockSourceSpan {
     let row = semantic.input_start_row.unwrap_or(cursor_row);
-    let start_col = semantic.input_start_col.unwrap_or(0);
     DockSourceSpan {
         row,
-        start_col,
-        end_col: cols.max(start_col.saturating_add(1)),
+        start_col: 0,
+        end_col: cols.max(1),
     }
 }
 
@@ -618,9 +620,15 @@ mod tests {
         assert!(pane.ever_seen_osc133());
         let snap = derive_input_dock(&pane, false);
         assert_eq!(snap.state, InputDockState::ShellInputActive);
-        assert_eq!(
-            snap.source.start_col,
-            pane.core.semantic_state().input_start_col.unwrap_or(0)
+        assert_eq!(snap.source.start_col, 0);
+        let text: String = snap
+            .cells
+            .iter()
+            .filter_map(|cell| char::from_u32(cell.content).filter(|ch| *ch != '\0'))
+            .collect();
+        assert!(
+            text.contains("$ "),
+            "dock must carry the prompt glyphs alongside input, got {text:?}"
         );
         let snapshot = pane.core.terminal_snapshot();
         let projection = extract_span_cells(&snapshot, snap.source);
@@ -860,7 +868,7 @@ mod tests {
     }
 
     #[test]
-    fn project_source_span_uses_b_col() {
+    fn project_source_span_starts_at_zero_after_b() {
         let mut semantic = SemanticPromptState::new();
         semantic.content = SemanticContent::Input;
         semantic.input_start_col = Some(4);
@@ -870,9 +878,28 @@ mod tests {
             span,
             DockSourceSpan {
                 row: 2,
-                start_col: 4,
+                start_col: 0,
                 end_col: 80,
             }
+        );
+    }
+
+    #[test]
+    fn idle_prompt_projects_prompt_cells_without_typed_input() {
+        let mut pane = PaneModel::detached(PaneId::new(1), GridSize::new(80, 24)).expect("pane");
+        pane.feed_test_output(b"\x1b]133;A\x07jamie@host / % \x1b]133;B\x07")
+            .expect("feed");
+        let snap = derive_input_dock(&pane, false);
+        assert_eq!(snap.state, InputDockState::ShellInputActive);
+        assert_eq!(snap.source.start_col, 0);
+        let text: String = snap
+            .cells
+            .iter()
+            .filter_map(|cell| char::from_u32(cell.content).filter(|ch| *ch != '\0'))
+            .collect();
+        assert!(
+            text.contains("jamie@host / % "),
+            "idle dock must carry the prompt glyphs, got {text:?}"
         );
     }
 
