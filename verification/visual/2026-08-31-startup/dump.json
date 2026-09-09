@@ -1,0 +1,20 @@
+{
+  "decision": "keep",
+  "frame_count": 8,
+  "logo_width": 17,
+  "unique_frame_hashes": 8,
+  "hashes": [
+    "a614decf4b36b30def59f49b0616d3abd82db4c30d520e67e6f1b0675e2ce479",
+    "fcf069e745bcc4bec560506aa4904e0aede01b135d982755bc8bbdb300e83bf0",
+    "d629e2fa26d4a36e4a18ccaeecb75199aa99223836f987d508ff9d5b70efa4fa",
+    "d5d0f811ad13eb0d34d8bb0f99cbdb642c8dfc66dd42b9e2a0f57ec70b075e5f",
+    "d8a2dc4e53759ce6ee814a5ad5fc72dafa0865e4b93380f25484c6109cc69418",
+    "b389661203c445da00616d67bcf94600a9e0e377962c545d6e5a369b672ef0dc",
+    "3bd135475eaa49aabcf39adfbbcbe8db265cc53fdf5447d446529ec55c4e2ea1",
+    "d41e4a61db11ca84005bd7a509a2dcf2369d7cb035d78bc0845b8a4344e4d9a6"
+  ],
+  "config_knobs": {
+    "startup-animation": "rustfetch",
+    "startup-fetch-command": "sleep 0.5; \"$MR_CRABS_BIN\" +animated-fetch"
+  }
+}

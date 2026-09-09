@@ -1,0 +1,9 @@
+sha=537d5bed16438f2370e8ef64850a6a21972ab34a run=1 warmup=50 iters=2000 large_iters=400
+name=apply_frame_80x24_first_stamp_streaming_trail n=200 mean_ns=47317.5 std_ns=2722.4 min_ns=45167 p50_ns=46583 p95_ns=49834 p99_ns=56708 max_ns=78458 note=new model each sample; dummy Clean then Full stamp so tracker stamps, repacks, collect_reveals, trail
+name=apply_frame_80x24_clean_mid_window n=2000 mean_ns=1675.4 std_ns=1672.3 min_ns=1292 p50_ns=1583 p95_ns=1708 p99_ns=4167 max_ns=73541 note=Full stamp then Clean; no stamp/repack on measured frames; collect_reveals walks 1920 cells
+name=apply_frame_80x24_clean_after_expiry n=2000 mean_ns=975.9 std_ns=26.6 min_ns=916 p50_ns=959 p95_ns=1041 p99_ns=1083 max_ns=1125 note=elapsed>=duration so collect_reveals walks all and emits none
+name=apply_frame_200x60_clean_mid_window n=400 mean_ns=10268.1 std_ns=686.2 min_ns=9917 p50_ns=10250 p95_ns=10458 p99_ns=10709 max_ns=23625 note=12000 tracked cells; Clean frame; collect_reveals plus trail; no stamp/repack
+name=collect_reveals_public_clone_80x24_hot n=2000 mean_ns=1792.2 std_ns=180.5 min_ns=1583 p50_ns=1792 p95_ns=1875 p99_ns=1875 max_ns=9250 note=NOT the private fn; same loop over bits_at/change_ms_at; all cells in window
+name=collect_reveals_public_clone_200x60_hot n=400 mean_ns=11507.2 std_ns=1334.5 min_ns=11083 p50_ns=11333 p95_ns=11708 p99_ns=16708 max_ns=31416 note=NOT the private fn; 12000-cell scan
+name=collect_reveals_public_clone_80x24_expired n=2000 mean_ns=1259.7 std_ns=433.7 min_ns=833 p50_ns=1209 p95_ns=1333 p99_ns=1500 max_ns=10417 note=all elapsed>=duration; still walks every cell
+name=apply_frame_80x24_disabled n=2000 mean_ns=17.6 std_ns=20.6 min_ns=0 p50_ns=0 p95_ns=42 p99_ns=42 max_ns=83 note=no tracker so collect_reveals never runs; floor for apply_frame

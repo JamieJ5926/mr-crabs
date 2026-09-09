@@ -1,0 +1,25 @@
+{
+  "source_pre_jump": "/Users/jamie/Documents/Projects/active/mr-crabs/verification/visual/2026-08-31-trail-implementation/repair/motion_off/pre_jump.png",
+  "cell_w": 10,
+  "cell_h": 18,
+  "jump_cells": 5,
+  "old_hot_luma_pre_jump": 183.0,
+  "old_box": [
+    64,
+    90,
+    74,
+    108
+  ],
+  "live_box": [
+    14,
+    90,
+    24,
+    108
+  ],
+  "neighbor_box": [
+    94,
+    90,
+    104,
+    108
+  ]
+}

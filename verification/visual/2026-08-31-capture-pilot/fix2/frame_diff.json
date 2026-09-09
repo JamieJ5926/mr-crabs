@@ -1,0 +1,378 @@
+{
+  "trigger_token": "TRIGGER_ZX9Q7_1788159453637",
+  "sampling_fps": 30,
+  "t_record_start_ms": 1788159438754,
+  "t_trigger_ms": 1788159453657,
+  "t_record_stop_ms": 1788159473176,
+  "session_span_ms": 34422,
+  "container_pts_span_s": 1.15,
+  "container_frame_count": 21,
+  "first_mark_extracted_frame": null,
+  "first_token_extracted_frame": null,
+  "last_ocr_mark": null,
+  "video": {
+    "frame_count": 36,
+    "diff_resize": "240x180",
+    "nonzero_diff_pairs": 5,
+    "substantial_pairs": 0,
+    "series": [
+      {
+        "pair": "frame_0001.png->frame_0002.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0002.png->frame_0003.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0003.png->frame_0004.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0004.png->frame_0005.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0005.png->frame_0006.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0006.png->frame_0007.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0007.png->frame_0008.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0008.png->frame_0009.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0009.png->frame_0010.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0010.png->frame_0011.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0011.png->frame_0012.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0012.png->frame_0013.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0013.png->frame_0014.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0014.png->frame_0015.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0015.png->frame_0016.png",
+        "changed_pixels": 11,
+        "changed_frac": 0.0002546296296296296,
+        "mean_abs_channel_sum": 1.1390740740740741
+      },
+      {
+        "pair": "frame_0016.png->frame_0017.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.025810185185185186
+      },
+      {
+        "pair": "frame_0017.png->frame_0018.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.06634259259259259
+      },
+      {
+        "pair": "frame_0018.png->frame_0019.png",
+        "changed_pixels": 1,
+        "changed_frac": 2.3148148148148147e-05,
+        "mean_abs_channel_sum": 0.3970138888888889
+      },
+      {
+        "pair": "frame_0019.png->frame_0020.png",
+        "changed_pixels": 1,
+        "changed_frac": 2.3148148148148147e-05,
+        "mean_abs_channel_sum": 0.64125
+      },
+      {
+        "pair": "frame_0020.png->frame_0021.png",
+        "changed_pixels": 1,
+        "changed_frac": 2.3148148148148147e-05,
+        "mean_abs_channel_sum": 0.060833333333333336
+      },
+      {
+        "pair": "frame_0021.png->frame_0022.png",
+        "changed_pixels": 2,
+        "changed_frac": 4.6296296296296294e-05,
+        "mean_abs_channel_sum": 0.21983796296296296
+      },
+      {
+        "pair": "frame_0022.png->frame_0023.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.08206018518518518
+      },
+      {
+        "pair": "frame_0023.png->frame_0024.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.27881944444444445
+      },
+      {
+        "pair": "frame_0024.png->frame_0025.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.05243055555555556
+      },
+      {
+        "pair": "frame_0025.png->frame_0026.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0868287037037037
+      },
+      {
+        "pair": "frame_0026.png->frame_0027.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.18625
+      },
+      {
+        "pair": "frame_0027.png->frame_0028.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.18291666666666667
+      },
+      {
+        "pair": "frame_0028.png->frame_0029.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.08284722222222222
+      },
+      {
+        "pair": "frame_0029.png->frame_0030.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.059236111111111114
+      },
+      {
+        "pair": "frame_0030.png->frame_0031.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0031.png->frame_0032.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.07108796296296296
+      },
+      {
+        "pair": "frame_0032.png->frame_0033.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.04217592592592593
+      },
+      {
+        "pair": "frame_0033.png->frame_0034.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.026944444444444444
+      },
+      {
+        "pair": "frame_0034.png->frame_0035.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.019328703703703702
+      },
+      {
+        "pair": "frame_0035.png->frame_0036.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.028796296296296296
+      }
+    ]
+  },
+  "ocr_sample": [
+    {
+      "frame_index": 1,
+      "path": "frame_0001.png",
+      "has_token": false,
+      "marks": [],
+      "snippet": "G\\, Ghostty File edit. View Window | Help je = ol y oF ca Se Mon Aug 31 637eM IS SN EE \u00e9 mi. . SS A fr \u00ab. Inspect roleProfiles policy schema r 1 = Inspect rolePrafiles policy schema xt Jamies-MacBook-Pro.local: omp-icade-worker-bridga x2 /U"
+    },
+    {
+      "frame_index": 5,
+      "path": "frame_0005.png",
+      "has_token": false,
+      "marks": [],
+      "snippet": "G\\, Ghostty File edit. View Window | Help je = ol y oF ca Se Mon Aug 31 637eM IS SN EE \u00e9 mi. . SS A fr \u00ab. Inspect roleProfiles policy schema r 1 = Inspect rolePrafiles policy schema xt Jamies-MacBook-Pro.local: omp-icade-worker-bridga x2 /U"
+    },
+    {
+      "frame_index": 9,
+      "path": "frame_0009.png",
+      "has_token": false,
+      "marks": [],
+      "snippet": "G\\, Ghostty File edit. View Window | Help je = ol y oF ca Se Mon Aug 31 637eM IS SN EE \u00e9 mi. . SS A fr \u00ab. Inspect roleProfiles policy schema r 1 = Inspect rolePrafiles policy schema xt Jamies-MacBook-Pro.local: omp-icade-worker-bridga x2 /U"
+    },
+    {
+      "frame_index": 13,
+      "path": "frame_0013.png",
+      "has_token": false,
+      "marks": [],
+      "snippet": "G\\, Ghostty File edit. View Window | Help je = ol y oF ca Se Mon Aug 31 637eM IS SN EE \u00e9 mi. . SS A fr \u00ab. Inspect roleProfiles policy schema r 1 = Inspect rolePrafiles policy schema xt Jamies-MacBook-Pro.local: omp-icade-worker-bridga x2 /U"
+    },
+    {
+      "frame_index": 17,
+      "path": "frame_0017.png",
+      "has_token": false,
+      "marks": [],
+      "snippet": "G\\, Ghostty File aMedit. View Window < Help 736\u00b0 yy oF a Se Mon Aug 31 63372M & rc :. Inspect roleProfiles policy schema , 1 Inspect roleProfiles policy schema xt Jamies-MacBook-Pro.local: omp-jcode-worker-bridge 2 . /Users/jamie/Projects/o"
+    },
+    {
+      "frame_index": 21,
+      "path": "frame_0021.png",
+      "has_token": false,
+      "marks": [],
+      "snippet": "G\\, Ghostty File Medi. View Window | Help YA, % mS ole a oF a Se Mon Aug 31 6372M SAN fp Z _. a x &\\ SS ; 4 AE SS & re -. Inspect roleProfiles policy schema , 1 + Inspect roleProfiles policy schema x1 Jamies-MacBook-Pro.local: omp-jcode-wor"
+    },
+    {
+      "frame_index": 25,
+      "path": "frame_0025.png",
+      "has_token": false,
+      "marks": [],
+      "snippet": "@\\ Ghostty File edit. View Window Help Ys, m ol. a \u00a9 F wa. Be Monatgs1 672M VANS : iif dl ~N \u2018Ss & re :. Inspect roleProfiles policy schema \\ 1 \u00ab Inspect roleProfiles policy schema Ea Jamies-MacBook-Pro local: omp-jcode-worker-bridge x2 A /"
+    },
+    {
+      "frame_index": 29,
+      "path": "frame_0029.png",
+      "has_token": false,
+      "marks": [],
+      "snippet": "G\\, Ghostty File SSedit \u2018View Window | Help Ys, = ou : a oF aa Be Mon Aug 31 6\u00b0372M & re :. Inspect roleProfiles policy schema \\ 1 Inspect roleProfiles policy schema xt Jamies-MacBook-Pro local: omp-jcode-worker-bridge 2 A /Users/jamie/Proj"
+    },
+    {
+      "frame_index": 29,
+      "path": "frame_0029.png",
+      "has_token": false,
+      "marks": [],
+      "snippet": "G\\, Ghostty File SSedit \u2018View Window | Help Ys, = ou : a oF aa Be Mon Aug 31 6\u00b0372M & re :. Inspect roleProfiles policy schema \\ 1 Inspect roleProfiles policy schema xt Jamies-MacBook-Pro local: omp-jcode-worker-bridge 2 A /Users/jamie/Proj"
+    },
+    {
+      "frame_index": 33,
+      "path": "frame_0033.png",
+      "has_token": false,
+      "marks": [],
+      "snippet": "G\\, Ghostty File SSedit \u2018View Window | Help Ys, = ou : a oF aa Be Mon Aug 31 6\u00b0372M & re :. Inspect roleProfiles policy schema \\ 1 = Inspect roleProfiles policy schema xt Jamies-MacBook-Pro local: omp-jcode-worker-bridge 2 A /Users/jamie/Pr"
+    },
+    {
+      "frame_index": 36,
+      "path": "frame_0036.png",
+      "has_token": false,
+      "marks": [],
+      "snippet": "G\\, Ghostty File SSedit \u2018View Window | Help Ys, = ou : a oF aa Be Mon Aug 31 6\u00b0372M & re :. Inspect roleProfiles policy schema \\ = Inspect roleProfiles policy schema xt Jamies-MacBook-Pro local: omp-jcode-worker-bridge 2 A /Users/jamie/Proj"
+    }
+  ],
+  "pts_head": [
+    {
+      "pkt_pts_time": null,
+      "best_effort_timestamp_time": "0.000000",
+      "pkt_duration_time": null,
+      "pict_type": "I"
+    },
+    {
+      "pkt_pts_time": null,
+      "best_effort_timestamp_time": "0.483333",
+      "pkt_duration_time": null,
+      "pict_type": "B"
+    },
+    {
+      "pkt_pts_time": null,
+      "best_effort_timestamp_time": "0.516667",
+      "pkt_duration_time": null,
+      "pict_type": "B"
+    },
+    {
+      "pkt_pts_time": null,
+      "best_effort_timestamp_time": "0.550000",
+      "pkt_duration_time": null,
+      "pict_type": "B"
+    },
+    {
+      "pkt_pts_time": null,
+      "best_effort_timestamp_time": "0.583333",
+      "pkt_duration_time": null,
+      "pict_type": "P"
+    }
+  ],
+  "pts_tail": [
+    {
+      "pkt_pts_time": null,
+      "best_effort_timestamp_time": "1.016667",
+      "pkt_duration_time": null,
+      "pict_type": "P"
+    },
+    {
+      "pkt_pts_time": null,
+      "best_effort_timestamp_time": "1.050000",
+      "pkt_duration_time": null,
+      "pict_type": "B"
+    },
+    {
+      "pkt_pts_time": null,
+      "best_effort_timestamp_time": "1.083333",
+      "pkt_duration_time": null,
+      "pict_type": "B"
+    },
+    {
+      "pkt_pts_time": null,
+      "best_effort_timestamp_time": "1.116667",
+      "pkt_duration_time": null,
+      "pict_type": "B"
+    },
+    {
+      "pkt_pts_time": null,
+      "best_effort_timestamp_time": "1.150000",
+      "pkt_duration_time": null,
+      "pict_type": "P"
+    }
+  ],
+  "type_effect": "unverifiable",
+  "type_delivery": {
+    "mode": "foreground"
+  }
+}

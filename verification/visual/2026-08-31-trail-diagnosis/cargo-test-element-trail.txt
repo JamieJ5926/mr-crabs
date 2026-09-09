@@ -1,0 +1,26 @@
+warning: fields `focused` and `now_ms` are never read
+   --> crates/mr-crabs-element/src/element.rs:260:5
+    |
+256 | struct PreparedEffects<'a> {
+    |        --------------- fields in this struct
+...
+260 |     focused: bool,
+    |     ^^^^^^^
+261 |     now_ms: u64,
+    |     ^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `mr-crabs-element` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.71s
+warning: the following packages contain code that will be rejected by a future version of Rust: block v0.1.6
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 3`
+     Running unittests src/lib.rs (/Users/jamie/.cargo-target/debug/deps/mr_crabs_element-7cbcb54bffa0c56b)
+
+running 3 tests
+test element::tests::trail_glow_reports_degenerate_as_none ... ok
+test element::tests::trail_glow_translates_by_origin ... ok
+test element::tests::trail_segment_quad_handles_horizontal_vertical_diagonal_and_zero_length ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 99 filtered out; finished in 0.00s
+

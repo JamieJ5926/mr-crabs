@@ -1,0 +1,91 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.16s
+     Running unittests src/lib.rs (/Users/jamie/.cargo-target/debug/deps/mr_crabs_effects-9164a3d3f192736b)
+
+running 58 tests
+test coords::tests::both_orientations_name_the_same_texture_rows ... ok
+test coords::tests::bottom_up_metrics_are_flipped ... ok
+test coords::tests::top_down_metrics_and_mapping ... ok
+test key::tests::full_reconcile_erasing_glyphs_clears_reveal_state ... ok
+test key::tests::changed_wide_spacer_restamps_the_whole_character ... ok
+test key::tests::identical_blank_row_does_not_restart_animation ... ok
+test key::tests::full_reconcile_schedule_advances_for_each_changed_character ... ok
+test key::tests::identical_replay_staggers_character_units_without_splitting_wide_cells ... ok
+test key::tests::max_cells_bounds_tracking ... ok
+test key::tests::full_reconcile_staggers_drawable_character_units ... ok
+test key::tests::orphan_wide_spacer_consumes_no_schedule_slot ... ok
+test key::tests::render_key_covers_content_style_flags ... ok
+test key::tests::resize_preserves_prefix_and_stamps_new_cells ... ok
+test key::tests::retained_capacity_is_exact ... ok
+test key::tests::streaming_stamps_changes_and_repeated_identical_glyph_writes ... ok
+test key::tests::texture_packing_matches_shader_byte_order ... ok
+test key::tests::typewriter_stamps_one_slot_per_character_unit ... ok
+test model::tests::backward_clock_is_clamped_monotonic ... ok
+test model::tests::change_texture_flows_through_model ... ok
+test model::tests::disabled_path_retains_and_schedules_nothing ... ok
+test model::tests::disabling_drops_all_text_state ... ok
+test model::tests::primary_scroll_translates_reveal_state_and_stamps_only_new_row ... ok
+test model::tests::repeated_identical_generation_restamps_only_drawable_glyphs ... ok
+test model::tests::resize_bypasses_reveal_and_adopts_new_snapshot ... ok
+test model::tests::retained_capacity_is_stable_after_warmup ... ok
+test model::tests::streaming_end_to_end_reveal_and_expiry ... ok
+test model::tests::tall_and_saturated_history_scrolls_still_reveal_new_bottom_row ... ok
+test model::tests::text_integrity_is_untouched ... ok
+test model::tests::trail_fades_and_resumes_with_focus ... ok
+test model::tests::typewriter_changed_glyphs_reveal_in_character_order ... ok
+test model::tests::typewriter_full_frame_stamps_rows_in_visual_order ... ok
+test model::tests::typewriter_partial_frame_stamps_rows_in_visual_order ... ok
+test model::tests::typewriter_partial_frames_advance_per_changed_character ... ok
+test model::tests::typewriter_stagger_across_rebuilds_via_model ... ok
+test reveal::tests::disabled_is_always_revealed ... ok
+test reveal::tests::intensity_scales_concealment ... ok
+test reveal::tests::streaming_conceal_math_matches_shader ... ok
+test reveal::tests::streaming_phases_and_boundary ... ok
+test reveal::tests::typewriter_conceal_math_matches_shader ... ok
+test reveal::tests::typewriter_future_is_pending_then_strikes_then_holds ... ok
+test schedule::tests::bounds_the_reveal_backlog ... ok
+test schedule::tests::fast_continuation_preserves_future_cascade ... ok
+test schedule::tests::fresh_burst_after_cascade_completes ... ok
+test schedule::tests::idle_schedule_is_a_noop ... ok
+test schedule::tests::max_ahead_still_resets_to_now ... ok
+test schedule::tests::paced_continuation_never_starts_before_now ... ok
+test schedule::tests::sequences_changed_rows_across_rebuilds ... ok
+test tests::config_clamps_to_oracle_ranges ... ok
+test tests::defaults_match_mr_crabs ... ok
+test tests::from_animation_defaults_maps_duration ... ok
+test trail::tests::bar_and_underline_rects_follow_shape_rules ... ok
+test trail::tests::block_cursor_rect_is_the_full_cell ... ok
+test trail::tests::degenerate_rect_draws_nothing ... ok
+test trail::tests::fade_is_linear_and_expires ... ok
+test trail::tests::first_frame_glows_without_segment ... ok
+test trail::tests::gradient_cache_is_bounded_and_evicts_lru ... ok
+test trail::tests::hidden_or_unfocused_or_disabled_draws_nothing ... ok
+test trail::tests::move_captures_previous_rect_and_resets_fade ... ok
+
+test result: ok. 58 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/issue_19_repeated_output.rs (/Users/jamie/.cargo-target/debug/deps/issue_19_repeated_output-04dd7f87b700cd6d)
+
+running 7 tests
+test full_multiline_output_schedules_reveal_instead_of_pop_in ... ok
+test repeated_identical_wide_pair_restamps_full_span ... ok
+test full_bypass_preserves_existing_reveal_for_unchanged_cells ... ok
+test repeated_identical_partial_frame_starts_a_fresh_typewriter_reveal ... ok
+test five_cold_sequential_identical_executions_each_start_a_reveal ... ok
+test large_partial_bypass_preserves_existing_reveal_and_ignores_new_cells ... ok
+test third_overlapping_identical_execution_preserves_active_and_pending_reveals ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/s9_corpus.rs (/Users/jamie/.cargo-target/debug/deps/s9_corpus-3f995049d90213a2)
+
+running 1 test
+test s9_effects_corpus_matches_fixtures ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests mr_crabs_effects
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

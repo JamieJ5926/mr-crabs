@@ -1,0 +1,9 @@
+{
+  "delivery": {
+    "mode": "foreground"
+  },
+  "effect": "unverifiable",
+  "route": "global_input"
+}
+
+press_key_rc=0 elapsed_ms=8468

@@ -1,0 +1,184 @@
+{
+  "mechanism": "window-local screenshot PNG burst; trigger mid-span",
+  "trigger_token": "ZX9Q7",
+  "mean_interval_ms": 88.46666666666667,
+  "median_interval_ms": 87,
+  "min_interval_ms": 78,
+  "max_interval_ms": 115,
+  "mean_call_ms": 88.25284242630005,
+  "frame_count": 16,
+  "png_ok": 16,
+  "t_record_start_ms": 1788161967876,
+  "t_trigger_ms": 1788161968172,
+  "t_record_stop_ms": 1788161969344,
+  "session_span_ms": 1468,
+  "order_ok": true,
+  "first_mark_extracted_frame": null,
+  "first_token_extracted_frame": null,
+  "last_ocr_mark": null,
+  "capture_end_frame": 16,
+  "post_has_token": false,
+  "video": {
+    "frame_count": 16,
+    "diff_resize": "240x180",
+    "nonzero_diff_pairs": 14,
+    "substantial_pairs": 11,
+    "series": [
+      {
+        "pair": "frame_0001.png->frame_0002.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0005555555555555556
+      },
+      {
+        "pair": "frame_0002.png->frame_0003.png",
+        "changed_pixels": 890,
+        "changed_frac": 0.0824074074074074,
+        "mean_abs_channel_sum": 4.835462962962963
+      },
+      {
+        "pair": "frame_0003.png->frame_0004.png",
+        "changed_pixels": 899,
+        "changed_frac": 0.08324074074074074,
+        "mean_abs_channel_sum": 4.886759259259259
+      },
+      {
+        "pair": "frame_0004.png->frame_0005.png",
+        "changed_pixels": 890,
+        "changed_frac": 0.0824074074074074,
+        "mean_abs_channel_sum": 4.873518518518519
+      },
+      {
+        "pair": "frame_0005.png->frame_0006.png",
+        "changed_pixels": 5,
+        "changed_frac": 0.000462962962962963,
+        "mean_abs_channel_sum": 0.06138888888888889
+      },
+      {
+        "pair": "frame_0006.png->frame_0007.png",
+        "changed_pixels": 888,
+        "changed_frac": 0.08222222222222222,
+        "mean_abs_channel_sum": 5.520462962962963
+      },
+      {
+        "pair": "frame_0007.png->frame_0008.png",
+        "changed_pixels": 822,
+        "changed_frac": 0.07611111111111112,
+        "mean_abs_channel_sum": 4.774907407407407
+      },
+      {
+        "pair": "frame_0008.png->frame_0009.png",
+        "changed_pixels": 845,
+        "changed_frac": 0.07824074074074074,
+        "mean_abs_channel_sum": 4.99574074074074
+      },
+      {
+        "pair": "frame_0009.png->frame_0010.png",
+        "changed_pixels": 31,
+        "changed_frac": 0.0028703703703703703,
+        "mean_abs_channel_sum": 0.2222222222222222
+      },
+      {
+        "pair": "frame_0010.png->frame_0011.png",
+        "changed_pixels": 13,
+        "changed_frac": 0.0012037037037037038,
+        "mean_abs_channel_sum": 0.11185185185185186
+      },
+      {
+        "pair": "frame_0011.png->frame_0012.png",
+        "changed_pixels": 851,
+        "changed_frac": 0.0787962962962963,
+        "mean_abs_channel_sum": 5.577314814814815
+      },
+      {
+        "pair": "frame_0012.png->frame_0013.png",
+        "changed_pixels": 35,
+        "changed_frac": 0.0032407407407407406,
+        "mean_abs_channel_sum": 0.3038888888888889
+      },
+      {
+        "pair": "frame_0013.png->frame_0014.png",
+        "changed_pixels": 830,
+        "changed_frac": 0.07685185185185185,
+        "mean_abs_channel_sum": 5.838148148148148
+      },
+      {
+        "pair": "frame_0014.png->frame_0015.png",
+        "changed_pixels": 6,
+        "changed_frac": 0.0005555555555555556,
+        "mean_abs_channel_sum": 0.04898148148148148
+      },
+      {
+        "pair": "frame_0015.png->frame_0016.png",
+        "changed_pixels": 710,
+        "changed_frac": 0.06574074074074074,
+        "mean_abs_channel_sum": 5.002407407407407
+      }
+    ]
+  },
+  "ocr_sample": [
+    {
+      "frame_index": 1,
+      "path": "frame_0001.png",
+      "has_token": false,
+      "marks": [],
+      "snippet": "f could lose No live LFM endpoint is selected by default. LFM_BASE_URL or --1fm-url must name one endpoint explicitly. {ition then The Pi configuration offers ports 8090 through 8094, all using model id 1fm-heretic. ?; scored matrix and The"
+    },
+    {
+      "frame_index": 3,
+      "path": "frame_0003.png",
+      "has_token": false,
+      "marks": [],
+      "snippet": "f could lose No live LFM endpoint is selected by default. LFM_BASE_URL or --1fm-url must name one endpoint explicitly. {ition then The Pi configuration offers ports 8090 through 8094, all using model id 1fm-heretic. ?; scored matrix and The"
+    },
+    {
+      "frame_index": 5,
+      "path": "frame_0005.png",
+      "has_token": false,
+      "marks": [],
+      "snippet": "f could lose No live LFM endpoint is selected by default. LFM_BASE_URL or --1fm-url must name one endpoint explicitly. {ition then The Pi configuration offers ports 8090 through 8094, all using model id 1fm-heretic. ?; scored matrix and The"
+    },
+    {
+      "frame_index": 7,
+      "path": "frame_0007.png",
+      "has_token": false,
+      "marks": [],
+      "snippet": "f could lose No live LFM endpoint is selected by default. LFM_BASE_URL or --1fm-url must name one endpoint explicitly. {ition then The Pi configuration offers ports 8090 through 8094, all using model id 1fm-heretic. ?; scored matrix and The"
+    },
+    {
+      "frame_index": 9,
+      "path": "frame_0009.png",
+      "has_token": false,
+      "marks": [],
+      "snippet": "f could lose No live LFM endpoint is selected by default. LFM_BASE_URL or --1fm-url must name one endpoint explicitly. {ition then The Pi configuration offers ports 8090 through 8094, all using model id 1fm-heretic. ?; scored matrix and The"
+    },
+    {
+      "frame_index": 11,
+      "path": "frame_0011.png",
+      "has_token": false,
+      "marks": [],
+      "snippet": "f could lose No live LFM endpoint is selected by default. LFM_BASE_URL or --1fm-url must name one endpoint explicitly. {ition then The Pi configuration offers ports 8090 through 8094, all using model id 1fm-heretic. ?; scored matrix and The"
+    },
+    {
+      "frame_index": 13,
+      "path": "frame_0013.png",
+      "has_token": false,
+      "marks": [],
+      "snippet": "f could lose No live LFM endpoint is selected by default. LFM_BASE_URL or --1fm-url must name one endpoint explicitly. {ition then The Pi configuration offers ports 8090 through 8094, all using model id 1fm-heretic. ?; scored matrix and The"
+    },
+    {
+      "frame_index": 15,
+      "path": "frame_0015.png",
+      "has_token": false,
+      "marks": [],
+      "snippet": "f could lose No live LFM endpoint is selected by default. LFM_BASE_URL or --1fm-url must name one endpoint explicitly. {ition then The Pi configuration offers ports 8090 through 8094, all using model id 1fm-heretic. ?; scored matrix and The"
+    },
+    {
+      "frame_index": 16,
+      "path": "frame_0016.png",
+      "has_token": false,
+      "marks": [],
+      "snippet": "f could lose No live LFM endpoint is selected by default. LFM_BASE_URL or --1fm-url must name one endpoint explicitly. {ition then The Pi configuration offers ports 8090 through 8094, all using model id 1fm-heretic. ?; scored matrix and The"
+    }
+  ]
+}

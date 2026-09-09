@@ -1,0 +1,9 @@
+Product race in capture_rustfetch_from (crates/mr-crabs-app/src/animated_fetch.rs:371):
+- Child process (fixture) exits immediately and closes PTY output channel.
+- mpsc receiver thread (in capture_rustfetch_from) receives Disconnected before all chunks (including last output) are received in the 50ms timeout loop.
+- output_disconnected = true; loop exits; status not set; return None.
+- Test expect("capture ...") panics.
+
+Interleaving: child prints and exits before reader polls the mpsc; PTY drop race.
+
+This is a product race (not test bug), so no fix applied. Tests unchanged. Flake reproduced under loaded/unloaded contention.

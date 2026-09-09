@@ -1,0 +1,5 @@
+run_id=p1run1
+mode=marker
+burst_ms=80
+burst_count=25
+started=2026-08-31 19:15:42

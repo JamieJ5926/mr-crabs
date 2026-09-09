@@ -1,0 +1,178 @@
+[
+  {
+    "i": 1,
+    "wall_ms": 1788161592072,
+    "done_ms": 1788161592434,
+    "call_ms": 361.9191646575928,
+    "since_start_ms": 362.2297499969136,
+    "png_exists": true,
+    "png_bytes": 535387,
+    "rc": 0,
+    "triggered_this_frame": false
+  },
+  {
+    "i": 2,
+    "wall_ms": 1788161592434,
+    "done_ms": 1788161592642,
+    "call_ms": 208.30011367797852,
+    "since_start_ms": 570.8630839944817,
+    "png_exists": true,
+    "png_bytes": 535656,
+    "rc": 0,
+    "triggered_this_frame": false
+  },
+  {
+    "i": 3,
+    "wall_ms": 1788161592643,
+    "done_ms": 1788161592941,
+    "call_ms": 298.14600944519043,
+    "since_start_ms": 869.3417920003412,
+    "png_exists": true,
+    "png_bytes": 534820,
+    "rc": 0,
+    "triggered_this_frame": false
+  },
+  {
+    "i": 4,
+    "wall_ms": 1788161592941,
+    "done_ms": 1788161593263,
+    "call_ms": 321.2087154388428,
+    "since_start_ms": 1191.596958997252,
+    "png_exists": true,
+    "png_bytes": 320792,
+    "rc": 0,
+    "triggered_this_frame": true
+  },
+  {
+    "i": 5,
+    "wall_ms": 1788161593263,
+    "done_ms": 1788161594050,
+    "call_ms": 787.1038913726807,
+    "since_start_ms": 1979.1606250000768,
+    "png_exists": true,
+    "png_bytes": 263999,
+    "rc": 0,
+    "triggered_this_frame": false
+  },
+  {
+    "i": 6,
+    "wall_ms": 1788161594051,
+    "done_ms": 1788161594872,
+    "call_ms": 820.807933807373,
+    "since_start_ms": 2800.402999993821,
+    "png_exists": true,
+    "png_bytes": 263920,
+    "rc": 0,
+    "triggered_this_frame": false
+  },
+  {
+    "i": 7,
+    "wall_ms": 1788161594872,
+    "done_ms": 1788161595340,
+    "call_ms": 467.9899215698242,
+    "since_start_ms": 3268.8081249943934,
+    "png_exists": true,
+    "png_bytes": 258940,
+    "rc": 0,
+    "triggered_this_frame": false
+  },
+  {
+    "i": 8,
+    "wall_ms": 1788161595341,
+    "done_ms": 1788161595766,
+    "call_ms": 425.0619411468506,
+    "since_start_ms": 3694.673124999099,
+    "png_exists": true,
+    "png_bytes": 320961,
+    "rc": 0,
+    "triggered_this_frame": false
+  },
+  {
+    "i": 9,
+    "wall_ms": 1788161595766,
+    "done_ms": 1788161596393,
+    "call_ms": 626.0831356048584,
+    "since_start_ms": 4321.266999999352,
+    "png_exists": true,
+    "png_bytes": 362956,
+    "rc": 0,
+    "triggered_this_frame": false
+  },
+  {
+    "i": 10,
+    "wall_ms": 1788161596393,
+    "done_ms": 1788161596946,
+    "call_ms": 552.9940128326416,
+    "since_start_ms": 4874.61870900006,
+    "png_exists": true,
+    "png_bytes": 336857,
+    "rc": 0,
+    "triggered_this_frame": false
+  },
+  {
+    "i": 11,
+    "wall_ms": 1788161596946,
+    "done_ms": 1788161597204,
+    "call_ms": 257.2591304779053,
+    "since_start_ms": 5132.576291995065,
+    "png_exists": true,
+    "png_bytes": 340536,
+    "rc": 0,
+    "triggered_this_frame": false
+  },
+  {
+    "i": 12,
+    "wall_ms": 1788161597204,
+    "done_ms": 1788161597455,
+    "call_ms": 250.14090538024902,
+    "since_start_ms": 5383.972833995358,
+    "png_exists": true,
+    "png_bytes": 355783,
+    "rc": 0,
+    "triggered_this_frame": false
+  },
+  {
+    "i": 13,
+    "wall_ms": 1788161597456,
+    "done_ms": 1788161598655,
+    "call_ms": 1198.7249851226807,
+    "since_start_ms": 6653.294416995777,
+    "png_exists": true,
+    "png_bytes": 394806,
+    "rc": 0,
+    "triggered_this_frame": false
+  },
+  {
+    "i": 14,
+    "wall_ms": 1788161598745,
+    "done_ms": 1788161599108,
+    "call_ms": 363.28601837158203,
+    "since_start_ms": 7039.08333399886,
+    "png_exists": true,
+    "png_bytes": 161346,
+    "rc": 0,
+    "triggered_this_frame": false
+  },
+  {
+    "i": 15,
+    "wall_ms": 1788161599111,
+    "done_ms": 1788161599417,
+    "call_ms": 305.91583251953125,
+    "since_start_ms": 7345.575291998102,
+    "png_exists": true,
+    "png_bytes": 161372,
+    "rc": 0,
+    "triggered_this_frame": false
+  },
+  {
+    "i": 16,
+    "wall_ms": 1788161599417,
+    "done_ms": 1788161599647,
+    "call_ms": 229.77685928344727,
+    "since_start_ms": 7575.951499995426,
+    "png_exists": true,
+    "png_bytes": 161217,
+    "rc": 0,
+    "triggered_this_frame": false
+  }
+]

@@ -1,0 +1,10 @@
+{
+  "cursor_blink": false,
+  "cursor_trail": false,
+  "text_animation": "none",
+  "text_animation_duration_ms": 0,
+  "text_animation_intensity": 0.0,
+  "startup_fetch": false,
+  "startup_animation": "none",
+  "background_opacity": 1.0
+}

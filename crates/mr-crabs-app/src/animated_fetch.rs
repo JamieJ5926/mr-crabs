@@ -1,174 +1,108 @@
-use std::io::{IsTerminal, Write};
-use std::path::Path;
-use std::sync::mpsc::{RecvTimeoutError, TryRecvError};
-use std::time::{Duration, Instant};
+use std::io::Write;
+use std::time::Duration;
 
-use mr_crabs_pty::{CommandBuilder, PtyConfig, PtySession, PtySize};
+use mr_crabs_config::{FetchArrangement, StartupArt};
+
+use crate::{art, sysinfo};
 
 pub const FRAME_COUNT: usize = 8;
 pub const FRAME_DELAY: Duration = Duration::from_millis(80);
-pub const RUSTFETCH_CAPTURE_MAX_BYTES: usize = 64 * 1024;
+
+fn startup_art() -> StartupArt {
+    match std::env::var("MR_CRABS_STARTUP_ART").ok().as_deref() {
+        Some("none") => StartupArt::None,
+        Some("apple") => StartupArt::Apple,
+        Some(value) if value.starts_with("file:") => StartupArt::parse(value).unwrap_or_default(),
+        _ => StartupArt::Native,
+    }
+}
+
+fn fetch_arrangement() -> FetchArrangement {
+    match std::env::var("MR_CRABS_FETCH_ARRANGEMENT").ok().as_deref() {
+        Some("beside") => FetchArrangement::Beside,
+        Some("hidden") => FetchArrangement::Hidden,
+        _ => FetchArrangement::Below,
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FetchLine {
     pub logo: String,
     pub info: String,
 }
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FetchLayout {
     pub lines: Vec<FetchLine>,
     pub logo_width: usize,
 }
 
-pub fn logo_only_bytes(layout: &FetchLayout) -> Vec<u8> {
-    let mut out = String::new();
-    for line in &layout.lines {
-        out.push_str(&line.logo);
-        out.push('\n');
-    }
-    out.into_bytes()
-}
-
-fn ansi_sequence_end(bytes: &[u8], start: usize) -> usize {
-    let mut index = start + 1;
-    if index >= bytes.len() {
-        return bytes.len();
-    }
-    match bytes[index] {
-        b'[' => {
-            index += 1;
-            while index < bytes.len() {
-                let byte = bytes[index];
-                index += 1;
-                if (0x40..=0x7e).contains(&byte) {
-                    break;
-                }
+fn compose(arrangement: FetchArrangement, selected: &StartupArt) -> FetchLayout {
+    let logo = if matches!(selected, StartupArt::None) {
+        None
+    } else {
+        art::art_for_startup(selected)
+    };
+    let info = sysinfo::collect();
+    let art_rows = logo.as_ref().map(|a| a.rows.clone()).unwrap_or_default();
+    let width = logo.as_ref().map_or(0, |a| a.width);
+    let mut lines = Vec::new();
+    match arrangement {
+        FetchArrangement::Hidden => lines.extend(art_rows.into_iter().map(|logo| FetchLine {
+            logo,
+            info: String::new(),
+        })),
+        FetchArrangement::Beside => {
+            let facts: Vec<String> = std::iter::once(info.title)
+                .chain(info.lines.into_iter().map(|(k, v)| format!("{k}: {v}")))
+                .collect();
+            let gutter = width + 2;
+            let n = art_rows.len().max(facts.len());
+            for i in 0..n {
+                let row = art_rows.get(i).cloned().unwrap_or_default();
+                let pad = gutter.saturating_sub(row.chars().count());
+                lines.push(FetchLine {
+                    logo: format!("{row}{}", " ".repeat(pad)),
+                    info: facts.get(i).cloned().unwrap_or_default(),
+                });
             }
         }
-        b']' => {
-            index += 1;
-            while index < bytes.len() {
-                if bytes[index] == 0x07 {
-                    index += 1;
-                    break;
-                }
-                if bytes[index] == 0x1b && index + 1 < bytes.len() && bytes[index + 1] == b'\\' {
-                    index += 2;
-                    break;
-                }
-                index += 1;
-            }
+        FetchArrangement::Below => {
+            lines.extend(art_rows.into_iter().map(|logo| FetchLine {
+                logo,
+                info: String::new(),
+            }));
+            lines.push(FetchLine {
+                logo: String::new(),
+                info: info.title,
+            });
+            lines.extend(info.lines.into_iter().map(|(k, v)| FetchLine {
+                logo: String::new(),
+                info: format!("{k}: {v}"),
+            }));
         }
-        _ => index += 1,
     }
-    index
-}
-
-fn visible_text(input: &str) -> String {
-    let bytes = input.as_bytes();
-    let mut output = String::with_capacity(input.len());
-    let mut index = 0;
-    while index < bytes.len() {
-        if bytes[index] == 0x1b {
-            index = ansi_sequence_end(bytes, index);
-            continue;
-        }
-        let ch = input[index..].chars().next().expect("character boundary");
-        output.push(ch);
-        index += ch.len_utf8();
-    }
-    output
-}
-
-fn char_cell_width(ch: char) -> Option<usize> {
-    match ch {
-        '\u{00}'..='\u{1F}' | '\u{7F}'..='\u{9F}' => None,
-        '\u{0300}'..='\u{036F}' | '\u{1AB0}'..='\u{1AFF}' | '\u{1DC0}'..='\u{1DFF}' => Some(0),
-        '\u{1100}'..='\u{115F}'
-        | '\u{2329}'..='\u{232A}'
-        | '\u{2E80}'..='\u{A4CF}'
-        | '\u{AC00}'..='\u{D7A3}'
-        | '\u{F900}'..='\u{FAFF}'
-        | '\u{FE10}'..='\u{FE19}'
-        | '\u{FE30}'..='\u{FE6F}'
-        | '\u{FF00}'..='\u{FF60}'
-        | '\u{FFE0}'..='\u{FFE6}'
-        | '\u{1F300}'..='\u{1FAFF}'
-        | '\u{20000}'..='\u{3FFFD}' => Some(2),
-        _ => Some(1),
+    FetchLayout {
+        lines,
+        logo_width: width,
     }
 }
 
-fn visible_width(input: &str) -> usize {
-    visible_text(input)
-        .chars()
-        .filter_map(char_cell_width)
-        .sum()
+pub fn composed_layout(arrangement: FetchArrangement, selected: &StartupArt) -> FetchLayout {
+    compose(arrangement, selected)
 }
-
-fn is_sgr_reset(sequence: &[u8]) -> bool {
-    sequence == b"\x1b[m" || sequence == b"\x1b[0m"
+pub fn logo_only_bytes(layout: &FetchLayout, _: FetchArrangement) -> Vec<u8> {
+    layout
+        .lines
+        .iter()
+        .map(|l| format!("{}{}\n", l.logo, l.info))
+        .collect::<String>()
+        .into_bytes()
 }
-
-fn split_at_visible_column(input: &str, column: usize) -> Option<usize> {
-    let bytes = input.as_bytes();
-    let mut index = 0;
-    let mut cells = 0;
-    while cells < column {
-        if index >= bytes.len() {
-            return None;
-        }
-        if bytes[index] == 0x1b {
-            index = ansi_sequence_end(bytes, index);
-            continue;
-        }
-        let ch = input[index..].chars().next()?;
-        let width = char_cell_width(ch)?;
-        if cells + width > column {
-            return None;
-        }
-        index += ch.len_utf8();
-        cells += width;
-    }
-    while index < bytes.len() && bytes[index] == 0x1b {
-        let end = ansi_sequence_end(bytes, index);
-        if !is_sgr_reset(&bytes[index..end]) {
-            break;
-        }
-        index = end;
-    }
-    Some(index)
-}
-
-pub fn parse_fetch_layout(output: &str) -> Option<FetchLayout> {
-    let raw_lines: Vec<&str> = output.lines().collect();
-    let logo_width = raw_lines.iter().find_map(|line| {
-        let visible = visible_text(line);
-        let dash_byte = visible.find("---")?;
-        Some(
-            visible[..dash_byte]
-                .chars()
-                .filter_map(char_cell_width)
-                .sum(),
-        )
-    })?;
-    let mut lines = Vec::with_capacity(raw_lines.len());
-    for line in raw_lines {
-        let split = split_at_visible_column(line, logo_width)?;
-        let (logo_raw, info) = line.split_at(split);
-        lines.push(FetchLine {
-            logo: visible_text(logo_raw),
-            info: info.to_string(),
-        });
-    }
-    Some(FetchLayout { lines, logo_width })
-}
-
-fn hsv_to_rgb(h: f32, s: f32, v: f32) -> (u8, u8, u8) {
-    let c = v * s;
-    let h2 = h / 60.0;
-    let x = c * (1.0 - ((h2 % 2.0) - 1.0).abs());
-    let (r1, g1, b1) = match h2 as u32 {
+fn hsv(phase: usize, col: usize, row: usize) -> (u8, u8, u8) {
+    let h = ((phase * 45 + col * 17 + row * 11) % 360) as f32;
+    let c = 0.9;
+    let x = c * (1.0 - ((h / 60.0 % 2.0) - 1.0).abs());
+    let (r, g, b) = match (h / 60.0) as u32 {
         0 => (c, x, 0.0),
         1 => (x, c, 0.0),
         2 => (0.0, c, x),
@@ -176,687 +110,162 @@ fn hsv_to_rgb(h: f32, s: f32, v: f32) -> (u8, u8, u8) {
         4 => (x, 0.0, c),
         _ => (c, 0.0, x),
     };
-    let m = v - c;
     (
-        ((r1 + m) * 255.0) as u8,
-        ((g1 + m) * 255.0) as u8,
-        ((b1 + m) * 255.0) as u8,
+        ((r + 0.1) * 255.0) as u8,
+        ((g + 0.1) * 255.0) as u8,
+        ((b + 0.1) * 255.0) as u8,
     )
 }
-
-fn color_for(phase: usize, col: usize, row: usize) -> (u8, u8, u8) {
-    let hue = ((phase * 45 + col * 17 + row * 11) % 360) as f32;
-    hsv_to_rgb(hue, 0.9, 1.0)
-}
-
-pub fn frame_bytes(layout: &FetchLayout, phase: usize) -> Vec<u8> {
-    let mut out = String::new();
-    for (row, line) in layout.lines.iter().enumerate() {
-        for (col, ch) in line.logo.chars().enumerate() {
+fn frame(layout: &FetchLayout, phase: usize) -> Vec<u8> {
+    let mut s = String::new();
+    for (r, l) in layout.lines.iter().enumerate() {
+        for (c, ch) in l.logo.chars().enumerate() {
             if ch == ' ' {
-                out.push(' ');
+                s.push(ch)
             } else {
-                let (r, g, b) = color_for(phase, col, row);
-                out.push_str(&format!("\x1b[38;2;{r};{g};{b}m{ch}\x1b[0m"));
+                let (a, b, d) = hsv(phase, c, r);
+                s.push_str(&format!("\x1b[38;2;{a};{b};{d}m{ch}\x1b[0m"));
             }
         }
-        out.push('\n');
+        s.push_str(&l.info);
+        s.push('\n');
     }
-    out.into_bytes()
+    s.into_bytes()
 }
-
-pub fn animation_frames(layout: &FetchLayout) -> Vec<Vec<u8>> {
-    (0..FRAME_COUNT).map(|p| frame_bytes(layout, p)).collect()
+pub fn animation_frames(layout: &FetchLayout, _: FetchArrangement) -> Vec<Vec<u8>> {
+    (0..FRAME_COUNT).map(|p| frame(layout, p)).collect()
 }
-
-pub fn animation_chunks(layout: &FetchLayout, original: &str) -> Vec<Vec<u8>> {
-    let _ = original;
-    let height = layout.lines.len();
-    let prefix = format!("\x1b[{height}A\r").into_bytes();
-    let mut chunks = Vec::with_capacity(FRAME_COUNT + 1);
-    for phase in 0..FRAME_COUNT {
-        let frame = frame_bytes(layout, phase);
-        if phase == 0 {
-            chunks.push(frame);
-        } else {
-            let mut chunk = Vec::with_capacity(prefix.len() + frame.len());
-            chunk.extend_from_slice(&prefix);
-            chunk.extend_from_slice(&frame);
-            chunks.push(chunk);
-        }
+pub fn animation_chunks(layout: &FetchLayout, _: &str, _: FetchArrangement) -> Vec<Vec<u8>> {
+    let mut out = animation_frames(layout, FetchArrangement::Hidden);
+    let prefix = format!("\x1b[{}A\r", layout.lines.len()).into_bytes();
+    for x in out.iter_mut().skip(1) {
+        let mut y = prefix.clone();
+        y.append(x);
+        *x = y;
     }
-    let logo = logo_only_bytes(layout);
-    let mut last = Vec::with_capacity(prefix.len() + logo.len());
-    last.extend_from_slice(&prefix);
-    last.extend_from_slice(&logo);
-    chunks.push(last);
-    chunks
-}
-
-pub fn inline_animation_bytes(layout: &FetchLayout, original: &str) -> Vec<u8> {
-    animation_chunks(layout, original).concat()
-}
-
-pub fn fits_terminal(layout: &FetchLayout, original: &str, rows: u16, cols: u16) -> bool {
-    if rows == 0 || cols == 0 {
-        return false;
-    }
-    if layout.lines.len() + 1 > rows as usize {
-        return false;
-    }
-    for line in original.lines() {
-        if !line.is_ascii() {
-            return false;
-        }
-        if line.len() > cols as usize {
-            return false;
-        }
-    }
-    true
-}
-
-fn positioned_frame(layout: &FetchLayout, phase: usize, top: u16, left: u16) -> Vec<u8> {
-    let mut out = Vec::new();
-    for (row, line) in layout.lines.iter().enumerate() {
-        out.extend_from_slice(format!("\x1b[{};{}H\x1b[0m", top as usize + row, left).as_bytes());
-        for (col, ch) in line.logo.chars().enumerate() {
-            if ch == ' ' {
-                out.push(b' ');
-            } else {
-                let (r, g, b) = color_for(phase, col, row);
-                out.extend_from_slice(format!("\x1b[38;2;{r};{g};{b}m{ch}\x1b[0m").as_bytes());
-            }
-        }
-        out.extend_from_slice(b"\x1b[0m");
-    }
+    let mut final_frame = prefix.clone();
+    final_frame.extend_from_slice(&logo_only_bytes(layout, FetchArrangement::Hidden));
+    out.push(final_frame);
     out
 }
-
-fn dimmed_frame(layout: &FetchLayout, level: u8, top: u16, left: u16) -> Vec<u8> {
-    let mut out = Vec::new();
-    for (row, line) in layout.lines.iter().enumerate() {
-        out.extend_from_slice(
-            format!(
-                "\x1b[{};{}H\x1b[2m\x1b[38;2;{level};{level};{level}m",
-                top as usize + row,
-                left
-            )
-            .as_bytes(),
-        );
-        out.extend_from_slice(line.logo.as_bytes());
-        out.extend_from_slice(b"\x1b[0m");
-    }
-    out
+pub fn inline_animation_bytes(
+    layout: &FetchLayout,
+    original: &str,
+    a: FetchArrangement,
+) -> Vec<u8> {
+    animation_chunks(layout, original, a).concat()
 }
-
-pub fn centered_animation_chunks(layout: &FetchLayout, rows: u16, cols: u16) -> Vec<Vec<u8>> {
-    let height = layout.lines.len() as u16;
-    let width = layout
-        .lines
-        .iter()
-        .map(|line| visible_width(&line.logo))
-        .max()
-        .unwrap_or(0) as u16;
-    let top = ((rows.saturating_sub(height)) / 2).saturating_add(1);
-    let left = ((cols.saturating_sub(width)) / 2).saturating_add(1);
-    let mut chunks = Vec::with_capacity(FRAME_COUNT + 5);
-    chunks.push(b"\x1b[?25l".to_vec());
-    for phase in 0..FRAME_COUNT {
-        chunks.push(positioned_frame(layout, phase, top, left));
-    }
-    for level in [160, 96, 40] {
-        chunks.push(dimmed_frame(layout, level, top, left));
-    }
-    let mut final_frame = Vec::new();
-    for (row, line) in layout.lines.iter().enumerate() {
-        final_frame
-            .extend_from_slice(format!("\x1b[{};{}H\x1b[0m", top as usize + row, left).as_bytes());
-        final_frame.extend_from_slice(line.logo.as_bytes());
-        final_frame.extend_from_slice(b"\x1b[0m");
-    }
-    let prompt_row = top.saturating_add(height).min(rows);
-    final_frame.extend_from_slice(format!("\x1b[{};1H\x1b[0m\x1b[?25h", prompt_row).as_bytes());
-    chunks.push(final_frame);
-    chunks
+pub fn should_sleep_after_chunk(i: usize) -> bool {
+    i < FRAME_COUNT
 }
-
-pub fn centered_inline_animation_bytes(layout: &FetchLayout, rows: u16, cols: u16) -> Vec<u8> {
-    centered_animation_chunks(layout, rows, cols).concat()
-}
-
-pub fn fits_centered_terminal(layout: &FetchLayout, rows: u16, cols: u16) -> bool {
-    if rows == 0 || cols == 0 || layout.lines.len() + 2 > rows as usize {
-        return false;
-    }
-    layout
-        .lines
-        .iter()
-        .all(|line| visible_width(&line.logo) + 2 <= cols as usize)
-}
-
-fn terminal_size() -> Option<(u16, u16)> {
-    #[cfg(unix)]
-    {
-        let mut ws: libc::winsize = unsafe { std::mem::zeroed() };
-        let ret = unsafe { libc::ioctl(libc::STDOUT_FILENO, libc::TIOCGWINSZ, &mut ws) };
-        if ret == 0 && ws.ws_row != 0 && ws.ws_col != 0 {
-            return Some((ws.ws_row, ws.ws_col));
-        }
-        None
-    }
-    #[cfg(not(unix))]
-    {
-        None
-    }
-}
-
-fn capture_rustfetch_from(executable: &Path) -> Option<String> {
-    let mut command = CommandBuilder::new(executable);
-    command
-        .env("TERM", "xterm-256color")
-        .env("COLORTERM", "truecolor");
-    let size = PtySize::new(120, 40, 0, 0).ok()?;
-    let (mut session, output_rx, exit_rx) = match PtySession::spawn(PtyConfig::new(command, size)) {
-        Ok(spawned) => spawned,
-        Err(e) => {
-            eprintln!("mr-crabs: rustfetch spawn failed: {e}");
-            return None;
-        }
-    };
-
-    let deadline = Instant::now() + Duration::from_secs(2);
-    let mut output = Vec::new();
-    let mut status = None;
-    let mut output_disconnected = false;
-    while !output_disconnected {
-        let remaining = deadline.saturating_duration_since(Instant::now());
-        if remaining.is_zero() {
-            let _ = session.shutdown_and_reap(Duration::from_millis(100));
-            return None;
-        }
-        match output_rx.recv_timeout(remaining.min(Duration::from_millis(50))) {
-            Ok(chunk) => {
-                if output.len().saturating_add(chunk.len()) > RUSTFETCH_CAPTURE_MAX_BYTES {
-                    let _ = session.shutdown_and_reap(Duration::from_millis(100));
-                    return None;
-                }
-                output.extend_from_slice(&chunk);
-            }
-            Err(RecvTimeoutError::Timeout) => {}
-            Err(RecvTimeoutError::Disconnected) => output_disconnected = true,
-        }
-
-        if status.is_none() {
-            match exit_rx.try_recv() {
-                Ok(exit) => status = Some(exit),
-                Err(TryRecvError::Empty) => {}
-                Err(TryRecvError::Disconnected) => {
-                    let _ = session.shutdown_and_reap(Duration::from_millis(100));
-                    return None;
-                }
-            }
-        }
-    }
-
-    if status.is_none() {
-        let remaining = deadline.saturating_duration_since(Instant::now());
-        if remaining.is_zero() {
-            let _ = session.shutdown_and_reap(Duration::from_millis(100));
-            return None;
-        }
-        status = exit_rx.recv_timeout(remaining).ok();
-    }
-    let status = status?;
-    if output.is_empty() {
-        if status.code() != Some(0) {
-            eprintln!(
-                "mr-crabs: rustfetch failed (exit status {:?})",
-                status.code()
-            );
-        }
-        return None;
-    }
-
-    match String::from_utf8(output) {
-        Ok(s) => Some(s),
-        Err(e) => Some(String::from_utf8_lossy(e.as_bytes()).into_owned()),
-    }
-}
-
-fn capture_rustfetch() -> Option<String> {
-    capture_rustfetch_from(Path::new("rustfetch"))
-}
-
-pub fn should_sleep_after_chunk(idx: usize) -> bool {
-    idx < FRAME_COUNT
-}
-
 pub fn should_run_animated_fetch(args: &[String]) -> bool {
-    args.first()
-        .is_some_and(|arg| matches!(arg.as_str(), "+animated-fetch" | "+rustfetch"))
+    args.first().is_some_and(|a| a == "+fetch")
+}
+fn terminal_size() -> Option<(u16, u16)> {
+    let mut ws: libc::winsize = unsafe { std::mem::zeroed() };
+    let read = unsafe { libc::ioctl(libc::STDOUT_FILENO, libc::TIOCGWINSZ, &mut ws) };
+    (read == 0 && ws.ws_row > 0 && ws.ws_col > 0).then_some((ws.ws_row, ws.ws_col))
+}
+
+fn centered(layout: &FetchLayout) -> FetchLayout {
+    let Some((rows, cols)) = terminal_size() else {
+        return layout.clone();
+    };
+    let block_width = layout
+        .lines
+        .iter()
+        .map(|l| l.logo.chars().count() + l.info.chars().count())
+        .max()
+        .unwrap_or(0);
+    let left = (usize::from(cols).saturating_sub(block_width)) / 2;
+    let top = (usize::from(rows).saturating_sub(layout.lines.len())) / 2;
+    let margin = " ".repeat(left);
+    let mut lines: Vec<FetchLine> = (0..top)
+        .map(|_| FetchLine {
+            logo: String::new(),
+            info: String::new(),
+        })
+        .collect();
+    lines.extend(layout.lines.iter().map(|l| FetchLine {
+        logo: format!("{margin}{}", l.logo),
+        info: l.info.clone(),
+    }));
+    FetchLayout {
+        lines,
+        logo_width: layout.logo_width + left,
+    }
 }
 
 pub fn run_animated_fetch_and_exit() -> ! {
-    let captured = capture_rustfetch();
-    let is_tty = std::io::stdout().is_terminal();
-    match captured {
-        None => std::process::exit(0),
-        Some(original) => {
-            let layout = parse_fetch_layout(&original);
-            if !is_tty {
-                let bytes = layout
-                    .as_ref()
-                    .map(logo_only_bytes)
-                    .unwrap_or_else(|| original.into_bytes());
-                let _ = std::io::stdout().write_all(&bytes);
-                let _ = std::io::stdout().flush();
-                std::process::exit(0);
-            }
-            let Some(layout) = layout else {
-                let _ = std::io::stdout().write_all(original.as_bytes());
-                let _ = std::io::stdout().flush();
-                std::process::exit(0);
-            };
-            if layout.lines.is_empty() {
-                std::process::exit(0);
-            }
-            let terminal = terminal_size();
-            let animate = terminal
-                .map(|(rows, cols)| fits_centered_terminal(&layout, rows, cols))
-                .unwrap_or(false);
-            if !animate {
-                let _ = std::io::stdout().write_all(&logo_only_bytes(&layout));
-                let _ = std::io::stdout().flush();
-                std::process::exit(0);
-            }
-            let (rows, cols) = terminal.expect("terminal size checked above");
-            let chunks = centered_animation_chunks(&layout, rows, cols);
-            let mut stdout = std::io::stdout();
-            for (idx, chunk) in chunks.iter().enumerate() {
-                let _ = stdout.write_all(chunk);
-                let _ = stdout.flush();
-                if idx > 0 && idx <= FRAME_COUNT {
-                    std::thread::sleep(FRAME_DELAY);
-                } else if idx > FRAME_COUNT && idx < chunks.len() - 1 {
-                    std::thread::sleep(Duration::from_millis(50));
-                }
-            }
-            std::process::exit(0);
+    let layout = centered(&compose(fetch_arrangement(), &startup_art()));
+    let chunks = animation_chunks(&layout, "", FetchArrangement::Hidden);
+    let mut out = std::io::stdout();
+    for (index, chunk) in chunks.iter().enumerate() {
+        let _ = out.write_all(chunk);
+        let _ = out.flush();
+        if should_sleep_after_chunk(index) {
+            std::thread::sleep(FRAME_DELAY);
         }
     }
+    std::process::exit(0)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn sample_output() -> String {
-        let mut s = String::new();
-        s.push_str("        .:'      jamie@host\n");
-        s.push_str("    __ :'__      ------------------------------\n");
-        s.push_str(" .'`__`-'__``.   OS: Darwin (aarch64)\n");
-        s.push_str(":__________.-'   Kernel: 25.5.0\n");
-        s.push_str(":_________:      Shell: zsh\n");
-        s.push_str(" :_________`-;   Terminal: Mr Crabs\n");
-        s.push_str("  `.__.-.__.'   Uptime: 1 day\n");
-        s
-    }
-
     #[test]
-    fn parse_splits_at_separator_column() {
-        let out = sample_output();
-        let layout = parse_fetch_layout(&out).expect("layout");
-        assert_eq!(layout.logo_width, 17);
-        assert_eq!(layout.lines.len(), 7);
-        for line in &layout.lines {
-            assert_eq!(line.logo.chars().count(), 17);
-        }
-        assert!(layout.lines[1].info.contains("---"));
-    }
-
-    #[test]
-    fn logo_only_coloring() {
-        let out = sample_output();
-        let layout = parse_fetch_layout(&out).expect("layout");
-        let frame = frame_bytes(&layout, 0);
-        let text = String::from_utf8(frame).unwrap();
-        let visible = visible_text(&text);
-        assert!(text.contains("\x1b[38;2;"));
-        assert!(visible.contains(".:'"));
-        assert!(!visible.contains("jamie@host"));
-        assert!(!visible.contains("Darwin"));
-    }
-
-    #[test]
-    fn exact_capture_after_immediate_exit() {
-        use std::fs;
-        use std::os::unix::fs::PermissionsExt;
-        use std::time::{SystemTime, UNIX_EPOCH};
-
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("clock")
-            .as_nanos();
-        let dir = std::env::temp_dir().join(format!(
-            "mr-crabs-animated-fetch-{}-{nonce}",
-            std::process::id()
-        ));
-        fs::create_dir(&dir).expect("create fixture directory");
-        let fixture = dir.join("rustfetch-fixture");
-        fs::write(
-            &fixture,
-            "#!/bin/sh\ni=0\nwhile [ \"$i\" -lt 9000 ]; do printf x; i=$((i + 1)); done\nprintf 'FINAL-TAIL\\n'\n",
-        )
-        .expect("write fixture");
-        fs::set_permissions(&fixture, fs::Permissions::from_mode(0o755))
-            .expect("make fixture executable");
-
-        let captured = capture_rustfetch_from(&fixture).expect("capture fixture output");
-        let mut expected = "x".repeat(9000);
-        expected.push_str("FINAL-TAIL\r\n");
-        assert_eq!(captured, expected);
-
-        fs::remove_dir_all(dir).expect("remove fixture directory");
-    }
-    #[test]
-    fn exact_capture_preserves_tiny_output() {
-        use std::fs;
-        use std::os::unix::fs::PermissionsExt;
-        use std::time::{SystemTime, UNIX_EPOCH};
-
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("clock")
-            .as_nanos();
-        let dir = std::env::temp_dir().join(format!(
-            "mr-crabs-animated-fetch-tiny-{}-{nonce}",
-            std::process::id()
-        ));
-        fs::create_dir(&dir).expect("create fixture directory");
-        let fixture = dir.join("rustfetch-fixture");
-        fs::write(&fixture, "#!/bin/sh\nprintf 'tiny-tail\\n'\n").expect("write fixture");
-        fs::set_permissions(&fixture, fs::Permissions::from_mode(0o755))
-            .expect("make fixture executable");
-
-        assert_eq!(
-            capture_rustfetch_from(&fixture).expect("capture tiny fixture"),
-            "tiny-tail\r\n"
-        );
-        fs::remove_dir_all(dir).expect("remove fixture directory");
-    }
-
-    #[test]
-    fn capture_overflow_reaps_and_returns_none() {
-        use std::fs;
-        use std::os::unix::fs::PermissionsExt;
-        use std::time::{SystemTime, UNIX_EPOCH};
-
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("clock")
-            .as_nanos();
-        let dir = std::env::temp_dir().join(format!(
-            "mr-crabs-animated-fetch-overflow-{}-{nonce}",
-            std::process::id()
-        ));
-        fs::create_dir(&dir).expect("create fixture directory");
-        let fixture = dir.join("rustfetch-fixture");
-        fs::write(
-            &fixture,
-            format!(
-                "#!/bin/sh\ndd if=/dev/zero bs={} count=2 2>/dev/null\n",
-                RUSTFETCH_CAPTURE_MAX_BYTES
-            ),
-        )
-        .expect("write fixture");
-        fs::set_permissions(&fixture, fs::Permissions::from_mode(0o755))
-            .expect("make fixture executable");
-
-        assert_eq!(capture_rustfetch_from(&fixture), None);
-        fs::remove_dir_all(dir).expect("remove fixture directory");
-    }
-
-    #[test]
-    fn centered_animation_leaves_final_fetch_visible_with_prompt_below() {
-        let out = sample_output();
-        let layout = parse_fetch_layout(&out).expect("layout");
-        let chunks = centered_animation_chunks(&layout, 24, 80);
-        let text = String::from_utf8(chunks.concat()).expect("ansi bytes");
-        assert!(text.starts_with("\x1b[?25l"));
-        assert!(!text.contains("\x1b[2K"));
-        assert!(text.ends_with("\x1b[0m\x1b[16;1H\x1b[0m\x1b[?25h"));
-        let final_frame = String::from_utf8(chunks.last().expect("final frame").clone())
-            .expect("final frame text");
-        for line in &layout.lines {
-            assert!(final_frame.contains(&line.logo));
-            assert!(!final_frame.contains(&line.info) || line.info.is_empty());
-        }
-    }
-
-    #[test]
-    fn centered_overlay_uses_absolute_positions_and_fade_frames() {
-        let out = sample_output();
-        let layout = parse_fetch_layout(&out).expect("layout");
-        let chunks = centered_animation_chunks(&layout, 24, 80);
-        assert_eq!(chunks.len(), FRAME_COUNT + 5);
-        for chunk in chunks.iter().skip(1).take(FRAME_COUNT + 3) {
-            assert!(chunk.starts_with(b"\x1b["));
-        }
+    fn composed_rows_never_shift_between_frames() {
+        let layout = compose(FetchArrangement::Below, &StartupArt::Native);
+        let frames = animation_frames(&layout, FetchArrangement::Below);
+        let rows = |f: &Vec<u8>| f.iter().filter(|b| **b == b'\n').count();
         assert!(
-            chunks[FRAME_COUNT + 1]
-                .windows(5)
-                .any(|window| window == b"\x1b[2m\x1b")
+            frames.windows(2).all(|w| rows(&w[0]) == rows(&w[1])),
+            "every animation frame keeps the same row count, so the block cannot move"
         );
     }
 
     #[test]
-    fn unicode_cell_width_controls_fit_and_final_prompt_position() {
-        assert_eq!(visible_width("A中"), 3);
-        assert_eq!(visible_width("e\u{0301}"), 1);
-        let layout = FetchLayout {
-            lines: vec![FetchLine {
-                logo: "中".to_string(),
-                info: "e\u{0301}".to_string(),
-            }],
-            logo_width: 2,
-        };
-        assert!(fits_centered_terminal(&layout, 4, 5));
-        assert!(fits_centered_terminal(&layout, 4, 4));
-        assert!(!fits_centered_terminal(&layout, 4, 3));
-        let final_frame = String::from_utf8(
-            centered_animation_chunks(&layout, 4, 5)
-                .last()
-                .expect("final frame")
-                .clone(),
-        )
-        .expect("final frame text");
-        assert_eq!(
-            final_frame,
-            "\x1b[2;2H\x1b[0m中\x1b[0m\x1b[3;1H\x1b[0m\x1b[?25h"
-        );
-    }
-
-    #[test]
-    fn positioned_frame_resets_each_info_row() {
-        let layout = FetchLayout {
-            lines: vec![
-                FetchLine {
-                    logo: "A".to_string(),
-                    info: "\x1b[31mone".to_string(),
-                },
-                FetchLine {
-                    logo: "B".to_string(),
-                    info: "two".to_string(),
-                },
-            ],
-            logo_width: 1,
-        };
-        let frame = String::from_utf8(positioned_frame(&layout, 0, 2, 3)).expect("frame");
-        assert!(frame.contains("\x1b[2;3H\x1b[0m"));
-        assert!(frame.contains("\x1b[3;3H\x1b[0m"));
-        assert!(!frame.contains("one"));
-        assert!(!frame.contains("two"));
-    }
-
-    #[test]
-    fn small_terminal_uses_static_fallback() {
-        let out = sample_output();
-        let layout = parse_fetch_layout(&out).expect("layout");
-        assert!(!fits_centered_terminal(&layout, 8, 80));
-        assert!(!fits_centered_terminal(&layout, 24, 18));
-        assert!(fits_centered_terminal(&layout, 24, 80));
-    }
-
-    #[test]
-    fn fade_strips_info_color_overrides() {
-        let colored = sample_output().replace(
-            "OS: Darwin (aarch64)",
-            "\x1b[38;2;255;0;0mOS: Darwin (aarch64)\x1b[0m",
-        );
-        let layout = parse_fetch_layout(&colored).expect("layout");
-        let fade = String::from_utf8(dimmed_frame(&layout, 40, 9, 10)).expect("fade");
-        assert!(fade.contains("\x1b[38;2;40;40;40m"));
-        assert!(!fade.contains("\x1b[38;2;255;0;0m"));
-        assert!(!fade.contains("OS: Darwin (aarch64)"));
-    }
-
-    #[test]
-    fn colored_info_uses_visible_columns_for_split_fit_and_final_frame() {
-        let colored = sample_output().replace(
-            "------------------------------",
-            "\x1b[38;2;255;0;0m------------------------------\x1b[0m",
-        );
-        let layout = parse_fetch_layout(&colored).expect("colored layout");
-        assert_eq!(layout.logo_width, 17);
-        assert!(fits_centered_terminal(&layout, 24, 80));
-        let final_frame = String::from_utf8(
-            centered_animation_chunks(&layout, 24, 80)
-                .last()
-                .expect("final frame")
-                .clone(),
-        )
-        .expect("final frame text");
-        assert!(final_frame.starts_with("\x1b[9;32H\x1b[0m"));
-        assert!(!final_frame.contains("\x1b[38;2;255;0;0m------------------------------\x1b[0m"));
-        assert!(final_frame.ends_with("\x1b[0m\x1b[16;1H\x1b[0m\x1b[?25h"));
-        assert!(!final_frame.contains("\x1b[2K"));
-    }
-
-    #[test]
-    fn ansi_adjacent_to_split_keeps_logo_visible_and_info_styled() {
-        let layout = parse_fetch_layout("AB\x1b[0m\x1b[32m--- info").expect("layout");
-        assert_eq!(layout.logo_width, 2);
-        assert_eq!(layout.lines[0].logo, "AB");
-        assert_eq!(visible_width(&layout.lines[0].logo), 2);
-        assert!(layout.lines[0].info.starts_with("\x1b[32m---"));
-    }
-
-    #[test]
-    fn consecutive_phases_recolor_the_same_logo_glyph() {
-        let layout = parse_fetch_layout(&sample_output()).expect("layout");
-        let frames: Vec<String> = (0..FRAME_COUNT)
-            .map(|phase| String::from_utf8(frame_bytes(&layout, phase)).expect("utf8"))
-            .collect();
-        let glyph = layout
-            .lines
-            .iter()
-            .flat_map(|line| line.logo.chars())
-            .find(|ch| *ch != ' ')
-            .expect("logo glyph");
-        let mut unique_sgr = std::collections::HashSet::new();
-        for frame in &frames {
-            let needle = format!("m{glyph}\x1b[0m");
-            let at = frame.find(&needle).expect("colored glyph");
-            let sgr_start = frame[..at].rfind("\x1b[38;2;").expect("sgr");
-            unique_sgr.insert(frame[sgr_start..at + 1].to_string());
-        }
-        assert_eq!(frames.len(), FRAME_COUNT);
-        assert_eq!(unique_sgr.len(), FRAME_COUNT);
-        for pair in frames.windows(2) {
-            assert_ne!(pair[0], pair[1]);
-        }
-    }
-
-    #[test]
-    fn should_run_requires_supported_first_argument() {
-        assert!(should_run_animated_fetch(&["+animated-fetch".to_string()]));
-        assert!(should_run_animated_fetch(&["+rustfetch".to_string()]));
-        assert!(!should_run_animated_fetch(&["normal".to_string()]));
-        assert!(!should_run_animated_fetch(&[
-            "normal".to_string(),
-            "+rustfetch".to_string(),
-        ]));
-    }
-
-    #[test]
-    fn chunks_flatten_to_inline_bytes() {
-        let out = sample_output();
-        let layout = parse_fetch_layout(&out).expect("layout");
-        let chunks = animation_chunks(&layout, &out);
-        assert_eq!(chunks.len(), FRAME_COUNT + 1);
-        assert_eq!(chunks.concat(), inline_animation_bytes(&layout, &out));
-        let height = layout.lines.len();
-        let prefix = format!("\x1b[{height}A\r").into_bytes();
+    fn arrangements_have_expected_shapes() {
+        let hidden = compose(FetchArrangement::Hidden, &StartupArt::Native);
+        let below = compose(FetchArrangement::Below, &StartupArt::Native);
+        let beside = compose(FetchArrangement::Beside, &StartupArt::Native);
         assert!(
-            !chunks[0].starts_with(&prefix),
-            "first chunk has no CUU prefix"
+            hidden.lines.iter().all(|l| l.info.is_empty()),
+            "hidden shows art only"
         );
         assert!(
-            chunks[0].windows(7).any(|w| w == b"\x1b[38;2;"),
-            "first chunk contains truecolor"
+            below.lines.len() > hidden.lines.len(),
+            "below adds info rows beneath the art"
         );
-        for chunk in &chunks[1..] {
-            assert!(
-                chunk.starts_with(&prefix),
-                "subsequent chunks start with CUU prefix"
-            );
-        }
         assert!(
-            chunks.last().unwrap().ends_with(&logo_only_bytes(&layout)),
-            "last chunk ends with logo only"
+            beside.lines.len() <= below.lines.len(),
+            "beside is shorter than stacked"
         );
-        assert_eq!(
-            chunks.last().unwrap()[prefix.len()..],
-            logo_only_bytes(&layout)
+        assert!(
+            beside
+                .lines
+                .iter()
+                .any(|l| !l.logo.is_empty() && !l.info.is_empty()),
+            "beside pairs art and info on one row"
         );
-        assert!(!String::from_utf8_lossy(chunks.last().unwrap()).contains("jamie@host"));
     }
 
     #[test]
-    fn production_uses_same_chunks() {
-        let out = sample_output();
-        let layout = parse_fetch_layout(&out).expect("layout");
-        let chunks = animation_chunks(&layout, &out);
-        let frames = animation_frames(&layout);
-        assert_eq!(chunks.len(), FRAME_COUNT + 1);
-        assert_eq!(frames.len(), FRAME_COUNT);
-        assert_eq!(chunks[0], frames[0]);
-        let height = layout.lines.len();
-        let prefix = format!("\x1b[{height}A\r").into_bytes();
-        for idx in 1..FRAME_COUNT {
-            let mut expected = prefix.clone();
-            expected.extend_from_slice(&frames[idx]);
-            assert_eq!(chunks[idx], expected);
-        }
+    fn missing_custom_art_does_not_panic() {
+        let art = StartupArt::parse("file:/nonexistent/mr-crabs-art.txt").unwrap_or_default();
+        let layout = compose(FetchArrangement::Below, &art);
+        assert!(!layout.lines.is_empty(), "falls back with content");
     }
 
     #[test]
-    fn fits_terminal_rejects_narrow_width() {
-        let out = sample_output();
-        let layout = parse_fetch_layout(&out).expect("layout");
+    fn composition_carries_real_system_facts() {
+        let layout = compose(FetchArrangement::Below, &StartupArt::Native);
+        let text: String = layout.lines.iter().map(|l| l.info.clone()).collect();
+        assert!(text.contains('@'), "title row present");
         assert!(
-            !fits_terminal(&layout, &out, 24, 20),
-            "narrow cols must fallback to static"
+            text.contains("Kernel") || text.contains("CPU"),
+            "facts present"
         );
-        assert!(
-            !fits_terminal(&layout, &out, 24, 30),
-            "cols shorter than longest line must fallback"
-        );
-        assert!(fits_terminal(&layout, &out, 24, 80));
-        assert!(
-            !fits_terminal(&layout, &out, 7, 80),
-            "exact height without spare row must fallback"
-        );
-        assert!(fits_terminal(&layout, &out, 8, 80), "height+1 fits");
     }
 }

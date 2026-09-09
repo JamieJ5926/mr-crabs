@@ -1,0 +1,6 @@
+run_id=open4
+burst_ms=40
+burst_count=20
+started=2026-08-31 21:24:01
+exit_status=0
+2026-08-31 21:24:49

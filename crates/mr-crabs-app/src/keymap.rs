@@ -122,12 +122,13 @@ pub fn default_keybindings() -> Vec<KeyBindingDef> {
     vec![
         KeyBindingDef::new("cmd+shift+n", AppAction::NewWindow),
         KeyBindingDef::new("cmd+t", AppAction::NewTab),
-        // close_surface semantics: closes the focused pane; the last pane
-        // closes the tab, and the last tab closes the window.
-        KeyBindingDef::new("cmd+w", AppAction::ClosePane),
+        KeyBindingDef::new("cmd+w", AppAction::CloseTab),
         KeyBindingDef::new("cmd+shift+w", AppAction::CloseWindow),
+        KeyBindingDef::new("cmd+alt+w", AppAction::ClosePane),
         KeyBindingDef::new("cmd+]", AppAction::NextTab),
         KeyBindingDef::new("cmd+[", AppAction::PreviousTab),
+        KeyBindingDef::new("cmd+alt+]", AppAction::NextPane),
+        KeyBindingDef::new("cmd+alt+[", AppAction::PreviousPane),
         KeyBindingDef::new("cmd+d", AppAction::NewSplitRight),
         KeyBindingDef::new("cmd+shift+d", AppAction::NewSplitDown),
         KeyBindingDef::new("ctrl+cmd+up", AppAction::GotoSplitUp),
@@ -241,10 +242,19 @@ mod tests {
     #[test]
     fn defaults_cover_the_shell_action_surface() {
         let bindings = default_keybindings();
-        assert_eq!(bindings.len(), 20);
+        assert_eq!(bindings.len(), 23);
         let resolver = KeymapResolver::new(bindings);
         assert!(resolver.invalid.is_empty());
         assert_eq!(resolver.resolve("cmd+t", ""), Some(AppAction::NewTab));
+        assert_eq!(resolver.resolve("cmd+w", ""), Some(AppAction::CloseTab));
+        assert_eq!(
+            resolver.resolve("cmd+shift+w", ""),
+            Some(AppAction::CloseWindow)
+        );
+        assert_eq!(
+            resolver.resolve("cmd+alt+w", ""),
+            Some(AppAction::ClosePane)
+        );
         assert_eq!(
             resolver.resolve("cmd+d", ""),
             Some(AppAction::NewSplitRight)
@@ -274,6 +284,55 @@ mod tests {
             resolver.resolve("cmd+shift+h", ""),
             Some(AppAction::SearchPrevious)
         );
+        assert_eq!(resolver.resolve("cmd+alt+]", ""), Some(AppAction::NextPane));
+        assert_eq!(
+            resolver.resolve("cmd+alt+[", ""),
+            Some(AppAction::PreviousPane)
+        );
+    }
+
+    #[test]
+    fn default_close_chords_match_macos_terminal_convention() {
+        let resolver = KeymapResolver::new(default_keybindings());
+        assert_eq!(resolver.resolve("cmd+w", ""), Some(AppAction::CloseTab));
+        assert_eq!(
+            resolver.resolve("cmd+shift+w", ""),
+            Some(AppAction::CloseWindow)
+        );
+        assert!(
+            resolver.bindings_for_action(AppAction::CloseTab).len() == 1
+                && resolver.bindings_for_action(AppAction::CloseWindow).len() == 1
+        );
+    }
+
+    #[test]
+    fn default_bindings_do_not_share_a_chord() {
+        let mut seen = std::collections::HashSet::new();
+        for def in default_keybindings() {
+            let stroke = ShellKeystroke::parse(&def.keys).expect("default chord parses");
+            assert!(
+                seen.insert(stroke.clone()),
+                "duplicate default chord {:?}",
+                def.keys
+            );
+        }
+    }
+
+    #[test]
+    fn palette_only_actions_stay_unbound() {
+        let resolver = KeymapResolver::new(default_keybindings());
+        for action in [
+            AppAction::CheckForUpdates,
+            AppAction::SetTextAnimationNone,
+            AppAction::SetTextAnimationStreaming,
+            AppAction::SetTextAnimationTypewriter,
+            AppAction::ToggleCursorTrail,
+        ] {
+            assert!(
+                resolver.bindings_for_action(action).is_empty(),
+                "{action:?} must stay palette/menu only"
+            );
+        }
     }
 
     #[test]

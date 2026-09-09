@@ -255,6 +255,73 @@ fn resize_reflow_joins_wrapped_rows_and_shorter_height_pages_history() {
     assert_eq!(tall.size(), size(4, 2));
 }
 
+fn numbered_visible_lines(engine: &CompactEngine) -> Vec<String> {
+    visible_text(engine)
+        .into_iter()
+        .map(|row| row.trim_end().to_string())
+        .filter(|row| !row.is_empty())
+        .collect()
+}
+
+#[test]
+fn reflow_narrower_does_not_insert_blank_rows_between_unwrapped_lines() {
+    let mut term = engine(20, 6);
+    feed(&mut term, b"38\r\n39\r\n40");
+    assert_eq!(numbered_visible_lines(&term), ["38", "39", "40"]);
+
+    term.resize(size(10, 6)).expect("narrow");
+    let rows: Vec<String> = visible_text(&term)
+        .into_iter()
+        .map(|row| row.trim_end().to_string())
+        .collect();
+    let numbered: Vec<&str> = rows
+        .iter()
+        .map(String::as_str)
+        .filter(|row| !row.is_empty())
+        .collect();
+    assert_eq!(numbered, ["38", "39", "40"]);
+    for window in numbered.windows(2) {
+        let left = rows.iter().position(|row| row == window[0]).expect("left");
+        let right = rows.iter().position(|row| row == window[1]).expect("right");
+        assert_eq!(
+            right,
+            left + 1,
+            "blank row inserted between numbered lines: {rows:?}"
+        );
+    }
+}
+
+#[test]
+fn reflow_narrower_keeps_genuinely_blank_output_lines() {
+    let mut term = engine(20, 6);
+    feed(&mut term, b"38\r\n\r\n40");
+    term.resize(size(10, 6)).expect("narrow");
+    let rows: Vec<String> = visible_text(&term)
+        .into_iter()
+        .map(|row| row.trim_end().to_string())
+        .collect();
+    assert_eq!(&rows[..3], &["38".to_string(), String::new(), "40".to_string()]);
+}
+
+#[test]
+fn reflow_narrower_keeps_wrapped_continuation_as_one_logical_line() {
+    let mut term = engine(8, 4);
+    for ch in "ABCDEFGHIJKL".chars() {
+        term.input(ch);
+    }
+    assert_ne!(term.visible_rows()[0][7].flags & flags::WRAPLINE, 0);
+    term.resize(size(4, 6)).expect("narrow");
+    let rows: Vec<String> = visible_text(&term)
+        .into_iter()
+        .map(|row| row.trim_end().to_string())
+        .collect();
+    assert_eq!(&rows[..3], &["ABCD".to_string(), "EFGH".to_string(), "IJKL".to_string()]);
+    let cells = term.visible_rows();
+    assert_ne!(cells[0][3].flags & flags::WRAPLINE, 0);
+    assert_ne!(cells[1][3].flags & flags::WRAPLINE, 0);
+}
+
+
 #[test]
 fn taller_primary_grid_restores_history_and_shifts_live_and_saved_cursor() {
     let mut term = engine(4, 3);

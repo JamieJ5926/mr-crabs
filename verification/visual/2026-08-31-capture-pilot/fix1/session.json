@@ -1,0 +1,15 @@
+{
+  "cursor": {
+    "present": true,
+    "sample_count": 39
+  },
+  "schema_version": 1,
+  "started_at_monotonic_ms": 1788158919742,
+  "video": {
+    "absolute_path": "/Users/jamie/Documents/Projects/active/mr-crabs/verification/visual/2026-08-31-capture-pilot/fix1/recording.mp4",
+    "duration_ms": 1388,
+    "finalized": true,
+    "path": "recording.mp4",
+    "present": true
+  }
+}

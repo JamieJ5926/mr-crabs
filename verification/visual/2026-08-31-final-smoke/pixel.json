@@ -1,0 +1,62 @@
+{
+  "paper_size": [
+    1536,
+    1128
+  ],
+  "harbor_size": [
+    1536,
+    1128
+  ],
+  "cluster_size": [
+    1536,
+    1128
+  ],
+  "paper_bg": {
+    "x": 80,
+    "y": 200,
+    "w": 80,
+    "h": 80,
+    "mean_rgba": [
+      244.0,
+      244.0,
+      244.0,
+      255.0
+    ],
+    "n": 6400
+  },
+  "harbor_bg": {
+    "x": 80,
+    "y": 200,
+    "w": 80,
+    "h": 80,
+    "mean_rgba": [
+      19.0,
+      22.0,
+      26.0,
+      255.0
+    ],
+    "n": 6400
+  },
+  "cluster_bg": {
+    "x": 80,
+    "y": 200,
+    "w": 80,
+    "h": 80,
+    "mean_rgba": [
+      19.0,
+      22.0,
+      26.0,
+      255.0
+    ],
+    "n": 6400
+  },
+  "paper_harbor_abs_rgb_delta": [
+    225.0,
+    222.0,
+    218.0
+  ],
+  "paper_harbor_luma_paper": 244.0,
+  "paper_harbor_luma_harbor": 21.651,
+  "paper_is_lighter": true,
+  "backgrounds_differ": true
+}

@@ -1,0 +1,1110 @@
+{
+  "_note": "Prefer `elements` — `tree_markdown` will continue to work but new fields will only be added to the structured side. Issue #22865: use `max_elements` / `max_depth` to bound the AX walk on apps with very large trees.",
+  "background_input": {
+    "exact_window": {
+      "pid": 42038,
+      "status": "matched",
+      "window_id": 3733
+    },
+    "observation": {
+      "frame_freshness": "unknown",
+      "one_shot_capture": "available"
+    },
+    "routes": [
+      {
+        "route": "accessibility",
+        "status": "available"
+      },
+      {
+        "route": "window_pointer",
+        "status": "available"
+      },
+      {
+        "route": "pid_keyboard",
+        "status": "available"
+      }
+    ]
+  },
+  "element_count": 102,
+  "elements": [
+    {
+      "depth": 0,
+      "element_index": 0,
+      "element_token": "s0000006b:0",
+      "frame": {
+        "h": 1128.0,
+        "w": 1536.0,
+        "x": 977.0,
+        "y": 198.0
+      },
+      "label": "Mr Crabs — shell",
+      "role": "AXWindow"
+    },
+    {
+      "depth": 1,
+      "element_index": 1,
+      "element_token": "s0000006b:1",
+      "enabled": true,
+      "frame": {
+        "h": 16.0,
+        "w": 16.0,
+        "x": 985.0,
+        "y": 206.0
+      },
+      "parent_index": 0,
+      "role": "AXButton"
+    },
+    {
+      "depth": 1,
+      "element_index": 2,
+      "element_token": "s0000006b:2",
+      "enabled": true,
+      "frame": {
+        "h": 16.0,
+        "w": 16.0,
+        "x": 1031.0,
+        "y": 206.0
+      },
+      "parent_index": 0,
+      "role": "AXButton"
+    },
+    {
+      "depth": 1,
+      "element_index": 3,
+      "element_token": "s0000006b:3",
+      "enabled": true,
+      "frame": {
+        "h": 16.0,
+        "w": 16.0,
+        "x": 1008.0,
+        "y": 206.0
+      },
+      "parent_index": 0,
+      "role": "AXButton"
+    },
+    {
+      "depth": 0,
+      "element_index": 4,
+      "element_token": "s0000006b:4",
+      "enabled": true,
+      "frame": {
+        "h": 30.0,
+        "w": 3440.0,
+        "x": 0.0,
+        "y": 0.0
+      },
+      "role": "AXMenuBar",
+      "selected": false
+    },
+    {
+      "depth": 1,
+      "element_index": 5,
+      "element_token": "s0000006b:5",
+      "enabled": true,
+      "frame": {
+        "h": 30.0,
+        "w": 34.0,
+        "x": 10.0,
+        "y": 0.0
+      },
+      "label": "Apple",
+      "parent_index": 4,
+      "role": "AXMenuBarItem",
+      "selected": false
+    },
+    {
+      "depth": 2,
+      "element_index": 6,
+      "element_token": "s0000006b:6",
+      "enabled": true,
+      "parent_index": 5,
+      "role": "AXMenu",
+      "selected": false
+    },
+    {
+      "depth": 3,
+      "element_index": 7,
+      "element_token": "s0000006b:7",
+      "enabled": true,
+      "label": "About This Mac",
+      "parent_index": 6,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 3,
+      "element_index": 8,
+      "element_token": "s0000006b:8",
+      "enabled": true,
+      "label": "System Information",
+      "parent_index": 6,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 3,
+      "element_index": 9,
+      "element_token": "s0000006b:9",
+      "enabled": true,
+      "label": "System Settings…, 1 update",
+      "parent_index": 6,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 3,
+      "element_index": 10,
+      "element_token": "s0000006b:10",
+      "enabled": true,
+      "label": "App Store",
+      "parent_index": 6,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 3,
+      "element_index": 11,
+      "element_token": "s0000006b:11",
+      "enabled": true,
+      "label": "Recent Items",
+      "parent_index": 6,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 4,
+      "element_index": 12,
+      "element_token": "s0000006b:12",
+      "enabled": true,
+      "parent_index": 11,
+      "role": "AXMenu",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 13,
+      "element_token": "s0000006b:13",
+      "enabled": true,
+      "label": "Activity Monitor",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 14,
+      "element_token": "s0000006b:14",
+      "enabled": true,
+      "label": "Show “Activity Monitor” in Finder",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 15,
+      "element_token": "s0000006b:15",
+      "enabled": true,
+      "label": "Ghostty",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 16,
+      "element_token": "s0000006b:16",
+      "enabled": true,
+      "label": "Show “Ghostty” in Finder",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 17,
+      "element_token": "s0000006b:17",
+      "enabled": true,
+      "label": "Hermes",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 18,
+      "element_token": "s0000006b:18",
+      "enabled": true,
+      "label": "Show “Hermes” in Finder",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 19,
+      "element_token": "s0000006b:19",
+      "enabled": true,
+      "label": "Hermes",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 20,
+      "element_token": "s0000006b:20",
+      "enabled": true,
+      "label": "Show “Hermes” in Finder",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 21,
+      "element_token": "s0000006b:21",
+      "enabled": true,
+      "label": "Karabiner-Elements",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 22,
+      "element_token": "s0000006b:22",
+      "enabled": true,
+      "label": "Show “Karabiner-Elements” in Finder",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 23,
+      "element_token": "s0000006b:23",
+      "enabled": true,
+      "label": "Mr Crabs",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 24,
+      "element_token": "s0000006b:24",
+      "enabled": true,
+      "label": "Show “Mr Crabs” in Finder",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 25,
+      "element_token": "s0000006b:25",
+      "enabled": true,
+      "label": "Safari",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 26,
+      "element_token": "s0000006b:26",
+      "enabled": true,
+      "label": "Show “Safari” in Finder",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 27,
+      "element_token": "s0000006b:27",
+      "enabled": true,
+      "label": "Spotify",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 28,
+      "element_token": "s0000006b:28",
+      "enabled": true,
+      "label": "Show “Spotify” in Finder",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 29,
+      "element_token": "s0000006b:29",
+      "enabled": true,
+      "label": "Terminal",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 30,
+      "element_token": "s0000006b:30",
+      "enabled": true,
+      "label": "Show “Terminal” in Finder",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 31,
+      "element_token": "s0000006b:31",
+      "enabled": true,
+      "label": "Zen",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 32,
+      "element_token": "s0000006b:32",
+      "enabled": true,
+      "label": "Show “Zen” in Finder",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 33,
+      "element_token": "s0000006b:33",
+      "enabled": true,
+      "label": ".omp",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 34,
+      "element_token": "s0000006b:34",
+      "enabled": true,
+      "label": "Show “.omp” in Finder",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 35,
+      "element_token": "s0000006b:35",
+      "enabled": true,
+      "label": "00-master-inventory.md",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 36,
+      "element_token": "s0000006b:36",
+      "enabled": true,
+      "label": "Show “00-master-inventory.md” in Finder",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 37,
+      "element_token": "s0000006b:37",
+      "enabled": true,
+      "label": "709ae81b7d2b9504f6c4c732f772c909.jpg",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 38,
+      "element_token": "s0000006b:38",
+      "enabled": true,
+      "label": "Show “709ae81b7d2b9504f6c4c732f772c909.jpg” in Finder",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 39,
+      "element_token": "s0000006b:39",
+      "enabled": true,
+      "label": "agent-profiles-reference.md",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 40,
+      "element_token": "s0000006b:40",
+      "enabled": true,
+      "label": "Show “agent-profiles-reference.md” in Finder",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 41,
+      "element_token": "s0000006b:41",
+      "enabled": true,
+      "label": "grill-roleprofiles-round1.md",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 42,
+      "element_token": "s0000006b:42",
+      "enabled": true,
+      "label": "Show “grill-roleprofiles-round1.md” in Finder",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 43,
+      "element_token": "s0000006b:43",
+      "enabled": true,
+      "label": "grok.csv",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 44,
+      "element_token": "s0000006b:44",
+      "enabled": true,
+      "label": "Show “grok.csv” in Finder",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 45,
+      "element_token": "s0000006b:45",
+      "enabled": true,
+      "label": "INVENTORY.md",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 46,
+      "element_token": "s0000006b:46",
+      "enabled": true,
+      "label": "Show “INVENTORY.md” in Finder",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 47,
+      "element_token": "s0000006b:47",
+      "enabled": true,
+      "label": "SESSION-REVIEW-2026-08-29-full.md",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 48,
+      "element_token": "s0000006b:48",
+      "enabled": true,
+      "label": "Show “SESSION-REVIEW-2026-08-29-full.md” in Finder",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 49,
+      "element_token": "s0000006b:49",
+      "enabled": true,
+      "label": "straggler-plan.md",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 50,
+      "element_token": "s0000006b:50",
+      "enabled": true,
+      "label": "Show “straggler-plan.md” in Finder",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 51,
+      "element_token": "s0000006b:51",
+      "enabled": true,
+      "label": "table(5).csv",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 52,
+      "element_token": "s0000006b:52",
+      "enabled": true,
+      "label": "Show “table(5).csv” in Finder",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 53,
+      "element_token": "s0000006b:53",
+      "enabled": true,
+      "label": "Macintosh HD",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 54,
+      "element_token": "s0000006b:54",
+      "enabled": true,
+      "label": "Clear Menu",
+      "parent_index": 12,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 3,
+      "element_index": 55,
+      "element_token": "s0000006b:55",
+      "enabled": true,
+      "label": "Force Quit…",
+      "parent_index": 6,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 3,
+      "element_index": 56,
+      "element_token": "s0000006b:56",
+      "enabled": true,
+      "label": "Force Quit mr-crabs",
+      "parent_index": 6,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 3,
+      "element_index": 57,
+      "element_token": "s0000006b:57",
+      "enabled": true,
+      "label": "Sleep",
+      "parent_index": 6,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 3,
+      "element_index": 58,
+      "element_token": "s0000006b:58",
+      "enabled": true,
+      "label": "Restart…",
+      "parent_index": 6,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 3,
+      "element_index": 59,
+      "element_token": "s0000006b:59",
+      "enabled": true,
+      "label": "Restart",
+      "parent_index": 6,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 3,
+      "element_index": 60,
+      "element_token": "s0000006b:60",
+      "enabled": true,
+      "label": "Shut Down…",
+      "parent_index": 6,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 3,
+      "element_index": 61,
+      "element_token": "s0000006b:61",
+      "enabled": true,
+      "label": "Shut Down",
+      "parent_index": 6,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 3,
+      "element_index": 62,
+      "element_token": "s0000006b:62",
+      "enabled": true,
+      "label": "Lock Screen",
+      "parent_index": 6,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 3,
+      "element_index": 63,
+      "element_token": "s0000006b:63",
+      "enabled": true,
+      "label": "Log Out Jamie…",
+      "parent_index": 6,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 3,
+      "element_index": 64,
+      "element_token": "s0000006b:64",
+      "enabled": true,
+      "label": "Log Out Jamie",
+      "parent_index": 6,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 1,
+      "element_index": 65,
+      "element_token": "s0000006b:65",
+      "enabled": true,
+      "frame": {
+        "h": 30.0,
+        "w": 80.0,
+        "x": 44.0,
+        "y": 0.0
+      },
+      "label": "mr-crabs",
+      "parent_index": 4,
+      "role": "AXMenuBarItem",
+      "selected": false
+    },
+    {
+      "depth": 2,
+      "element_index": 66,
+      "element_token": "s0000006b:66",
+      "enabled": true,
+      "parent_index": 65,
+      "role": "AXMenu",
+      "selected": false
+    },
+    {
+      "depth": 3,
+      "element_index": 67,
+      "element_token": "s0000006b:67",
+      "enabled": true,
+      "label": "Check for Updates",
+      "parent_index": 66,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 3,
+      "element_index": 68,
+      "element_token": "s0000006b:68",
+      "enabled": true,
+      "label": "Quick Terminal",
+      "parent_index": 66,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 3,
+      "element_index": 69,
+      "element_token": "s0000006b:69",
+      "enabled": true,
+      "label": "Secure Input",
+      "parent_index": 66,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 3,
+      "element_index": 70,
+      "element_token": "s0000006b:70",
+      "enabled": true,
+      "label": "Quit",
+      "parent_index": 66,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 1,
+      "element_index": 71,
+      "element_token": "s0000006b:71",
+      "enabled": true,
+      "frame": {
+        "h": 30.0,
+        "w": 42.0,
+        "x": 124.0,
+        "y": 0.0
+      },
+      "label": "File",
+      "parent_index": 4,
+      "role": "AXMenuBarItem",
+      "selected": false
+    },
+    {
+      "depth": 2,
+      "element_index": 72,
+      "element_token": "s0000006b:72",
+      "enabled": true,
+      "parent_index": 71,
+      "role": "AXMenu",
+      "selected": false
+    },
+    {
+      "depth": 3,
+      "element_index": 73,
+      "element_token": "s0000006b:73",
+      "enabled": true,
+      "label": "New Window",
+      "parent_index": 72,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 3,
+      "element_index": 74,
+      "element_token": "s0000006b:74",
+      "enabled": true,
+      "label": "New Tab",
+      "parent_index": 72,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 3,
+      "element_index": 75,
+      "element_token": "s0000006b:75",
+      "enabled": true,
+      "label": "Close Tab",
+      "parent_index": 72,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 3,
+      "element_index": 76,
+      "element_token": "s0000006b:76",
+      "enabled": true,
+      "label": "Close Window",
+      "parent_index": 72,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 1,
+      "element_index": 77,
+      "element_token": "s0000006b:77",
+      "enabled": true,
+      "frame": {
+        "h": 30.0,
+        "w": 50.0,
+        "x": 166.0,
+        "y": 0.0
+      },
+      "label": "View",
+      "parent_index": 4,
+      "role": "AXMenuBarItem",
+      "selected": false
+    },
+    {
+      "depth": 2,
+      "element_index": 78,
+      "element_token": "s0000006b:78",
+      "enabled": true,
+      "parent_index": 77,
+      "role": "AXMenu",
+      "selected": false
+    },
+    {
+      "depth": 3,
+      "element_index": 79,
+      "element_token": "s0000006b:79",
+      "enabled": true,
+      "label": "Command Palette",
+      "parent_index": 78,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 3,
+      "element_index": 80,
+      "element_token": "s0000006b:80",
+      "enabled": true,
+      "label": "Reload Configuration",
+      "parent_index": 78,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 3,
+      "element_index": 81,
+      "element_token": "s0000006b:81",
+      "enabled": true,
+      "label": "Search Next",
+      "parent_index": 78,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 3,
+      "element_index": 82,
+      "element_token": "s0000006b:82",
+      "enabled": true,
+      "label": "Search Previous",
+      "parent_index": 78,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 3,
+      "element_index": 83,
+      "element_token": "s0000006b:83",
+      "enabled": true,
+      "label": "New Split Right",
+      "parent_index": 78,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 3,
+      "element_index": 84,
+      "element_token": "s0000006b:84",
+      "enabled": true,
+      "label": "New Split Down",
+      "parent_index": 78,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 3,
+      "element_index": 85,
+      "element_token": "s0000006b:85",
+      "enabled": true,
+      "label": "Close Pane",
+      "parent_index": 78,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 1,
+      "element_index": 86,
+      "element_token": "s0000006b:86",
+      "enabled": true,
+      "frame": {
+        "h": 30.0,
+        "w": 69.0,
+        "x": 216.0,
+        "y": 0.0
+      },
+      "label": "Window",
+      "parent_index": 4,
+      "role": "AXMenuBarItem",
+      "selected": false
+    },
+    {
+      "depth": 2,
+      "element_index": 87,
+      "element_token": "s0000006b:87",
+      "enabled": true,
+      "parent_index": 86,
+      "role": "AXMenu",
+      "selected": false
+    },
+    {
+      "depth": 3,
+      "element_index": 88,
+      "element_token": "s0000006b:88",
+      "enabled": true,
+      "label": "Move & Resize",
+      "parent_index": 87,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 4,
+      "element_index": 89,
+      "element_token": "s0000006b:89",
+      "enabled": true,
+      "parent_index": 88,
+      "role": "AXMenu",
+      "selected": false
+    },
+    {
+      "depth": 4,
+      "element_index": 90,
+      "element_token": "s0000006b:90",
+      "enabled": true,
+      "parent_index": 87,
+      "role": "AXMenu",
+      "selected": false
+    },
+    {
+      "depth": 3,
+      "element_index": 91,
+      "element_token": "s0000006b:91",
+      "enabled": true,
+      "label": "Next Tab",
+      "parent_index": 87,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 3,
+      "element_index": 92,
+      "element_token": "s0000006b:92",
+      "enabled": true,
+      "label": "Previous Tab",
+      "parent_index": 87,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 3,
+      "element_index": 93,
+      "element_token": "s0000006b:93",
+      "enabled": true,
+      "label": "Next Pane",
+      "parent_index": 87,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 3,
+      "element_index": 94,
+      "element_token": "s0000006b:94",
+      "enabled": true,
+      "label": "Previous Pane",
+      "parent_index": 87,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 3,
+      "element_index": 95,
+      "element_token": "s0000006b:95",
+      "enabled": true,
+      "label": "Split Navigation",
+      "parent_index": 87,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 4,
+      "element_index": 96,
+      "element_token": "s0000006b:96",
+      "enabled": true,
+      "parent_index": 95,
+      "role": "AXMenu",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 97,
+      "element_token": "s0000006b:97",
+      "enabled": true,
+      "label": "Move Focus Up",
+      "parent_index": 96,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 98,
+      "element_token": "s0000006b:98",
+      "enabled": true,
+      "label": "Move Focus Down",
+      "parent_index": 96,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 99,
+      "element_token": "s0000006b:99",
+      "enabled": true,
+      "label": "Move Focus Left",
+      "parent_index": 96,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 5,
+      "element_index": 100,
+      "element_token": "s0000006b:100",
+      "enabled": true,
+      "label": "Move Focus Right",
+      "parent_index": 96,
+      "role": "AXMenuItem",
+      "selected": false
+    },
+    {
+      "depth": 3,
+      "element_index": 101,
+      "element_token": "s0000006b:101",
+      "enabled": true,
+      "label": "Mr Crabs — shell",
+      "parent_index": 87,
+      "role": "AXMenuItem",
+      "selected": false
+    }
+  ],
+  "elements_complete": false,
+  "pid": 42038,
+  "returned_element_count": 102,
+  "screenshot_frame_valid": true,
+  "screenshot_height": 1128,
+  "screenshot_mime_type": "image/png",
+  "screenshot_png_b64": "iVBORw0KGgoAAAANSUhEUgAABgAAAARoCAYAAADD1h91AACcU0lEQVR4Ae3AA6AkWZbG8f937o3IzKdyS2Oubdu2bdu2bdu2bWmMnpZKr54yMyLu+Xa3anqmhztr1a/yr1BK2Z7NZtfP5/OHLBaLh85ms5tns9mNXdedrLWejIjNWutmRGyUUjYiYh4Rc6666qqrrrrqqquuuuqqq6666qqrrrrqqquuuuqq55CZq8xctdaOMvNomqbDzDycpunCOI4X1uv1nev1+vblcvm01Wr19PV6fXdrbZ8XDeJfEBFb8/n8VXZ2dt7t2LFj78VVV1111VVXXXXVVVddddVVV1111VVXXXXVVVdd9d/i0qVL37O3t/cDq9XqjzLzgBcM8YLVjY2N173mmmu+ZDabvTRXXXXVVVddddVVV1111VVXXXXVVVddddVVV1111f8I6/X6r++7775POjo6+k1g4nlReD5KKadOnTr1Sdddd9231Vqv46qrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676H6PWet2xY8feQ5LW6/Xf2l7ynCg8l1LKdWfOnPmqEydOfDhXXXXVVVddddVVV1111VVXXXXVVVddddVVV1111f9YGxsbr1VKuXG5XP6h7QOejcIDlFJOnTlz5quOHTv2blx11VVXXXXVVVddddVVV1111VVXXXXVVVddddVV/+PN5/OXLKVcv1wuf8f2kisoPFs9derUJ504ceLDueqqq6666qqrrrrqqquuuuqqq6666qqrrrrqqqv+15jP5y9pe310dPR7QAIUnmljY+P1r7vuum/jqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvpfZ2Nj47WWy+UfjOP4VIAAiIita6655ku46qqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq/7Xuuaaa74kIrYAKsB8Pn+V2Wz20rwIFosFp06dYnt7m67rABjHkf39fc6fP89yueTfamNjg5MnT7K1tcV8PgdgtVpxcHDAhQsXODo64t9qsVhw6tQptre36boOgHEc2d/f5/z58yyXS6666qqrrrrqqquuuuqqq6666qqrrrrqqquuuup/s9ls9tLz+fxVjo6Ofq0AnDp16jPn8/lL8y+45ppruPnmm1ksFgzDwDRNTNNEZrK9vc2JEycAODw85F/rmmuu4YYbbmBjY4PMZL1eM44jEcHm5ibHjh1DEoeHh/xrXXPNNdx8880sFguGYWCaJqZpIjPZ3t7mxIkTABweHnLVVVddddVVV1111VVXXXXVVVddddVVV1111VX/y+XBwcFPl4jYvuGGG36Ef8E111zDNddcwzRNjOPIc5umCYDt7W0ADg8PeVFde+21XHvttWQmwzBgm/vZZpomIoKdnR0kcXh4yIvqmmuu4ZprrmGaJsZx5LlN0wTA9vY2AIeHh/xP1nUd29vbTNOEbf49Sik87GEP5/jx41y8eJH/qW666SauvfZaVqsV4zjyr1FK4REPexjHjh/n4sWLlFJ4+MMfxvHjx7l48SJXXXXVVVddddVVV1111VVXXXXVVVddddVV/9fM5/OXvnjx4lfWWuv1/AsWiwXXXHMN0zTRWuMFaa0BcM0117C/v89yueRfMpvNOH36NOM40lrjBZmmCducPn2a3d1d1us1/5LFYsE111zDNE201nhBWmsAXHPNNezv77NcLvn3eO3Xem0Q3HXXXTzpSU/igV7u5V6One1tLu5e4q//+q94UR07doxHPvzhbG5tQ4DTnDt3jic84Qm01vi3KKVw0003Mk0TT3va0/if6syZ0xzbOc65c+c4OjriX6OUwg033cQwTTztaU+jlMJNN97EMI487WlP46qrrrrqqquuuuqqq6666qqrrrrqqquuuur/olrr9dF13UP4F5w6dQpJtNb4l7TWkMSpU6d4UZw5c4aIoLXGv6S1RkRw5swZXhSnTp1CEq01/iWtNSRx6tQp/r3SCYLrrruOUgr329raYnt7hzQgXmSbm5u82Eu8BJvb2xwdHnDvPfeyHkfOnDnNS77US/LvYgDzP5uw+DcTBsz90mCJq6666qqrrrrqqquuuuqqq6666qqrrrrqqv+ruq57SO267qH8C7a3t1mtVryoVqsV29vbvCi2t7dZrVa8qFarFdvb27wotre3Wa1WvKhWqxXb29v8e9mAISI4c+YM99xzDwA3Xn8DkEhCGIAbb7yRG2+8kQsXLrC9vc3W5iZ/8id/wjCO3O9BD7qZvlYuXLzI3/7N3wDQdR2v9IqvyLGd42xvbzNNEy/xEi/FelhydHjENddcw9Of/nTOnz/PIx7+CHaO7VBL4fDokKc97elcvHiRywQ23Hzzzdx00024mbPnz/LUpz4VgI2NDR7x8Ieztb2DBPv7+zzlKU/h8PCQ/0jXXnstt9x0E4uNTcZp5Nz5czztqU+jtUYAAnaOH+PhD3848/mc3d1LPP7xj2OaJgAe+tCHcerUaWbzjr1L+zzjGbdy6dIlAOxAFveTIDBXXXXVVVddddVVV1111VVXXXXVVVddddVV/1d1XffQqLXezL+g6zr+tbqu40XRdR3/Wl3X8aLouo5/ra7r+PeSYBpHhmnkuuuuA6CUwqlrr2F5uMIYzGVd17OxscFNN93EbLHg4PAI85w2t3Yw5o7bb+d+4zjyV3/91/zN3/w16/WaiGBzY8aJ4ye4/rrrWB0d0Vrj0Y9+FKfPnObg4ICzFy6wvbXDi734iyMJABtq1/HgBz+Y1WpFP59x88038eAHPxiARz/m0Rw/eZL7zt7Lfffdx4njx3mxF3sx/iPNZjMe85jHMFssuO3221itltx4w4086EEPAqABxjzoplsY1gMgTpw+yYMf8mAAHvGIR3DLg26GnLj33vs4fvwYL/mSL8nGxgYAyFjmfsZgrrrqqquuuuqqq6666qqrrrrqqquuuuqqq/7PqrXeXLuuu5Gr/sNlmvvO3sdNN93MxsYGOzs79F3lqc94Bg976MOxxBUGYG9vj7/6q7/CNg8kiY3FAlksl0se6PDwkMPDQwBqrVjgNH/+F3/B0dERAPv7+wgYxpGu67juzBlqVDY3NxmGAYnL/vZv/5ZLly5xww038MhHPpLTJ09y6623spjNETAOI+fOneP2228nM3lup0+fZmdnGyME2FwmARgQ9zt79iz7+/vcb7FYAJCtsVwuue+++7DNNE0ACJDFU5/+VO644w5uvPFGHvmIR7C5sQXA9TfcCAlPedrTmKaJvus4c+YMp06d4t577wVMmGeRgxRXXXXVVVddddVVV1111VVXXXXVVVddddVV/2d1XXdjjYiT/AvGceRfaxxHXhTjOPKvNY4jL4pxHPnXGseR/xCCu+++m5tuupHrr7+e7e1txmHg3LlzPOxhDwNzmcRlly5dwjbPzTbr9Zr5fM5iMWe5XHK/rutQBG2akMAW6/WKo6Mj7nfixAke/KAHU/sOYQCQAXG/zOTSpUsAXNjdBcF8YwOApz396Tz84Q/nwQ9+MA9+8IOZxpHb77iDZzzjGTzQmTNnuObaa5EB8QBGiASEEWK1XrO/v8/9Ll26xH333ceZM2d49GMegwRH+wc88clP5tKlS1wmODo6BODo6IjElBIsFgtCgOAlX+qlkAFx2dbWNvfeey9CGPEsMrK46qqrrrrqqquuuuqqq6666qqrrrrqqquu+r8qIk7WUspJ/gX7+/ucOHGC1WrFi2I+n3Px4kVeFPv7+5w4cYLVasWLYj6fc/HiRV4U+/v7nDhxgtVqxYtiPp9z8eJF/v2MBYeHh1y6tMf1N1xPKZU777iDzEQCyQDYAoTNC7S3t898PuPGG27iwoWLAJRSePmXf3nm8xl/9Vd/wzCsEQDifl3X8fCHP5zM5O/+9m85PDzkZV7uZVnMZkjmfhGFjY0Njo6O2NnaQoblcgXAPffcw3333cfOzg4nTpzg5ltu5iEPfgj33HMP6/Wa+z3jGc/g7rvvBgQYBFiAuUKAATg6OuKBbPP4xz+epzzlKRw/fpzrr7uOEydP8rCHPYy//Mu/xAAYmysMQWCb1WpFpgmJP/zDP8A2kogIWmtEBOY5SSCZq6666qqrrrrqqquuuuqqq6666qqrrrrqqv+rSiknayllk3/B+fPnOX78OKUUWmu8MKUUbHP+/HleFGfPnuXYsWOUUmit8cKUUshMzp49y4vi/PnzHD9+nFIKrTVemFIKtjl//jz/fkLJZffccw+PftQjseHuu+8GwBaYyywDRjIvyG23PYOTJ09w6vQpXvZlX5aDgwOOHz9OP5uxv3/E7u5FNjY2MADmuUWInZ0drr32WmbdHBtsnskAvORLvxR7u5c4efIUBnZ3L1BK4VVf9VWJCG699VbW6zVOk5hpmnigo6Mjjo6O+Le45ppreOxjH8PqaMkzbrud9WoAmfV6DYAAEM8iMAYJ25w/f44zZ07zmMc+hgvnL3DttdeyvbXNk578JM6dO4cwYO5nC5urrrrqqquuuuqqq6666qqrrrrqqquuuuqq/7NKKZsBbPIvWC6X3HfffdRaKaXwgpRSqLVy3333sVwueVGs12vOnTtH13XUWnlBaq10Xce5c+dYr9e8KJbLJffddx+1VkopvCClFGqt3HfffSyXS/69jEFcdt999zG2ZG//EoeHhwCAsQRAWFxmXqCDgwP+7u/+jv39fXZ2trnhhhtYLBZcOH+ev/mbv+J+wXMax5FnPOMZpOEhD34Q8/mc9foQMM8mpmli98J5rrnmGiLE2bPneNrTnk5rjcc//vGsx4GHPOShPOIRj2CaRh7/uMfRWuM/ytmzZ7nj9jvo53Me9ehHce0N13Hx4iWe9rSnAWAAxP1sAxA2AE94whO479w5jh87xsMf/nA2Nje47fbbuOuuuwBIhMQDGBBXXXXVVVddddVVV1111VVXXXXVVVddddVV/4dt6mEPe9idtdYbeBFcc801XHPNNUhitVrxQPP5HNvcd9993HffffxrXXPNNZw+fZpSCuM40loDoJRC13W01jh37hz33Xcf/1rXXHMN11xzDZJYrVY80Hw+xzb33Xcf9913H//T1VpZzBccLY9orfGikEStlXEceWFKKQC01nhufd9jm3Ec+c80m82YponWGv9akuj7nmEYsM1VV1111VVXXXXVVVddddVVV1111VVXXXXV/1fTNN2lRzziERcj4jgvosViwalTp9je3qbrOgDGcWR/f5/z58+zXC75t9rY2ODkyZNsbW0xn88BWK1WHBwccOHCBY6Ojvi3WiwWnDp1iu3tbbquA2AcR/b39zl//jzL5ZKrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676vyAzd/WIRzxiGRFzrrrqqquuuuqqq6666qqrrrrqqquuuuqqq6666qr/EzJzVSNizlVXXXXVVVddddVVV1111VVXXXXVVVddddVVV131f0ZEzIOrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq6666v8agquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrrrq/xqCq6666qqrrrrqqquuuuqqq6666qqrrrrqqquuuur/GoKrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq6666v8agquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrrrq/xqCq6666qqrrrrqqquuuuqqq6666qqrrrrqqquuuur/Guo0TVx11VVXXXXVVVddddVVV1111VVXXXXVVVddddVV/6eg7e1tc9VVV1111VVXXXXVVVddddVVV1111VVXXXXVVVf9X0Jw1VVXXXXVVVddddVVV1111VVXXXXVVVddddVVV/1fQ3DVVVddddVVV1111VVXXXXVVVddddVVV1111VVX/V9DcNVVV1111VVXXXXVVVddddVVV1111VVXXXXVVVf9X0Nw1VVXXXXVVVddddVVV1111VVXXXXVVVddddVVV/1fQ3DVVVddddVVV1111VVXXXXVVVddddVVV1111VVX/V9DcNVVV1111VVXXXXVVVddddVVV1111VVXXXXVVVf9X0Nw1VVXXXXVVVddddVVV1111VVXXXXVVVddddVVV/1fQ3DVVVddddVVV1111VVXXXXVVVddddVVV1111VVX/V9DcNVVV1111VVXXXXVVVddddVVV1111VVXXXXVVVf9X0PlRXRse5Orrrrqqquuuuqqq6666qqrrrrqqquuuuqqq6666j/Ppf1D/oMQXHXVVVddddVVV1111VVXXXXVVVddddVVV1111VX/1xBcddVVV1111VVXXXXVVVddddVVV1111VVXXXXVVf/XEFx11VVXXXXVVVddddVVV1111VVXXXXVVVddddVV/9cQXHXVVVddddVVV1111VVXXXXVVVddddVVV1111VX/1xBcddVVV1111VVXXXXVVVddddVVV1111VVXXXXVVf/XEFx11VVXXXXVVVddddVVV1111VVXXXXVVVddddVV/9cQXHXVVVddddVVV1111VVXXXXVVVddddVVV1111VX/1xBcddVVV1111VVXXXXVVVddddVVV1111VVXXXXVVf/XEFx11VVXXXXVVVddddVVV1111VVXXXXVVVddddVV/9cQXHXVVVddddVVV1111VVXXXXVVVddddVVV1111VX/1xBcddVVV1111VVXXXXVVVddddVVV1111VVXXXXVVf/XEFx11VVXXXXVVVddddVVV1111VVXXXXVVVddddVV/9cQXHXVVVddddVVV1111VVXXXXVVVddddVVV1111VX/1xBcddVVV1111VVXXXXVVVddddVVV1111VVXXXXVVf/XEFx11VVXXXXVVVddddVVV1111VVXXXXVVVddddVV/9cQXHXVVVddddVVV1111VVXXXXVVVddddVVV1111VX/1xBcddVVV1111VVXXXXVVVddddVVV1111VVXXXXVVf/XEFx11VVXXXXVVVddddVVV1111VVXXXXVVVddddVV/9cQXHXVVVddddVVV1111VVXXXXVVVddddVVV1111VX/1xBcddVVV1111VVXXXXVVVddddVVV1111VVXXXXVVf/XEFx11VVXXXXVVVddddVVV1111VVXXXXVVVddddVV/9cQXHXVVVddddVVV1111VVXXXXVVVddddVVV1111VX/1xBcddVVV1111VVXXXXVVVddddVVV1111VVXXXXVVf/XEFx11VVXXXXVVVddddVVV1111VVXXXXVVVddddVV/9dQeRFd2j/kqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvpfgeCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G+pKPfShXXXXVVVddddVVV1111VVXXXXVVVddddVVV1111f8p6NrTJ81VV1111VVXXXXVVVddddVVV1111VVXXXXVVVdd9X8JwVVXXXXVVVddddVVV1111VVXXXXVVVddddVVV131fw3BVVddddVVV1111VVXXXXVVVddddVVV1111VVXXfV/DcFVV1111VVXXXXVVVddddVVV1111VVXXXXVVVdd9X8NwVVXXXXVVVddddVVV1111VVXXXXVVVddddVVV131fw3BVVddddVVV1111VVXXXXVVVddddVVV1111VVXXfV/DcFVV1111VVXXXXVVVddddVVV1111VVXXXXVVVdd9X8NwVVXXXXVVVddddVVV1111VVXXXXVVVddddVVV131fw3BVVddddVVV1111VVXXXXVVVddddVVV1111VVXXfV/DcFVV1111VVXXXXVVVddddVVV1111VVXXXXVVVdd9X8NwVVXXXXVVVddddVVV1111VVXXXXVVVddddVVV131fw3BVVddddVVV1111VVXXXXVVVddddVVV1111VVXXfV/DcFVV1111VVXXXXVVVddddVVV1111VVXXXXVVVdd9X8NwVVXXXXVVVddddVVV1111VVXXXXVVVddddVVV131fw3BVVddddVVV1111VVXXXXVVVddddVVV1111VVXXfV/DcFVV1111VVXXXXVVVddddVVV1111VVXXXXVVVdd9X8NwVVXXXXVVVddddVVV1111VVXXXXVVVddddVVV131fw2V/8X+5i9/H4CXetlX56qrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq656Fir/BxytR6666qqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqZyG46qqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq/6vIbjqqquuuuqqq6666qqrrrrqqquuuuqqq6666qqr/q8huOqqq6666qqrrrrqqquuuuqqq6666qqrrrrqqqv+r6HyX+QVH3OcW84sADh/MPBbf3meq6666qqrrrrqqquuuuqqq6666qqrrrrqqquuuuo/BZX/ItnMB7/VLUgBQLYn8zt/c46rrrrqqquuuuqqq6666qqrrrrqqquuuuqqq6666j8cwX+RP3/SJb73V+/kfp/wzg/hpmsWXHXVVVddddVVV1111VVXXXXVVVddddVVV1111VX/4Qj+C33vr97Bnz3hAgCLWeVz3vtR9H3hqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvoPRfBfyfCFP/BUzu6uAXjwdQs+9h0ewlVXXXXVVVddddVVV1111VVXXXXVVVddddVVV131H4rgv9je4cTnfPeTmFoD4A1e7gxv/qrXctVVV1111VVXXXXVVVddddVVV1111VVXXXXVVVf9hyH4b/DEO4+46/ya+73OS5/kqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvoPQ+W/wQe86c3ccs0GAPvLkS/9oadx1VVXXXXVVVddddVVV1111VVXXXXVVVddddVVV/2HofJf7NVf4iTv+Do3AGAnX/wDT+Pei2uuuuqqq6666qqrrrrqqquuuuqqq6666qqrrrrqqv8wVP4LXX9ywSe+y8O43w/95p388eMucNVVV1111VVXXXXVVVddddVVV1111VVXXXXVVVf9h6LyX6Qvhc9+n4ezOa8A/PVTdvnOX76Lq6666qqrrrrqqquuuuqqq6666qqrrrrqqquuuuo/HJX/Iu/5Jjfy8Bu3ADi/N/B53/cU3JKrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq6666j8cuvb0SfO/1N/85e8D8IgXeyWuuuqqq6666qqrrrrqqquuuuqqq6666qqrrrrqqmchuOqqq6666qqrrrrqqquuuuqqq6666qqrrrrqqqv+ryG46qqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq/6vIbjqqquuuuqqq6666qqrrrrqqquuuuqqq6666qqr/q9B154+af6XOlqPXHXVVVddddVVV1111VVXXXXVVVddddVVV1111VXPg+Cqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+G4Kqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq676v4bgqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvq/huCqq6666qqrrrrqqquuuuqqq6666qqrrrrqqquu+r+Gyv9iG7OOq6666qqrrrrqqquuuuqqq6666qqrrrrqqquuuup5EFx11VVXXXXVVVddddVVV1111VVXXXXVVVddddVV/9cQXHXVVVddddVVV1111VVXXXXVVVddddVVV1111VX/1xBcddVVV1111VVXXXXVVVddddVVV1111VVXXXXVVf/XEFx11VVXXXXVVVddddVVV1111VVXXXXVVVddddVV/9cQXHXVVVddddVVV1111VVXXXXVVVddddVVV1111VX/1xBcddVVV1111VVXXXXVVVddddVVV1111VVXXXXVVf/XEFx11VVXXXXVVVddddVVV1111VVXXXXVVVddddVV/9cQXHXVVVddddVVV1111VVXXXXVVVddddVVV1111VX/1xBcddVVV1111VVXXXXVVVddddVVV1111VVXXXXVVf/XEFx11VVXXXXVVVddddVVV1111VVXXXXVVVddddVV/9cQXHXVVVddddVVV1111VVXXXXVVVddddVVV1111VX/11DH1rjqqquuuuqqq6666qqrrrrqqquuuuqqq6666qqr/k8huOqqq6666qqrrrrqqquuuuqqq6666qqrrrrqqqv+ryG46qqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq/6vIbjqqquuuuqqq6666qqrrrrqqquuuuqqq6666qqr/q8huOqqq6666qqrrrrqqquuuuqqq6666qqrrrrqqqv+ryG46qqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq/6vIbjqqquuuuqqq6666qqrrrrqqquuuuqqq6666qqr/q8hhFZcddVVV1111VVXXXXVVVddddVVV1111VVXXXXVVf9nCK0iW6646qqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq/7PyJarsHzEVVddddVVV1111VVXXXXVVVddddVVV1111VVXXfV/huWjKjjiqquuuuqqq6666qqrrrrqqquuuuqqq6666qqrrvo/Q3AU2XzIVVddddVVV1111VVXXXXVVVddddVVV1111VVXXfV/RjYfVotDrrrqqquuuuqqq6666qqrrrrqqquuuuqqq6666qr/MywOq/EFrrrqqquuuuqqq6666qqrrrrqqquuuuqqq6666qr/M4wvhKe8wFVXXXXVVVddddVVV1111VVXXXXVVVddddVVV131f4anvFDTvpOrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq6666v+MtO+szXk7V1111VVXXXXVVVddddVVV1111VVXXXXVVVddddX/Gc15e83007jqqquuuuqqq6666qqrrrrqqquuuuqqq6666qqr/s/I9NNqZj6dq6666qqrrrrqqquuuuqqq6666qqrrrrqqquuuur/jMx8es3Mu7nqqquuuuqqq6666qqrrrrqqquuuuqqq6666qqr/s/IzLvD9v56GL6Hq6666qqrrrrqqquuuuqqq6666qqrrrrqqquuuup/vfUwfI/t/QAYhukHuOqqq6666qqrrrrqqquuuuqqq6666qqrrrrqqqv+1xuG6QcAAmCapj9qY/trrrrqqquuuuqqq6666qqrrrrqqquuuuqqq6666qr/tdrY/nqapj8CCADbB0fr9Sdx1VVXXXXVVVddddVVV1111VVXXXXVVVddddVVV/2vdbRef5LtA4DCM2XmM6RQreW1uOqqq6666qqrrrrqqquuuuqqq6666qqrrrrqqqv+V1mths9br9ffDSRA4dlyau1vi+LGUstLctVVV1111VVXXXXVVVddddVVV1111VVXXXXVVVf9rzCsxx84Wq0+GzjkCgrPaTm19oehuL7U8pJcddVVV1111VVXXXXVVVddddVVV1111VVXXXXVVf+jDevxB45Wq4+3fZZno/BcbB+M0/Q7Qutay2tx1VVXXXXVVVddddVVV1111VVXXXXVVVddddVVV/2PtFoNn3e0Wn227bM8JwrP33Kcpt+bWv5BVbxElLiOq6666qqrrrrqqquuuuqqq6666qqrrrrqqquuuup/hDa2vz5crt5rvV5/N3DI80L8CyRt1Vpfpe/ru836/r246qqrrrrqqquuuuqqq6666qqrrrrqqquuuuqqq/5brIfhe4Zh+oFpmv7I9gEvGOJfQdJ2RFwfEQ+J0EOL4uaQblSNk0InZTajaNOwIWsjSsyN51x11VVXXXXVVVddddVVV1111VVXXXXVVVddddVVz0FolS1Xlo8ER9l8aHFofMFTXkj7zua8PdNPy8ynZ+bdtvd50fCP/LkRJlsThvAAAAAASUVORK5CYII=",
+  "screenshot_scale": 1.0,
+  "screenshot_width": 1536,
+  "snapshot_id": "s0000006b",
+  "total_element_count": 102,
+  "tree_markdown": "- [0] AXWindow \"Mr Crabs — shell\" [actions=[raise]]\n  - [1] AXButton [actions=[press]]\n  - [2] AXButton [help=\"this button also has an action to zoom the window\" actions=[press,zoomwindow,showmenu]]\n  - [3] AXButton [actions=[press]]\n  - AXStaticText = \"Mr Crabs — shell\"\n- [4] AXMenuBar [actions=[cancel]]\n  - [5] AXMenuBarItem \"Apple\" [actions=[cancel,press,pick]]\n    - [6] AXMenu [actions=[cancel]]\n      - [7] AXMenuItem \"About This Mac\" [id=_aboutThisMacRequested: actions=[cancel,press,pick]]\n      - [8] AXMenuItem \"System Information\" [id=_systemInformationRequested: actions=[cancel,press,pick]]\n      - [9] AXMenuItem \"System Settings…, 1 update\" [id=_systemSettingsRequested: actions=[cancel,press,pick]]\n      - [10] AXMenuItem \"App Store\" [id=_appStoreRequested: actions=[cancel,press,pick]]\n      - [11] AXMenuItem \"Recent Items\" [id=_recentsRequested: actions=[cancel,press,pick]]\n        - [12] AXMenu [actions=[cancel]]\n          - AXMenuItem \"Applications\"\n          - [13] AXMenuItem \"Activity Monitor\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [14] AXMenuItem \"Show “Activity Monitor” in Finder\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [15] AXMenuItem \"Ghostty\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [16] AXMenuItem \"Show “Ghostty” in Finder\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [17] AXMenuItem \"Hermes\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [18] AXMenuItem \"Show “Hermes” in Finder\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [19] AXMenuItem \"Hermes\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [20] AXMenuItem \"Show “Hermes” in Finder\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [21] AXMenuItem \"Karabiner-Elements\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [22] AXMenuItem \"Show “Karabiner-Elements” in Finder\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [23] AXMenuItem \"Mr Crabs\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [24] AXMenuItem \"Show “Mr Crabs” in Finder\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [25] AXMenuItem \"Safari\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [26] AXMenuItem \"Show “Safari” in Finder\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [27] AXMenuItem \"Spotify\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [28] AXMenuItem \"Show “Spotify” in Finder\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [29] AXMenuItem \"Terminal\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [30] AXMenuItem \"Show “Terminal” in Finder\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [31] AXMenuItem \"Zen\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [32] AXMenuItem \"Show “Zen” in Finder\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - AXMenuItem \"Documents\"\n          - [33] AXMenuItem \".omp\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [34] AXMenuItem \"Show “.omp” in Finder\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [35] AXMenuItem \"00-master-inventory.md\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [36] AXMenuItem \"Show “00-master-inventory.md” in Finder\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [37] AXMenuItem \"709ae81b7d2b9504f6c4c732f772c909.jpg\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [38] AXMenuItem \"Show “709ae81b7d2b9504f6c4c732f772c909.jpg” in Finder\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [39] AXMenuItem \"agent-profiles-reference.md\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [40] AXMenuItem \"Show “agent-profiles-reference.md” in Finder\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [41] AXMenuItem \"grill-roleprofiles-round1.md\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [42] AXMenuItem \"Show “grill-roleprofiles-round1.md” in Finder\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [43] AXMenuItem \"grok.csv\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [44] AXMenuItem \"Show “grok.csv” in Finder\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [45] AXMenuItem \"INVENTORY.md\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [46] AXMenuItem \"Show “INVENTORY.md” in Finder\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [47] AXMenuItem \"SESSION-REVIEW-2026-08-29-full.md\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [48] AXMenuItem \"Show “SESSION-REVIEW-2026-08-29-full.md” in Finder\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [49] AXMenuItem \"straggler-plan.md\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [50] AXMenuItem \"Show “straggler-plan.md” in Finder\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [51] AXMenuItem \"table(5).csv\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [52] AXMenuItem \"Show “table(5).csv” in Finder\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - AXMenuItem \"Servers\"\n          - [53] AXMenuItem \"Macintosh HD\" [id=_recentItemRequested: actions=[cancel,press,pick]]\n          - [54] AXMenuItem \"Clear Menu\" [id=_clearRecentItemsRequested: actions=[cancel,press,pick]]\n      - [55] AXMenuItem \"Force Quit…\" [id=_forceQuitPanelRequested: actions=[cancel,press,pick]]\n      - [56] AXMenuItem \"Force Quit mr-crabs\" [id=_forceQuitRequested: actions=[cancel,press,pick]]\n      - [57] AXMenuItem \"Sleep\" [id=_sleepRequested: actions=[cancel,press,pick]]\n      - [58] AXMenuItem \"Restart…\" [id=_restartRequested: actions=[cancel,press,pick]]\n      - [59] AXMenuItem \"Restart\" [id=_restartNowRequested: actions=[cancel,press,pick]]\n      - [60] AXMenuItem \"Shut Down…\" [id=_shutDownRequested: actions=[cancel,press,pick]]\n      - [61] AXMenuItem \"Shut Down\" [id=_shutDownNowRequested: actions=[cancel,press,pick]]\n      - [62] AXMenuItem \"Lock Screen\" [id=_lockScreenRequested: actions=[cancel,press,pick]]\n      - [63] AXMenuItem \"Log Out Jamie…\" [id=_logOutRequested: actions=[cancel,press,pick]]\n      - [64] AXMenuItem \"Log Out Jamie\" [id=_logOutNowRequested: actions=[cancel,press,pick]]\n  - [65] AXMenuBarItem \"mr-crabs\" [actions=[cancel,press,pick]]\n    - [66] AXMenu [actions=[cancel]]\n      - [67] AXMenuItem \"Check for Updates\" [id=handleGPUIMenuItem: actions=[cancel,press,pick]]\n      - [68] AXMenuItem \"Quick Terminal\" [id=handleGPUIMenuItem: actions=[cancel,press,pick]]\n      - [69] AXMenuItem \"Secure Input\" [id=handleGPUIMenuItem: actions=[cancel,press,pick]]\n      - [70] AXMenuItem \"Quit\" [id=handleGPUIMenuItem: actions=[cancel,press,pick]]\n  - [71] AXMenuBarItem \"File\" [actions=[cancel,press,pick]]\n    - [72] AXMenu [actions=[cancel]]\n      - [73] AXMenuItem \"New Window\" [id=handleGPUIMenuItem: actions=[cancel,press,pick]]\n      - [74] AXMenuItem \"New Tab\" [id=handleGPUIMenuItem: actions=[cancel,press,pick]]\n      - [75] AXMenuItem \"Close Tab\" [id=handleGPUIMenuItem: actions=[cancel,press,pick]]\n      - [76] AXMenuItem \"Close Window\" [id=handleGPUIMenuItem: actions=[cancel,press,pick]]\n  - [77] AXMenuBarItem \"View\" [actions=[cancel,press,pick]]\n    - [78] AXMenu [actions=[cancel]]\n      - [79] AXMenuItem \"Command Palette\" [id=handleGPUIMenuItem: actions=[cancel,press,pick]]\n      - [80] AXMenuItem \"Reload Configuration\" [id=handleGPUIMenuItem: actions=[cancel,press,pick]]\n      - [81] AXMenuItem \"Search Next\" [id=handleGPUIMenuItem: actions=[cancel,press,pick]]\n      - [82] AXMenuItem \"Search Previous\" [id=handleGPUIMenuItem: actions=[cancel,press,pick]]\n      - [83] AXMenuItem \"New Split Right\" [id=handleGPUIMenuItem: actions=[cancel,press,pick]]\n      - [84] AXMenuItem \"New Split Down\" [id=handleGPUIMenuItem: actions=[cancel,press,pick]]\n      - [85] AXMenuItem \"Close Pane\" [id=handleGPUIMenuItem: actions=[cancel,press,pick]]\n      - AXMenuItem \"Enter Full Screen\"\n  - [86] AXMenuBarItem \"Window\" [actions=[cancel,press,pick]]\n    - [87] AXMenu [actions=[cancel]]\n      - AXMenuItem \"Fill\"\n      - AXMenuItem \"Center\"\n      - [88] AXMenuItem \"Move & Resize\" [actions=[cancel,press,pick]]\n        - [89] AXMenu [actions=[cancel]]\n          - AXMenuItem \"Halves\"\n          - AXMenuItem \"Left\"\n          - AXMenuItem \"Right\"\n          - AXMenuItem \"Top\"\n          - AXMenuItem \"Bottom\"\n          - AXMenuItem \"Quarters\"\n          - AXMenuItem \"Top Left\"\n          - AXMenuItem \"Top Right\"\n          - AXMenuItem \"Bottom Left\"\n          - AXMenuItem \"Bottom Right\"\n          - AXMenuItem \"Arrange\"\n          - AXMenuItem \"Left & Right\"\n          - AXMenuItem \"Left & Quarters\"\n          - AXMenuItem \"Right & Left\"\n          - AXMenuItem \"Right & Quarters\"\n          - AXMenuItem \"Top & Bottom\"\n          - AXMenuItem \"Top & Quarters\"\n          - AXMenuItem \"Bottom & Top\"\n          - AXMenuItem \"Bottom & Quarters\"\n          - AXMenuItem \"Quarters\"\n          - AXMenuItem \"Return to Previous Size\"\n      - AXMenuItem \"Full Screen Tile\"\n        - [90] AXMenu [actions=[cancel]]\n          - AXMenuItem \"Left of Screen\"\n          - AXMenuItem \"Right of Screen\"\n      - AXMenuItem \"Remove Window from Set\"\n      - [91] AXMenuItem \"Next Tab\" [id=handleGPUIMenuItem: actions=[cancel,press,pick]]\n      - [92] AXMenuItem \"Previous Tab\" [id=handleGPUIMenuItem: actions=[cancel,press,pick]]\n      - [93] AXMenuItem \"Next Pane\" [id=handleGPUIMenuItem: actions=[cancel,press,pick]]\n      - [94] AXMenuItem \"Previous Pane\" [id=handleGPUIMenuItem: actions=[cancel,press,pick]]\n      - [95] AXMenuItem \"Split Navigation\" [actions=[cancel,press,pick]]\n        - [96] AXMenu [actions=[cancel]]\n          - [97] AXMenuItem \"Move Focus Up\" [id=handleGPUIMenuItem: actions=[cancel,press,pick]]\n          - [98] AXMenuItem \"Move Focus Down\" [id=handleGPUIMenuItem: actions=[cancel,press,pick]]\n          - [99] AXMenuItem \"Move Focus Left\" [id=handleGPUIMenuItem: actions=[cancel,press,pick]]\n          - [100] AXMenuItem \"Move Focus Right\" [id=handleGPUIMenuItem: actions=[cancel,press,pick]]\n      - [101] AXMenuItem \"Mr Crabs — shell\" [id=makeKeyAndOrderFront: actions=[cancel,press,pick]]\n",
+  "window_bounds": {
+    "height": 1128.0,
+    "width": 1536.0,
+    "x": 977.0,
+    "y": 198.0
+  },
+  "window_id": 3733
+}

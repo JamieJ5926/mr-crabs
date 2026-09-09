@@ -1,0 +1,19 @@
+{
+  "trigger_frame": 4,
+  "trigger_wall_ms": 1788168272763,
+  "first_visual_change_frame": 62,
+  "first_visual_change_wall_ms": 1788168278754,
+  "open_latency_ms": 5991,
+  "frame_interval_from_trigger": 58,
+  "crop_box": [
+    0,
+    0,
+    1536,
+    1128
+  ],
+  "frame_size": [
+    1536,
+    1128
+  ],
+  "hotkey": "{\n  \"delivery\": {\n    \"mode\": \"foreground\"\n  },\n  \"effect\": \"unverifiable\",\n  \"route\": \"global_input\"\n}\n\npress_key_rc=0 elapsed_ms=8468\n"
+}

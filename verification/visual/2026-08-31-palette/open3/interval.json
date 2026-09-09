@@ -1,0 +1,31 @@
+{
+  "count": 20,
+  "png_ok": 20,
+  "mean_interval_ms": 86.57894736842105,
+  "median_interval_ms": 84,
+  "min_interval_ms": 77,
+  "max_interval_ms": 116,
+  "mean_call_ms": 86.92471981048584,
+  "intervals_ms": [
+    89,
+    88,
+    88,
+    116,
+    84,
+    79,
+    77,
+    85,
+    95,
+    87,
+    84,
+    93,
+    80,
+    83,
+    84,
+    81,
+    89,
+    79,
+    84
+  ],
+  "input_route": "ax_menu_command_palette"
+}

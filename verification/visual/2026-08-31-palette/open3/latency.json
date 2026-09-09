@@ -1,0 +1,19 @@
+{
+  "trigger_frame": 4,
+  "trigger_wall_ms": 1788168191808,
+  "first_visual_change_frame": null,
+  "first_visual_change_wall_ms": null,
+  "open_latency_ms": null,
+  "frame_interval_from_trigger": null,
+  "crop_box": [
+    0,
+    0,
+    1536,
+    1128
+  ],
+  "frame_size": [
+    1536,
+    1128
+  ],
+  "hotkey": "state_rc=0\ntoken=s000000b7:79 idx=79 snap=s000000b7\nclick_rc=0\n{\n  \"code\": \"element_outside_target_window\",\n  \"effect\": \"refused\",\n  \"escalation\": {\n    \"reason\": \"the addressed element could not be proven to belong to window 5124; take a fresh get_window_state snapshot and re-address it\",\n    \"recommended\": \"get_window_state\"\n  },\n  \"pid\": 92183,\n  \"reason\": \"the addressed element could not be proven to belong to window 5124; take a fresh get_window_state snapshot and re-address it\",\n  \"window_id\": 5124\n}\n"
+}

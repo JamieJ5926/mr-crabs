@@ -1,0 +1,74 @@
+{
+  "frame_count": 12,
+  "nonzero_diff_pairs": 11,
+  "triple_inner_region_differs": true,
+  "looks_like_animation": true,
+  "series": [
+    {
+      "pair": "frame_0001.png->frame_0002.png",
+      "changed_pixels": 168625,
+      "changed_frac": 0.12103847964902609,
+      "mean_abs_channel_sum": 14.804289840591695
+    },
+    {
+      "pair": "frame_0002.png->frame_0003.png",
+      "changed_pixels": 41389,
+      "changed_frac": 0.02970889034362367,
+      "mean_abs_channel_sum": 1.9671091165931642
+    },
+    {
+      "pair": "frame_0003.png->frame_0004.png",
+      "changed_pixels": 329186,
+      "changed_frac": 0.2362886461778758,
+      "mean_abs_channel_sum": 19.57919667057148
+    },
+    {
+      "pair": "frame_0004.png->frame_0005.png",
+      "changed_pixels": 6383,
+      "changed_frac": 0.004581696756707093,
+      "mean_abs_channel_sum": 0.5997443207919883
+    },
+    {
+      "pair": "frame_0005.png->frame_0006.png",
+      "changed_pixels": 6307,
+      "changed_frac": 0.004527144202499081,
+      "mean_abs_channel_sum": 0.6005087743476663
+    },
+    {
+      "pair": "frame_0006.png->frame_0007.png",
+      "changed_pixels": 697,
+      "changed_frac": 0.0005003043458287395,
+      "mean_abs_channel_sum": 0.1255469611356119
+    },
+    {
+      "pair": "frame_0007.png->frame_0008.png",
+      "changed_pixels": 725,
+      "changed_frac": 0.0005204026552737964,
+      "mean_abs_channel_sum": 0.05740507855567806
+    },
+    {
+      "pair": "frame_0008.png->frame_0009.png",
+      "changed_pixels": 1008,
+      "changed_frac": 0.0007235391400220507,
+      "mean_abs_channel_sum": 0.09427399163910327
+    },
+    {
+      "pair": "frame_0009.png->frame_0010.png",
+      "changed_pixels": 909,
+      "changed_frac": 0.0006524772601984565,
+      "mean_abs_channel_sum": 0.08853161751194413
+    },
+    {
+      "pair": "frame_0010.png->frame_0011.png",
+      "changed_pixels": 929,
+      "changed_frac": 0.0006668331955163543,
+      "mean_abs_channel_sum": 0.08637535602719588
+    },
+    {
+      "pair": "frame_0011.png->frame_0012.png",
+      "changed_pixels": 523,
+      "changed_frac": 0.0003754077085630283,
+      "mean_abs_channel_sum": 0.0511889585630283
+    }
+  ]
+}

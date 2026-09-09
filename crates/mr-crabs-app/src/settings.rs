@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use mr_crabs_config::{
     AnimationDefaults, ChildTerminfo, CloseOnExitPolicy, ConfigOverlay, EffectiveConfig,
-    SettingKey, StartupAnimation, TextAnimation,
+    PresentationSettings, SettingKey, StartupAnimation, TextAnimation,
 };
 use mr_crabs_terminal::GridSize;
 use serde::{Deserialize, Serialize};
@@ -111,14 +111,20 @@ fn default_cursor_trail() -> bool {
 fn default_startup_fetch() -> bool {
     mr_crabs_config::DEFAULT_STARTUP_FETCH
 }
-fn default_startup_fetch_command() -> String {
-    mr_crabs_config::DEFAULT_STARTUP_FETCH_COMMAND.to_string()
-}
 fn default_fetch_gif_path() -> String {
     mr_crabs_config::DEFAULT_FETCH_GIF_PATH.to_string()
 }
 fn default_startup_animation() -> String {
     mr_crabs_config::DEFAULT_STARTUP_ANIMATION.to_string()
+}
+fn default_prompt_presentation() -> String {
+    mr_crabs_config::DEFAULT_PROMPT_PRESENTATION.to_string()
+}
+fn default_startup_art() -> String {
+    mr_crabs_config::DEFAULT_STARTUP_ART.to_string()
+}
+fn default_fetch_arrangement() -> String {
+    mr_crabs_config::DEFAULT_FETCH_ARRANGEMENT.to_string()
 }
 
 /// Typed shell settings. Unknown JSON fields are ignored; every field
@@ -191,18 +197,24 @@ pub struct AppSettings {
     /// Permit terminal OSC 52 reads from the system clipboard.
     #[serde(default)]
     pub allow_osc52_read: bool,
-    /// Whether new windows auto-run the startup fetch command.
+    /// Whether new windows auto-run the startup fetch.
     #[serde(default = "default_startup_fetch")]
     pub startup_fetch: bool,
-    /// POSIX command run on the PTY before the interactive shell starts.
-    #[serde(default = "default_startup_fetch_command")]
-    pub startup_fetch_command: String,
     /// Path to a GIF for animated fetch; empty disables animation.
     #[serde(default = "default_fetch_gif_path")]
     pub fetch_gif_path: String,
-    /// New-window startup presentation: `"none"`, `"rustfetch"`, or `"molt"`.
+    /// New-window startup presentation: `"none"`, `"fetch"`, or `"molt"`.
     #[serde(default = "default_startup_animation")]
     pub startup_animation: String,
+    /// Prompt chrome: `"dock"` or `"inline"`.
+    #[serde(default = "default_prompt_presentation")]
+    pub prompt_presentation: String,
+    /// Startup art: `"none"`, `"native"`, `"apple"`, or `"file:/absolute/path"`.
+    #[serde(default = "default_startup_art")]
+    pub startup_art: String,
+    /// Fetch info placement: `"below"`, `"beside"`, or `"hidden"`.
+    #[serde(default = "default_fetch_arrangement")]
+    pub fetch_arrangement: String,
     /// Shell keybindings (keyboard-only operation).
     #[serde(default)]
     pub keybindings: Vec<KeyBindingDef>,
@@ -250,8 +262,10 @@ impl AppSettings {
             allow_osc52_write: effective.allow_osc52_write,
             allow_osc52_read: effective.allow_osc52_read,
             startup_fetch: effective.startup_fetch,
-            startup_fetch_command: effective.startup_fetch_command.clone(),
             startup_animation: effective.startup_animation.clone(),
+            prompt_presentation: effective.prompt_presentation.clone(),
+            startup_art: effective.startup_art.clone(),
+            fetch_arrangement: effective.fetch_arrangement.clone(),
             fetch_gif_path: effective.fetch_gif_path.clone(),
             keybindings,
         }
@@ -263,6 +277,10 @@ impl AppSettings {
     }
     pub fn startup_animation_kind(&self) -> StartupAnimation {
         self.effective_config().startup_animation()
+    }
+
+    pub fn presentation_settings(&self) -> PresentationSettings {
+        self.effective_config().presentation_settings()
     }
 
     /// Build the Mr Crabs animation defaults for terminal elements.
@@ -295,8 +313,10 @@ impl AppSettings {
             allow_osc52_write: self.allow_osc52_write,
             allow_osc52_read: self.allow_osc52_read,
             startup_fetch: self.startup_fetch,
-            startup_fetch_command: self.startup_fetch_command.clone(),
             startup_animation: self.startup_animation.clone(),
+            prompt_presentation: self.prompt_presentation.clone(),
+            startup_art: self.startup_art.clone(),
+            fetch_arrangement: self.fetch_arrangement.clone(),
             fetch_gif_path: self.fetch_gif_path.clone(),
         }
     }
@@ -687,8 +707,10 @@ struct PartialAppSettings {
     allow_osc52_write: Option<bool>,
     allow_osc52_read: Option<bool>,
     startup_fetch: Option<bool>,
-    startup_fetch_command: Option<String>,
     startup_animation: Option<String>,
+    prompt_presentation: Option<String>,
+    startup_art: Option<String>,
+    fetch_arrangement: Option<String>,
     fetch_gif_path: Option<String>,
     keybindings: Option<Vec<KeyBindingDef>>,
 }
@@ -719,8 +741,10 @@ impl PartialAppSettings {
             allow_osc52_write: self.allow_osc52_write,
             allow_osc52_read: self.allow_osc52_read,
             startup_fetch: self.startup_fetch,
-            startup_fetch_command: self.startup_fetch_command,
             startup_animation: self.startup_animation,
+            prompt_presentation: self.prompt_presentation,
+            startup_art: self.startup_art,
+            fetch_arrangement: self.fetch_arrangement,
             fetch_gif_path: self.fetch_gif_path,
         };
         if let Some(theme) = self.theme.as_deref() {
@@ -1717,26 +1741,6 @@ mod tests {
 
     #[test]
     fn startup_fetch_json_overrides_and_defaults() {
-        let settings = AppSettings::from_json(
-            r#"{"startup_fetch": false, "startup_fetch_command": "fastfetch"}"#,
-        )
-        .expect("valid json");
-        assert!(!settings.startup_fetch);
-        assert_eq!(settings.startup_fetch_command, "fastfetch");
-
-        let defaults = AppSettings::default();
-        assert!(defaults.startup_fetch);
-        assert_eq!(
-            defaults.startup_fetch_command,
-            mr_crabs_config::DEFAULT_STARTUP_FETCH_COMMAND
-        );
-
-        let effective = defaults.effective_config();
-        assert!(effective.startup_fetch);
-        assert_eq!(
-            effective.startup_fetch_command,
-            mr_crabs_config::DEFAULT_STARTUP_FETCH_COMMAND
-        );
     }
 
     #[test]
@@ -1757,7 +1761,7 @@ mod tests {
             .expect("cli");
         assert_eq!(cli.overlay.startup_animation.as_deref(), Some("none"));
         let mut overlay = ConfigOverlay::default();
-        overlay.startup_animation = Some("rustfetch".into());
+        overlay.startup_animation = Some("fetch".into());
         overlay.merge(cli.overlay);
         let effective = EffectiveConfig::resolve(
             &ConfigOverlay::default(),
@@ -1765,6 +1769,48 @@ mod tests {
             &ConfigOverlay::default(),
         );
         assert_eq!(effective.startup_animation(), StartupAnimation::None);
+    }
+
+    #[test]
+    fn default_prompt_is_dock() {
+        let defaults = AppSettings::default();
+        assert_eq!(defaults.prompt_presentation, "dock");
+        assert_eq!(
+            defaults.presentation_settings().prompt,
+            mr_crabs_config::PromptPresentation::Dock
+        );
+    }
+
+    #[test]
+    fn molt_plus_native_resolves_to_no_static_art() {
+        let settings = AppSettings::from_effective(
+            &EffectiveConfig::defaults(),
+            crate::keymap::default_keybindings(),
+        );
+        let startup = settings.presentation_settings().startup;
+        assert_eq!(startup.animation, mr_crabs_config::StartupAnimation::Molt);
+        assert_eq!(startup.art, mr_crabs_config::StartupArt::Native);
+        assert_eq!(
+            startup.arrangement,
+            mr_crabs_config::FetchArrangement::Below
+        );
+    }
+
+    #[test]
+    fn explicit_prompt_beats_paper_preset() {
+        let file = ConfigOverlay {
+            theme: Some("paper".into()),
+            prompt_presentation: Some("dock".into()),
+            ..ConfigOverlay::default()
+        };
+        let effective =
+            EffectiveConfig::resolve(&file, &ConfigOverlay::default(), &ConfigOverlay::default());
+        let settings =
+            AppSettings::from_effective(&effective, crate::keymap::default_keybindings());
+        assert_eq!(
+            settings.presentation_settings().prompt,
+            mr_crabs_config::PromptPresentation::Dock
+        );
     }
 
     fn unique_stamp() -> u128 {

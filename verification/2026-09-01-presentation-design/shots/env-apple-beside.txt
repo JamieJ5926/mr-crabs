@@ -1,0 +1,10 @@
+        .:'jamie@Jamies-MacBook-Pro.local
+    __ :'__------------------------------
+ .'`__`-'__``.OS: Darwin (aarch64)
+:__________.-'Kernel: MacOS 25.5.0
+:_________:CPU: Apple M4 Pro
+ :_______:'Screen: 1512x982 @ 120Hz
+  :_____:'RAM: 24.02 GB / 48 GB (50%)
+   :___:'Swap: 2.32 GB / 4 GB (58%)
+Uptime: 04h 26m 30s
+Disk (/): 463GB / 494GB (93%)

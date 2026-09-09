@@ -1,0 +1,184 @@
+Metalterm — the terminal your GPU draws
+Metalterm
+features
+blocks
+themes
+speed
+faq
+beta
+Download
+{{ menuGlyph }}
+features
+blocks
+themes
+speed
+faq
+metal 3 · macOS 14+ · universal binary
+The terminal your
+GPU
+draws.
+Every frame goes through Metal 3. A 200 MB log streams past at 120 fps on a 120 Hz display, every command is its own block, and search and the palette are one keystroke away.
+Download for macOS
+6 MB download · free · no account · universal binary
+metalterm
+zsh
+vite dev
+node
+ssh edge-01
+bench
+cargo build --release
+1.24s
+Compiling mt-gpu v0.1.0
+Compiling mt-shell v0.1.0
+Finished `release` profile [optimized] in 1.24s
+git status --short
+0.02s
+M crates/mt-gpu/shaders/cell.metal
+A  crates/mt-atlas/src/atlas.rs
+?? bench/scroll_200mb.log
+du -sh bench/*.log | sort -h
+0.08s
+4.0K  bench/atlas_evict.log
+1.8M  bench/glyph_upload.log
+203M  bench/scroll_200mb.log
+~/src/metalterm
+main
++2
+~1
+?3
+THEME
+Metalterm
+Dark Carbon
+Palenight
+Brushed Aluminium
+Sunlit Alabaster
+18 in the app
+120
+fps
+steady on a 120 Hz display, zero dropped frames, scrolling a filled buffer
+0.22
+ms
+of GPU time per frame — 2.6% of the 8.33 ms budget
+MB
+installed — one app, zero dependencies
+18
+themes
+plus your own, in one toml file
+FEATURES
+Everything you'd otherwise install plugins for
+Nothing to configure on day one. All of it is on the moment you open the app.
+❯❯
+Command blocks
+Each command and its output is one tracked region, read from the shell's own OSC 133 markers — with how long it ran and a red gutter mark when it failed.
+⌘⇧P
+Command palette
+Every setting, theme, tab and recent command behind one fuzzy field. It opens in under a frame and remembers what you actually use.
+⌘F
+Find in scrollback
+Literal or regex, across your whole scrollback, highlighted on the GPU as you type. No lag on the first keystroke, none on the last.
+A caret with physics
+Sub-cell interpolation, three shapes and seven named motion styles — Snap, Ease, Spring, Smear, Squash, Phosphor, Arc — or switch it all off in one toggle.
+⌥⇥
+Tabs, splits, sessions
+Every tab and split keeps its own directory, scrollback and shell — 10 000 lines each, and each one its own shell process.
+One plain-text config
+Everything the Settings window writes lives in
+~/.config/metalterm
+. Commit it, share it, or never open it at all.
+20B
+A cell that stayed 20 bytes
+Colour emoji, grapheme clusters and per-cell underline colours are lazily-allocated side tables: a build log allocates
+zero bytes
+for all three. A cell is 20 bytes and stayed 20 bytes while they shipped.
+🇺🇸
+Clusters as one cell
+Family emoji, flags and skin tones occupy a single cell and are drawn as the font's own colour glyph — not a fallback box, not two half-cells.
+OSC 9
+Notifications in band
+A long build finishes in a tab you are not watching and macOS tells you. OSC 9 and OSC 777 are parsed and posted as real system notifications.
+BLOCKS
+Scrollback stops being a wall of text
+Metalterm reads the shell's own OSC 133 markers, so it knows where a command starts, where its output ends and how long it took. A flat buffer gets structure the moment output starts landing.
+Command, output and exit status tracked as one region
+Every block carries the time it actually took
+Failed blocks keep a red mark in the gutter until you clear them
+Works with zsh, bash and fish — and never edits a line of your rc files
+3 blocks · 1 failed
+pnpm test -- --run
+6.10s
+Test Files  18 passed (18)
+Tests  204 passed (204)
+docker compose up -d
+18.4s
+Container edge-db  Started
+Container edge-api  Started
+./scripts/deploy.sh edge-01
+2.03s
+ssh: connect to host edge-01 port 22: Operation timed out
+exit 255
+THEMES
+Eight colour roles. Eighteen ways to spend them.
+A theme is a background, a foreground, a dim, an accent and four states. Nothing else — which is why every theme looks deliberate instead of decorated.
+Metalterm
+active
+warm graphite, amber prompt
+Dark Carbon
+active
+sintered carbon, sheen 0.2
+Palenight
+active
+muted indigo, pastel
+Brushed Aluminium
+active
+machined silver, anisotropic
+Sunlit Alabaster
+active
+paper tooth, low sun
+Click a theme — the terminal above and the block preview follow it. In the app:
+⌘⇧P → Theme · …
+, the inspector list, or
+theme dark-carbon
+SPEED
+Two passes. 0.22 ms. Every frame.
+Text is one Metal pass, ambient light is the other. The glyph atlas stays resident on the GPU, so a 200 MB log costs what an empty prompt costs. When nothing changes, the renderer sends no frames at all — not fewer, none — and gives the battery back.
+GPU time
+0.22 ms
+CPU time
+0.13 ms
+frame budget at 120 Hz
+8.33 ms
+two 30 s runs, M3 Max · 118×34 · continuous scroll of a filled scrollback · 119.7 Hz steady, 0 dropped frames
+Open it once and you won't go back
+Free, no account. Your shell and your dotfiles stay exactly as they are — Metalterm never edits a line of them.
+{{ dlLabel }}
+Metalterm.dmg · 6 MB
+macOS 14 Sonoma or later
+universal · apple silicon & intel
+notarised by apple
+FAQ
+Short answers
+Do I have to change my shell?
+No. zsh, bash and fish all work as they are, and blocks need nothing added to your rc files — the integration loads by a route each shell already offers.
+Is it really free?
+Yes — free, with no account and no telemetry. Nothing about your sessions leaves the machine.
+Windows or Linux?
+Not yet. The renderer is Metal-only today; a Vulkan backend is the next platform step after 1.0.
+Can I turn the motion off?
+One toggle in Settings → Motion, and every animation falls back to a 90 ms fade. It also follows the system Reduce Motion setting.
+What about my old terminal's settings?
+Nothing is imported — everyone starts on Metalterm's defaults. What you change lands in one readable toml you can edit by hand.
+Something broken?
+Write to
+support@metalterm.dev
+— a real person reads it, usually the same day. Reproducible bugs are better off on
+issues
+Metalterm
+beta · built in Metal 3
+features
+faq
+download
+report a bug
+support@metalterm.dev
+built by
+twitter
+github

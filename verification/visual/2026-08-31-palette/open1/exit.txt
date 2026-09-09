@@ -1,0 +1,6 @@
+run_id=open1
+burst_ms=40
+burst_count=20
+started=2026-08-31 20:04:20
+exit_status=1
+2026-08-31 20:05:03

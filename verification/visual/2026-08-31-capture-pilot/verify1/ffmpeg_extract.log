@@ -1,0 +1,51 @@
+ffmpeg version 9.0.1 Copyright (c) 2000-2026 the FFmpeg developers
+  built with Apple clang version 21.0.0 (clang-2100.1.1.101)
+  configuration: --prefix=/opt/homebrew/Cellar/ffmpeg/9.0.1 --enable-shared --enable-pthreads --enable-version3 --cc=clang --host-cflags= --host-ldflags= --enable-ffplay --enable-gpl --enable-libsvtav1 --enable-libopus --enable-libx264 --enable-libmp3lame --enable-libdav1d --enable-libvmaf --enable-libvpx --enable-libx265 --enable-openssl --enable-videotoolbox --enable-audiotoolbox --enable-neon
+  libavutil      61.  1.101 / 61.  1.101
+  libavcodec     63.  1.101 / 63.  1.101
+  libavformat    63.  1.101 / 63.  1.101
+  libavdevice    63.  1.101 / 63.  1.101
+  libavfilter    12.  1.101 / 12.  1.101
+  libswscale     10.  1.101 / 10.  1.101
+  libswresample   7.  1.101 /  7.  1.101
+Input #0, mov,mp4,m4a,3gp,3g2,mj2, from '/Users/jamie/Documents/Projects/active/mr-crabs/verification/visual/2026-08-31-capture-pilot/verify1/recording.mp4':
+  Metadata:
+    major_brand     : mp42
+    minor_version   : 1
+    compatible_brands: isommp41mp42
+    creation_time   : 2026-08-31T06:37:52.000000Z
+  Duration: 00:00:01.17, start: 0.000000, bitrate: 2987 kb/s
+  Stream #0:0[0x1](und): Video: h264 (Main) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 1080x1920, 2906 kb/s, 29.17 fps, 60 tbr, 600 tbn (default)
+    Metadata:
+      creation_time   : 2026-08-31T06:37:52.000000Z
+      handler_name    : Core Media Video
+Stream mapping:
+  Stream #0:0 -> #0:0 (h264 (native) -> png (native))
+Press [q] to stop, [?] for help
+[swscaler @ 0xbf9380000] No accelerated colorspace conversion found from yuv420p to rgb24.
+[swscaler @ 0xbf9380000] [swscaler @ 0xbf8ba4000] No accelerated colorspace conversion found from yuv420p to rgb24.
+[swscaler @ 0xbf9380000] [swscaler @ 0xbf8bb4000] No accelerated colorspace conversion found from yuv420p to rgb24.
+[swscaler @ 0xbf9380000] [swscaler @ 0xbf8bc4000] No accelerated colorspace conversion found from yuv420p to rgb24.
+[swscaler @ 0xbf9380000] [swscaler @ 0xbf8bd4000] No accelerated colorspace conversion found from yuv420p to rgb24.
+[swscaler @ 0xbf9380000] [swscaler @ 0xbf8be4000] No accelerated colorspace conversion found from yuv420p to rgb24.
+[swscaler @ 0xbf9380000] [swscaler @ 0xbf8f8c000] No accelerated colorspace conversion found from yuv420p to rgb24.
+[swscaler @ 0xbf9380000] [swscaler @ 0xbf8f9c000] No accelerated colorspace conversion found from yuv420p to rgb24.
+[swscaler @ 0xbf9380000] [swscaler @ 0xbf8fac000] No accelerated colorspace conversion found from yuv420p to rgb24.
+[swscaler @ 0xbf9380000] [swscaler @ 0xbf8fbc000] No accelerated colorspace conversion found from yuv420p to rgb24.
+[swscaler @ 0xbf9380000] [swscaler @ 0xbf8fcc000] No accelerated colorspace conversion found from yuv420p to rgb24.
+[swscaler @ 0xbf9380000] [swscaler @ 0xbf8fdc000] No accelerated colorspace conversion found from yuv420p to rgb24.
+[swscaler @ 0xbf9380000] [swscaler @ 0xbf8fec000] No accelerated colorspace conversion found from yuv420p to rgb24.
+[swscaler @ 0xbf9380000] [swscaler @ 0xbf8500000] No accelerated colorspace conversion found from yuv420p to rgb24.
+Output #0, image2, to '/Users/jamie/Documents/Projects/active/mr-crabs/verification/visual/2026-08-31-capture-pilot/verify1/frames/frame_%04d.png':
+  Metadata:
+    major_brand     : mp42
+    minor_version   : 1
+    compatible_brands: isommp41mp42
+    encoder         : Lavf63.1.101
+  Stream #0:0(und): Video: png, rgb24(pc, gbr/bt709/bt709, progressive), 1080x1920, q=2-31, 200 kb/s, 10 fps, 10 tbn (default)
+    Metadata:
+      encoder         : Lavc63.1.101 png
+      creation_time   : 2026-08-31T06:37:52.000000Z
+      handler_name    : Core Media Video
+[out#0/image2 @ 0xbfec0c900] video:9949KiB audio:0KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: unknown
+frame=   12 fps=0.0 q=-0.0 Lsize=N/A time=00:00:01.20 bitrate=N/A speed=6.54x elapsed=0:00:00.18    

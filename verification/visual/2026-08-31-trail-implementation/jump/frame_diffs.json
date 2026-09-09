@@ -1,0 +1,97 @@
+[
+  {
+    "a": "frame_0001.png",
+    "b": "frame_0002.png",
+    "changed_bytes": 228070
+  },
+  {
+    "a": "frame_0002.png",
+    "b": "frame_0003.png",
+    "changed_bytes": 0
+  },
+  {
+    "a": "frame_0003.png",
+    "b": "frame_0004.png",
+    "changed_bytes": 0
+  },
+  {
+    "a": "frame_0004.png",
+    "b": "frame_0005.png",
+    "changed_bytes": 0
+  },
+  {
+    "a": "frame_0005.png",
+    "b": "frame_0006.png",
+    "changed_bytes": 0
+  },
+  {
+    "a": "frame_0006.png",
+    "b": "frame_0007.png",
+    "changed_bytes": 0
+  },
+  {
+    "a": "frame_0007.png",
+    "b": "frame_0008.png",
+    "changed_bytes": 0
+  },
+  {
+    "a": "frame_0008.png",
+    "b": "frame_0009.png",
+    "changed_bytes": 0
+  },
+  {
+    "a": "frame_0009.png",
+    "b": "frame_0010.png",
+    "changed_bytes": 0
+  },
+  {
+    "a": "frame_0010.png",
+    "b": "frame_0011.png",
+    "changed_bytes": 0
+  },
+  {
+    "a": "frame_0011.png",
+    "b": "frame_0012.png",
+    "changed_bytes": 0
+  },
+  {
+    "a": "frame_0012.png",
+    "b": "frame_0013.png",
+    "changed_bytes": 0
+  },
+  {
+    "a": "frame_0013.png",
+    "b": "frame_0014.png",
+    "changed_bytes": 0
+  },
+  {
+    "a": "frame_0014.png",
+    "b": "frame_0015.png",
+    "changed_bytes": 0
+  },
+  {
+    "a": "frame_0015.png",
+    "b": "frame_0016.png",
+    "changed_bytes": 0
+  },
+  {
+    "a": "frame_0016.png",
+    "b": "frame_0017.png",
+    "changed_bytes": 0
+  },
+  {
+    "a": "frame_0017.png",
+    "b": "frame_0018.png",
+    "changed_bytes": 0
+  },
+  {
+    "a": "frame_0018.png",
+    "b": "frame_0019.png",
+    "changed_bytes": 0
+  },
+  {
+    "a": "frame_0019.png",
+    "b": "frame_0020.png",
+    "changed_bytes": 0
+  }
+]

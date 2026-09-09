@@ -1,0 +1,11 @@
+ts	phase	decision	why	evidence	result
+2026-08-31T00:00:00Z	frame	reviewed the whole dirty tree before staging	28 modified and 19 untracked paths cannot be committed safely by inspection alone	artifact://1, artifact://3	review started
+2026-08-31T00:00:01Z	review	excluded macOS junk and stale handoff files from product commits	they are generated or contain obsolete repository-state claims	agent://ChangeInventory, agent://CommitBlockerDiagnosis	exclusion list set
+2026-08-31T00:00:02Z	review	held the product commit for fresh trust-boundary and memory-limit defects	PTY output could write host config and new buffers had no fixed bounds	agent://BoundarySecurity-2, agent://SecurityFindingDiagnosis	fix required
+2026-08-31T00:00:03Z	fix	blocked PTY-controlled save and disabled the unreachable TUI save action	terminal output must not authorize persistent host writes	agent://FinishSaveTrust	21 focused tests passed
+2026-08-31T00:00:04Z	fix	bounded Rustfetch capture and animation TUI scanner state	new buffers need fixed memory limits and deterministic overflow handling	agent://CommitSafetyFixes	focused tests added
+2026-08-31T00:00:05Z	fix	restored timer scheduling and the bounded gradient cache contract	repeated scheduling must not postpone frames and public effects contracts must remain intact	agent://CommitSafetyFixes	workspace tests exercised changes
+2026-08-31T00:00:06Z	build	cleaned selected shared Cargo artifacts while unrelated long-lived Rust binaries were present	stale shared-target metadata caused impossible cross-crate type errors; no cargo or rustc compiler process was active	agent://FrameDeltaDiagnosis, agent://ProtocolSinkDiagnosis	selected packages rebuilt
+2026-08-31T00:00:07Z	verify	formatted the Rust workspace and checked whitespace	commit must match repository formatting and contain no whitespace errors	agent://FormatRustChanges, artifact://197	format and diff checks passed
+2026-08-31T00:00:08Z	verify	ran locked workspace tests and all-target checks	the change crosses app, terminal, protocols, PTY, effects, element, config, and fixtures	artifact://199, artifact://197	1098 tests passed; check passed with one warning
+2026-08-31T00:00:09Z	review	requested independent review of the final tested diff	broad user work needs fresh eyes before staging	agent://FinalCommitReview	pending

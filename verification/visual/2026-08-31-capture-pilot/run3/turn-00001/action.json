@@ -1,0 +1,11 @@
+{
+  "arguments": {
+    "session": "sdk-90ebcaa6-5bae-4a8e-a035-9354d331efbc"
+  },
+  "result_error": false,
+  "result_summary": "✅ Session 'sdk-90ebcaa6-5bae-4a8e-a035-9354d331efbc' ended.",
+  "t_ms_from_session_start": 1175,
+  "t_start_ms_from_session_start": 1034,
+  "timestamp": "1788157699.225",
+  "tool": "end_session"
+}

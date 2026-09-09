@@ -74,9 +74,9 @@ fn help_text() -> String {
     out.push_str("    Bare +animation and +animation menu open the interactive animation TUI.\n");
     out.push_str("    +animation list prints the plain-text menu.\n");
     out.push('\n');
-    out.push_str("Rustfetch replay:\n");
-    out.push_str("  +rustfetch\n");
-    out.push_str("    Replay rustfetch in the calling window. Requires the mr-crabs binary\n");
+    out.push_str("Fetch replay:\n");
+    out.push_str("  +fetch\n");
+    out.push_str("    Replay the composed fetch in the calling window. Requires the mr-crabs binary\n");
     out.push_str("    directory on the child PATH (set automatically for new panes).\n");
 
     out.push_str("  Inside Mr Crabs, press Cmd+Shift+P and run:\n");
@@ -296,10 +296,6 @@ mod tests {
         assert!(config.contains("text-animation-duration = 120ms"));
         assert!(config.contains("text-animation-intensity = 1"));
         assert!(config.contains("startup-fetch = true"));
-        assert!(config.contains(&format!(
-            "startup-fetch-command = {}",
-            mr_crabs_config::DEFAULT_STARTUP_FETCH_COMMAND
-        )));
     }
 
     #[test]

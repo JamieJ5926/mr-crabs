@@ -61,8 +61,9 @@ pub struct MoltLayout {
 pub enum StartupPresentation {
     #[default]
     None,
-    RustfetchRetained,
-    RustfetchDismissed,
+    FetchRetained,
+    FetchDismissed,
+    MoltWaiting,
     MoltActive {
         started_ms: u64,
     },
@@ -74,7 +75,7 @@ impl StartupPresentation {
     pub fn from_config(kind: StartupAnimation, now_ms: u64) -> Self {
         match kind {
             StartupAnimation::None => Self::None,
-            StartupAnimation::Rustfetch => Self::RustfetchRetained,
+            StartupAnimation::Fetch => Self::FetchRetained,
             StartupAnimation::Molt => Self::MoltActive { started_ms: now_ms },
         }
     }
@@ -83,9 +84,17 @@ impl StartupPresentation {
         Self::None
     }
 
+    /// Begin the molt clock once there is content to reveal. Masking an empty
+    /// grid is what froze the default window, so `MoltWaiting` never paints.
+    pub fn start_molt(&mut self, now_ms: u64) {
+        if matches!(*self, Self::MoltWaiting) {
+            *self = Self::MoltActive { started_ms: now_ms };
+        }
+    }
+
     pub fn dismiss_on_enter(&mut self) {
         match *self {
-            Self::RustfetchRetained => *self = Self::RustfetchDismissed,
+            Self::FetchRetained => *self = Self::FetchDismissed,
             Self::MoltActive { .. } => *self = Self::MoltDismissed,
             _ => {}
         }
@@ -194,10 +203,12 @@ pub struct WindowModel {
     pub visible: bool,
     /// Whether the window was restored from shell state.
     pub restored: bool,
-    /// Window-local startup presentation (Rustfetch retention, molt fade).
     /// Set by `AppModel` from settings when a normal window is created;
     /// restored windows and suppressed windows carry [`StartupPresentation::None`].
     pub startup_presentation: StartupPresentation,
+    /// Static logo revealed through the molt hole. `None` keeps the original
+    /// hole-and-glow paint with no art.
+    pub molt_art: Option<crate::art::Art>,
 }
 
 impl WindowModel {
@@ -225,6 +236,7 @@ impl WindowModel {
             visible: true,
             restored: false,
             startup_presentation: StartupPresentation::default(),
+            molt_art: None,
         })
     }
     /// A window from parts (restore path). The tab order must contain
@@ -268,6 +280,7 @@ impl WindowModel {
             visible: true,
             restored: true,
             startup_presentation: StartupPresentation::default(),
+            molt_art: None,
         })
     }
 
@@ -700,5 +713,27 @@ mod tests {
             .expect("mid");
         assert!(mid.eased > 0.5);
         assert!(mid.eased < 1.0);
+    }
+
+    #[test]
+    fn molt_layout_none_art_matches_pre_art_geometry() {
+        let pres = StartupPresentation::MoltActive { started_ms: 0 };
+        let now = MOLT_DURATION_MS / 2;
+        let width = 200.0_f32;
+        let height = 100.0_f32;
+        let layout = pres.molt_layout(now, width, height).expect("mid");
+        let t = (now as f32 / MOLT_DURATION_MS as f32).clamp(0.0, 1.0);
+        let eased = (t * std::f32::consts::FRAC_PI_2).sin();
+        let hole_width = eased * width;
+        let hole_height = eased * height;
+        assert_eq!(layout.eased, eased);
+        assert_eq!(layout.hole_width, hole_width);
+        assert_eq!(layout.hole_height, hole_height);
+        assert_eq!(layout.hole_left, (width - hole_width) * 0.5);
+        assert_eq!(layout.hole_top, (height - hole_height) * 0.5);
+        assert_eq!(
+            layout.glow_alpha,
+            ((eased * std::f32::consts::PI).sin() * 0.55).clamp(0.0, 0.55)
+        );
     }
 }

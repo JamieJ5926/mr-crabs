@@ -1,0 +1,30 @@
+{
+  "count": 20,
+  "png_ok": 20,
+  "mean_interval_ms": 88.42105263157895,
+  "median_interval_ms": 88,
+  "min_interval_ms": 79,
+  "max_interval_ms": 100,
+  "mean_call_ms": 88.61100673675537,
+  "intervals_ms": [
+    87,
+    88,
+    89,
+    91,
+    88,
+    100,
+    100,
+    82,
+    88,
+    92,
+    94,
+    80,
+    96,
+    79,
+    82,
+    88,
+    79,
+    92,
+    85
+  ]
+}

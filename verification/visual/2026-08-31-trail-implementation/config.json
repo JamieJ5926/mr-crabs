@@ -1,0 +1,10 @@
+{
+  "cursor_blink": false,
+  "cursor_trail": true,
+  "cursor_trail_opacity": 1.0,
+  "cursor_trail_duration_ms": 2000,
+  "text_animation": "none",
+  "startup_fetch": false,
+  "startup_animation": "none",
+  "background_opacity": 1.0
+}

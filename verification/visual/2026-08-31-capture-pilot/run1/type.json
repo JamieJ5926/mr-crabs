@@ -1,0 +1,11 @@
+{
+  "delivery": {
+    "mode": "background"
+  },
+  "effect": "unverifiable",
+  "escalation": {
+    "reason": "delivery_failed",
+    "target": "foreground"
+  },
+  "route": "synthetic_events"
+}

@@ -1,0 +1,25 @@
+{
+  "after": {
+    "screenshot": {
+      "status": "captured"
+    },
+    "state": {
+      "classification": "no_target_pid",
+      "status": "not_applicable"
+    }
+  },
+  "before": {
+    "screenshot": {
+      "status": "captured"
+    },
+    "state": {
+      "classification": "no_target_pid",
+      "status": "not_applicable"
+    }
+  },
+  "click": {
+    "classification": "not_a_click_action",
+    "status": "not_applicable"
+  },
+  "schema": "cua-turn-evidence/v1"
+}

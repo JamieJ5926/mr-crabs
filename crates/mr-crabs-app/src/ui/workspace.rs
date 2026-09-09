@@ -384,15 +384,26 @@ impl Render for WindowView {
         let metrics = self.measured.as_ref().map(|measured| measured.metrics);
         let terminal_font = self.measured.as_ref().map(|measured| measured.font.clone());
         let viewport = window.viewport_size();
+        let reserve_dock = self
+            .model
+            .read(cx)
+            .window(self.window_id)
+            .and_then(|window_model| window_model.active_tab())
+            .and_then(|tab| tab.focused_pane())
+            .is_some_and(|pane| {
+                pane.lifecycle == crate::model::pane::PtyLifecycle::Pending
+                    || pane.should_reserve_dock_chrome()
+            });
         let geometry = metrics.and_then(|metrics| {
             settings_padding(settings.padding_x, settings.padding_y).and_then(|padding| {
-                SurfaceGeometry::from_viewport(
+                SurfaceGeometry::from_viewport_with_dock_reserve(
                     PixelExtent {
                         width: f32::from(viewport.width),
                         height: f32::from(viewport.height),
                     },
                     metrics,
                     padding,
+                    reserve_dock,
                 )
             })
         });
@@ -401,6 +412,7 @@ impl Render for WindowView {
                 model.commit_geometry(self.window_id, geometry)
             });
             if changed {
+                cx.notify();
                 let shell = self.shell.clone();
                 cx.defer(move |cx| {
                     if let Some(shell) = shell.upgrade() {
@@ -457,17 +469,19 @@ impl Render for WindowView {
         let palette = self.model.read(cx).palette.clone();
         let secure_input = self.model.read(cx).secure_input.is_enabled();
         let trace_for_paint = self.model.read(cx).diagnostic_trace();
-        let molt_layout = self
+        let (molt_layout, molt_art) = self
             .model
             .read(cx)
             .window(self.window_id)
-            .and_then(|window| {
-                window.startup_presentation.molt_layout(
+            .map(|window| {
+                let layout = window.startup_presentation.molt_layout(
                     crate::model::app_model::monotonic_ms(),
                     f32::from(viewport.width),
                     f32::from(viewport.height),
-                )
-            });
+                );
+                (layout, window.molt_art.clone())
+            })
+            .unwrap_or((None, None));
         let focused_dock = bundles.iter().find_map(|bundle| {
             if !bundle.focused {
                 return None;
@@ -665,6 +679,35 @@ impl Render for WindowView {
         }
 
         if let Some(layout) = molt_layout {
+            let width = f32::from(viewport.width);
+            let height = f32::from(viewport.height);
+            if let (Some(art), Some(cell)) = (molt_art.as_ref(), metrics) {
+                let (cell_w, cell_h) = (cell.width, cell.height);
+                let (art_left, art_top) = art.centered_origin(width, height, cell_w, cell_h);
+                let mut art_layer = div()
+                    .absolute()
+                    .left(px(layout.hole_left))
+                    .top(px(layout.hole_top))
+                    .w(px(layout.hole_width.max(0.0)))
+                    .h(px(layout.hole_height.max(0.0)))
+                    .overflow_hidden();
+                for (i, row) in art.rows.iter().enumerate() {
+                    if row.is_empty() {
+                        continue;
+                    }
+                    art_layer = art_layer.child(
+                        div()
+                            .absolute()
+                            .left(px(art_left - layout.hole_left))
+                            .top(px(art_top - layout.hole_top + i as f32 * cell_h))
+                            .text_color(gpui::white())
+                            .font(font("JetBrains Mono"))
+                            .text_size(px(cell_h * 0.85))
+                            .child(SharedString::from(row.clone())),
+                    );
+                }
+                root = root.child(art_layer);
+            }
             let width = f32::from(viewport.width);
             let height = f32::from(viewport.height);
             let hole_right = layout.hole_left + layout.hole_width;
@@ -2334,6 +2377,11 @@ mod tests {
             });
         });
 
+        cx.update_window(handle, |_, window, cx| {
+            window.draw(cx).clear(cx);
+        })
+        .unwrap();
+
         let (generation_before, preferred_before) = cx.update(|cx| {
             let model = model.read(cx);
             let pane = model.focused_pane().expect("pane");
@@ -2646,6 +2694,14 @@ mod tests {
                 }
                 pane.feed_test_output(b"\x1b]133;A\x07$ \x1b]133;B\x07")
                     .expect("live prompt");
+            });
+        });
+        draw_window(cx, handle);
+        cx.update(|cx| {
+            model.update(cx, |model, _| {
+                let pane = model.focused_pane_mut().expect("pane");
+                pane.feed_test_output(b"\x1b]133;A\x07$ \x1b]133;B\x07")
+                    .expect("live prompt after reserve");
             });
         });
         draw_window(cx, handle);

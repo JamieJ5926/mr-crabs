@@ -1,0 +1,11 @@
+[workspace]
+
+[package]
+name = "glyph-cluster-occupancy"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+mr-crabs-terminal = { path = "../../../crates/mr-crabs-terminal" }
+unicode-width = "=0.2.2"

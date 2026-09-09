@@ -1,0 +1,546 @@
+{
+  "mechanism": "one-shot payload after burst start; window-local screencapture",
+  "trigger_token": "ZX9Q7",
+  "mean_interval_ms": 111.17948717948718,
+  "median_interval_ms": 106,
+  "min_interval_ms": 90,
+  "max_interval_ms": 204,
+  "mean_call_ms": 110.6335997581482,
+  "frame_count": 40,
+  "png_ok": 40,
+  "t_record_start_ms": 1788170625462,
+  "t_trigger_ms": 1788170625791,
+  "t_record_stop_ms": 1788170629955,
+  "session_span_ms": 4493,
+  "order_ok": true,
+  "first_token_extracted_frame": 4,
+  "last_token_extracted_frame": 40,
+  "progressive_roi_pairs": 17,
+  "mark_spam_frames": [],
+  "capture_end_frame": 40,
+  "post_has_token": true,
+  "video": {
+    "frame_count": 40,
+    "roi": "first text line y=28..90",
+    "nonzero_diff_pairs": 19,
+    "substantial_pairs": 18,
+    "series": [
+      {
+        "pair": "frame_0001.png->frame_0002.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0002.png->frame_0003.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0003.png->frame_0004.png",
+        "changed_pixels": 255,
+        "changed_frac": 0.010931538560466412,
+        "mean_abs_channel_sum": 3.601620439833669
+      },
+      {
+        "pair": "frame_0004.png->frame_0005.png",
+        "changed_pixels": 1013,
+        "changed_frac": 0.04342607279118618,
+        "mean_abs_channel_sum": 3.4289021305782996
+      },
+      {
+        "pair": "frame_0005.png->frame_0006.png",
+        "changed_pixels": 1049,
+        "changed_frac": 0.04496934882325203,
+        "mean_abs_channel_sum": 1.0280790500278647
+      },
+      {
+        "pair": "frame_0006.png->frame_0007.png",
+        "changed_pixels": 1231,
+        "changed_frac": 0.05277146654091825,
+        "mean_abs_channel_sum": 3.9588888412569125
+      },
+      {
+        "pair": "frame_0007.png->frame_0008.png",
+        "changed_pixels": 1064,
+        "changed_frac": 0.04561238050327946,
+        "mean_abs_channel_sum": 1.3877909718352124
+      },
+      {
+        "pair": "frame_0008.png->frame_0009.png",
+        "changed_pixels": 1194,
+        "changed_frac": 0.051185321730183905,
+        "mean_abs_channel_sum": 4.791486260556437
+      },
+      {
+        "pair": "frame_0009.png->frame_0010.png",
+        "changed_pixels": 916,
+        "changed_frac": 0.03926780126034209,
+        "mean_abs_channel_sum": 3.275088952715737
+      },
+      {
+        "pair": "frame_0010.png->frame_0011.png",
+        "changed_pixels": 670,
+        "changed_frac": 0.02872208170789214,
+        "mean_abs_channel_sum": 0.7366570926394307
+      },
+      {
+        "pair": "frame_0011.png->frame_0012.png",
+        "changed_pixels": 601,
+        "changed_frac": 0.025764135979765936,
+        "mean_abs_channel_sum": 2.387833840613881
+      },
+      {
+        "pair": "frame_0012.png->frame_0013.png",
+        "changed_pixels": 572,
+        "changed_frac": 0.02452094139837956,
+        "mean_abs_channel_sum": 0.6528057615638531
+      },
+      {
+        "pair": "frame_0013.png->frame_0014.png",
+        "changed_pixels": 496,
+        "changed_frac": 0.021262914219573884,
+        "mean_abs_channel_sum": 2.320572726883011
+      },
+      {
+        "pair": "frame_0014.png->frame_0015.png",
+        "changed_pixels": 403,
+        "changed_frac": 0.01727611780340378,
+        "mean_abs_channel_sum": 0.47082779611608866
+      },
+      {
+        "pair": "frame_0015.png->frame_0016.png",
+        "changed_pixels": 519,
+        "changed_frac": 0.022248896128949286,
+        "mean_abs_channel_sum": 2.0865091953530244
+      },
+      {
+        "pair": "frame_0016.png->frame_0017.png",
+        "changed_pixels": 302,
+        "changed_frac": 0.012946371157885711,
+        "mean_abs_channel_sum": 0.29810948686071936
+      },
+      {
+        "pair": "frame_0017.png->frame_0018.png",
+        "changed_pixels": 328,
+        "changed_frac": 0.0140609594032666,
+        "mean_abs_channel_sum": 1.2395078664208856
+      },
+      {
+        "pair": "frame_0018.png->frame_0019.png",
+        "changed_pixels": 159,
+        "changed_frac": 0.0068161358082908215,
+        "mean_abs_channel_sum": 0.16950315085523213
+      },
+      {
+        "pair": "frame_0019.png->frame_0020.png",
+        "changed_pixels": 192,
+        "changed_frac": 0.008230805504351181,
+        "mean_abs_channel_sum": 0.6691387662365499
+      },
+      {
+        "pair": "frame_0020.png->frame_0021.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0342092853774596
+      },
+      {
+        "pair": "frame_0021.png->frame_0022.png",
+        "changed_pixels": 117,
+        "changed_frac": 0.005015647104214001,
+        "mean_abs_channel_sum": 0.1939383546962747
+      },
+      {
+        "pair": "frame_0022.png->frame_0023.png",
+        "changed_pixels": 2,
+        "changed_frac": 8.573755733699147e-05,
+        "mean_abs_channel_sum": 0.004758434432203027
+      },
+      {
+        "pair": "frame_0023.png->frame_0024.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0016718823680713336
+      },
+      {
+        "pair": "frame_0024.png->frame_0025.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0007716380160329232
+      },
+      {
+        "pair": "frame_0025.png->frame_0026.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0026.png->frame_0027.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0027.png->frame_0028.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0028.png->frame_0029.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0029.png->frame_0030.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0030.png->frame_0031.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0031.png->frame_0032.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0032.png->frame_0033.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0033.png->frame_0034.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0034.png->frame_0035.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0035.png->frame_0036.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0036.png->frame_0037.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0037.png->frame_0038.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0038.png->frame_0039.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0039.png->frame_0040.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      }
+    ]
+  },
+  "ocr_sample": [
+    {
+      "frame_index": 1,
+      "path": "frame_0001.png",
+      "has_token": false,
+      "has_mark_clock": false,
+      "snippet": "OOO | e y"
+    },
+    {
+      "frame_index": 2,
+      "path": "frame_0002.png",
+      "has_token": false,
+      "has_mark_clock": false,
+      "snippet": "OOO | e y"
+    },
+    {
+      "frame_index": 3,
+      "path": "frame_0003.png",
+      "has_token": false,
+      "has_mark_clock": false,
+      "snippet": "OOO | e y"
+    },
+    {
+      "frame_index": 4,
+      "path": "frame_0004.png",
+      "has_token": true,
+      "has_mark_clock": false,
+      "snippet": "OOO ee ZX9Q7 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXY2 | e y"
+    },
+    {
+      "frame_index": 5,
+      "path": "frame_0005.png",
+      "has_token": true,
+      "has_mark_clock": false,
+      "snippet": "ZX9Q7 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXY 2"
+    },
+    {
+      "frame_index": 6,
+      "path": "frame_0006.png",
+      "has_token": true,
+      "has_mark_clock": false,
+      "snippet": "ZX9Q7 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    },
+    {
+      "frame_index": 7,
+      "path": "frame_0007.png",
+      "has_token": false,
+      "has_mark_clock": false,
+      "snippet": "re Mr Crabs \u2014 shell -) ZY9O7 THE CULCK BROWN FOX JUMPS OVER TRE LAZY DOG OLesebe7e\u00a9 ABCDEFERIOKLENOPORSTUWINZ a y"
+    },
+    {
+      "frame_index": 8,
+      "path": "frame_0008.png",
+      "has_token": true,
+      "has_mark_clock": false,
+      "snippet": "re Mr Crabs \u2014 shell -) ZX9Q7 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG 0125456789 ABCDEFGHIJKLMNOPOQRSTUVWXY2 a y"
+    },
+    {
+      "frame_index": 9,
+      "path": "frame_0009.png",
+      "has_token": true,
+      "has_mark_clock": false,
+      "snippet": "re -) ZX9Q7 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG \u00a9125456789 ABCDEFGHIUKLMNOPQRSTUVWXYZ a a\u201d"
+    },
+    {
+      "frame_index": 10,
+      "path": "frame_0010.png",
+      "has_token": true,
+      "has_mark_clock": false,
+      "snippet": "re -) ZX9Q7 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG \u00a9123456789 ABCDEFGHIJKLMNOPOQRSTUWWXYZ a a\u201d"
+    },
+    {
+      "frame_index": 11,
+      "path": "frame_0011.png",
+      "has_token": true,
+      "has_mark_clock": false,
+      "snippet": "re -) ZX9Q7 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG \u00a9123456789 ABCDEFGHIJKLMNOPQRSTUWWXYZ a a\u201d"
+    },
+    {
+      "frame_index": 12,
+      "path": "frame_0012.png",
+      "has_token": true,
+      "has_mark_clock": false,
+      "snippet": "Cc -) ZX9Q7 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG \u00a9123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ a a\u201d"
+    },
+    {
+      "frame_index": 13,
+      "path": "frame_0013.png",
+      "has_token": true,
+      "has_mark_clock": false,
+      "snippet": "fe Mr Crabs \u2014 shell a ZX9Q7 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG \u00a9123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ a a\u201d"
+    },
+    {
+      "frame_index": 14,
+      "path": "frame_0014.png",
+      "has_token": true,
+      "has_mark_clock": false,
+      "snippet": "re -) ZX9Q7 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG \u00a9123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ a a\u201d"
+    },
+    {
+      "frame_index": 15,
+      "path": "frame_0015.png",
+      "has_token": true,
+      "has_mark_clock": false,
+      "snippet": "re -) ZX9Q7 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG \u00a9123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ a a\u201d"
+    },
+    {
+      "frame_index": 16,
+      "path": "frame_0016.png",
+      "has_token": true,
+      "has_mark_clock": false,
+      "snippet": "Cc -) ZX9Q7 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ a a\u201d"
+    },
+    {
+      "frame_index": 17,
+      "path": "frame_0017.png",
+      "has_token": true,
+      "has_mark_clock": false,
+      "snippet": "'@ ) ZX9Q7 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ a a\u201d"
+    },
+    {
+      "frame_index": 18,
+      "path": "frame_0018.png",
+      "has_token": true,
+      "has_mark_clock": false,
+      "snippet": "'@ ) ZX9Q7 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ a \u201d"
+    },
+    {
+      "frame_index": 19,
+      "path": "frame_0019.png",
+      "has_token": true,
+      "has_mark_clock": false,
+      "snippet": "'@ ) ZX9Q7 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ a \u201d"
+    },
+    {
+      "frame_index": 20,
+      "path": "frame_0020.png",
+      "has_token": true,
+      "has_mark_clock": false,
+      "snippet": "'@ ) ZX9Q7 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ a \u201d"
+    },
+    {
+      "frame_index": 21,
+      "path": "frame_0021.png",
+      "has_token": true,
+      "has_mark_clock": false,
+      "snippet": "'@ ) ZX9Q7 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ a \u201d"
+    },
+    {
+      "frame_index": 22,
+      "path": "frame_0022.png",
+      "has_token": true,
+      "has_mark_clock": false,
+      "snippet": "'@ ) ZX9Q7 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ a \u201d"
+    },
+    {
+      "frame_index": 23,
+      "path": "frame_0023.png",
+      "has_token": true,
+      "has_mark_clock": false,
+      "snippet": "'@ ) ZX9Q7 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ a \u201d"
+    },
+    {
+      "frame_index": 24,
+      "path": "frame_0024.png",
+      "has_token": true,
+      "has_mark_clock": false,
+      "snippet": "'@ ) ZX9Q7 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ a \u201d"
+    },
+    {
+      "frame_index": 25,
+      "path": "frame_0025.png",
+      "has_token": true,
+      "has_mark_clock": false,
+      "snippet": "'@ ) ZX9Q7 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ a \u201d"
+    },
+    {
+      "frame_index": 26,
+      "path": "frame_0026.png",
+      "has_token": true,
+      "has_mark_clock": false,
+      "snippet": "'@ ) ZX9Q7 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ a \u201d"
+    },
+    {
+      "frame_index": 27,
+      "path": "frame_0027.png",
+      "has_token": true,
+      "has_mark_clock": false,
+      "snippet": "'@ ) ZX9Q7 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ a \u201d"
+    },
+    {
+      "frame_index": 28,
+      "path": "frame_0028.png",
+      "has_token": true,
+      "has_mark_clock": false,
+      "snippet": "'@ ) ZX9Q7 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ a \u201d"
+    },
+    {
+      "frame_index": 29,
+      "path": "frame_0029.png",
+      "has_token": true,
+      "has_mark_clock": false,
+      "snippet": "'@ ) ZX9Q7 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ a \u201d"
+    },
+    {
+      "frame_index": 30,
+      "path": "frame_0030.png",
+      "has_token": true,
+      "has_mark_clock": false,
+      "snippet": "'@ ) ZX9Q7 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ a \u201d"
+    },
+    {
+      "frame_index": 31,
+      "path": "frame_0031.png",
+      "has_token": true,
+      "has_mark_clock": false,
+      "snippet": "'@ ) ZX9Q7 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ a \u201d"
+    },
+    {
+      "frame_index": 32,
+      "path": "frame_0032.png",
+      "has_token": true,
+      "has_mark_clock": false,
+      "snippet": "'@ ) ZX9Q7 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ a \u201d"
+    },
+    {
+      "frame_index": 33,
+      "path": "frame_0033.png",
+      "has_token": true,
+      "has_mark_clock": false,
+      "snippet": "'@ ) ZX9Q7 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ a \u201d"
+    },
+    {
+      "frame_index": 34,
+      "path": "frame_0034.png",
+      "has_token": true,
+      "has_mark_clock": false,
+      "snippet": "'@ ) ZX9Q7 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ a \u201d"
+    },
+    {
+      "frame_index": 35,
+      "path": "frame_0035.png",
+      "has_token": true,
+      "has_mark_clock": false,
+      "snippet": "'@ ) ZX9Q7 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ a \u201d"
+    },
+    {
+      "frame_index": 36,
+      "path": "frame_0036.png",
+      "has_token": true,
+      "has_mark_clock": false,
+      "snippet": "'@ ) ZX9Q7 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ a \u201d"
+    },
+    {
+      "frame_index": 37,
+      "path": "frame_0037.png",
+      "has_token": true,
+      "has_mark_clock": false,
+      "snippet": "'@ ) ZX9Q7 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ a \u201d"
+    },
+    {
+      "frame_index": 38,
+      "path": "frame_0038.png",
+      "has_token": true,
+      "has_mark_clock": false,
+      "snippet": "'@ ) ZX9Q7 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ a \u201d"
+    },
+    {
+      "frame_index": 39,
+      "path": "frame_0039.png",
+      "has_token": true,
+      "has_mark_clock": false,
+      "snippet": "'@ ) ZX9Q7 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ a \u201d"
+    },
+    {
+      "frame_index": 40,
+      "path": "frame_0040.png",
+      "has_token": true,
+      "has_mark_clock": false,
+      "snippet": "'@ ) ZX9Q7 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ a \u201d"
+    }
+  ]
+}

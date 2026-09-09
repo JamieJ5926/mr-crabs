@@ -1,0 +1,7 @@
+run_id=streaming
+mode=streaming
+burst_ms=80
+burst_count=40
+started=2026-08-31 22:03:10
+exit_status=0
+2026-08-31 22:04:02

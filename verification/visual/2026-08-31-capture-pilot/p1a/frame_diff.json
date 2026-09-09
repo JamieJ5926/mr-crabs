@@ -1,0 +1,184 @@
+{
+  "mechanism": "window-local screenshot PNG burst; trigger mid-span",
+  "trigger_token": "ZX9Q7",
+  "mean_interval_ms": 95.46666666666667,
+  "median_interval_ms": 89,
+  "min_interval_ms": 81,
+  "max_interval_ms": 129,
+  "mean_call_ms": 93.81656348705292,
+  "frame_count": 16,
+  "png_ok": 16,
+  "t_record_start_ms": 1788162188505,
+  "t_trigger_ms": 1788162188807,
+  "t_record_stop_ms": 1788162190063,
+  "session_span_ms": 1558,
+  "order_ok": true,
+  "first_mark_extracted_frame": null,
+  "first_token_extracted_frame": null,
+  "last_ocr_mark": null,
+  "capture_end_frame": 16,
+  "post_has_token": false,
+  "video": {
+    "frame_count": 16,
+    "diff_resize": "240x180",
+    "nonzero_diff_pairs": 0,
+    "substantial_pairs": 0,
+    "series": [
+      {
+        "pair": "frame_0001.png->frame_0002.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0002.png->frame_0003.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0003.png->frame_0004.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0004.png->frame_0005.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0005.png->frame_0006.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0006.png->frame_0007.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0007.png->frame_0008.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0008.png->frame_0009.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0009.png->frame_0010.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0010.png->frame_0011.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0011.png->frame_0012.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0012.png->frame_0013.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0013.png->frame_0014.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0014.png->frame_0015.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      },
+      {
+        "pair": "frame_0015.png->frame_0016.png",
+        "changed_pixels": 0,
+        "changed_frac": 0.0,
+        "mean_abs_channel_sum": 0.0
+      }
+    ]
+  },
+  "ocr_sample": [
+    {
+      "frame_index": 1,
+      "path": "frame_0001.png",
+      "has_token": false,
+      "marks": [],
+      "snippet": "'@ ) jamie@Jamies-MacBook-Pro pla % kepyt haon 3 -u clock.py zsh: command not found: kepyt >| a \u201d"
+    },
+    {
+      "frame_index": 3,
+      "path": "frame_0003.png",
+      "has_token": false,
+      "marks": [],
+      "snippet": "'@ ) jamie@Jamies-MacBook-Pro pla % kepyt haon 3 -u clock.py zsh: command not found: kepyt >| a \u201d"
+    },
+    {
+      "frame_index": 5,
+      "path": "frame_0005.png",
+      "has_token": false,
+      "marks": [],
+      "snippet": "'@ ) jamie@Jamies-MacBook-Pro pla % kepyt haon 3 -u clock.py zsh: command not found: kepyt >| a \u201d"
+    },
+    {
+      "frame_index": 7,
+      "path": "frame_0007.png",
+      "has_token": false,
+      "marks": [],
+      "snippet": "'@ ) jamie@Jamies-MacBook-Pro pla % kepyt haon 3 -u clock.py zsh: command not found: kepyt >| a \u201d"
+    },
+    {
+      "frame_index": 9,
+      "path": "frame_0009.png",
+      "has_token": false,
+      "marks": [],
+      "snippet": "'@ ) jamie@Jamies-MacBook-Pro pla % kepyt haon 3 -u clock.py zsh: command not found: kepyt >| a \u201d"
+    },
+    {
+      "frame_index": 11,
+      "path": "frame_0011.png",
+      "has_token": false,
+      "marks": [],
+      "snippet": "'@ ) jamie@Jamies-MacBook-Pro pla % kepyt haon 3 -u clock.py zsh: command not found: kepyt >| a \u201d"
+    },
+    {
+      "frame_index": 13,
+      "path": "frame_0013.png",
+      "has_token": false,
+      "marks": [],
+      "snippet": "'@ ) jamie@Jamies-MacBook-Pro pla % kepyt haon 3 -u clock.py zsh: command not found: kepyt >| a \u201d"
+    },
+    {
+      "frame_index": 15,
+      "path": "frame_0015.png",
+      "has_token": false,
+      "marks": [],
+      "snippet": "'@ ) jamie@Jamies-MacBook-Pro pla % kepyt haon 3 -u clock.py zsh: command not found: kepyt >| a \u201d"
+    },
+    {
+      "frame_index": 16,
+      "path": "frame_0016.png",
+      "has_token": false,
+      "marks": [],
+      "snippet": "'@ ) jamie@Jamies-MacBook-Pro pla % kepyt haon 3 -u clock.py zsh: command not found: kepyt >| a \u201d"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+state_rc=0
+token=s000000b7:79 idx=79 snap=s000000b7
+click_rc=0
+{
+  "code": "element_outside_target_window",
+  "effect": "refused",
+  "escalation": {
+    "reason": "the addressed element could not be proven to belong to window 5124; take a fresh get_window_state snapshot and re-address it",
+    "recommended": "get_window_state"
+  },
+  "pid": 92183,
+  "reason": "the addressed element could not be proven to belong to window 5124; take a fresh get_window_state snapshot and re-address it",
+  "window_id": 5124
+}

@@ -1,0 +1,10 @@
+{
+  "content_redacted_from_telemetry": true,
+  "privacy_sensitive": true,
+  "supported": true,
+  "types": [
+    "NSStringPboardType",
+    "public.utf8-plain-text"
+  ],
+  "written_type": "text"
+}

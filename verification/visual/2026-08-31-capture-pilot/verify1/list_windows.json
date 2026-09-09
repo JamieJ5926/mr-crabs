@@ -1,0 +1,25 @@
+{
+  "current_space_id": 3,
+  "windows": [
+    {
+      "app_name": "mr-crabs",
+      "bounds": {
+        "height": 1128.0,
+        "width": 1536.0,
+        "x": 977.0,
+        "y": 198.0
+      },
+      "current_space_id": 3,
+      "is_on_screen": true,
+      "layer": 0,
+      "on_current_space": true,
+      "pid": 72713,
+      "space_ids": [
+        3
+      ],
+      "title": "Mr Crabs — shell",
+      "window_id": 3655,
+      "z_index": 382
+    }
+  ]
+}

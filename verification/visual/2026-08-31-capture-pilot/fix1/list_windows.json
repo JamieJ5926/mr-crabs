@@ -1,0 +1,259 @@
+{
+  "current_space_id": 3,
+  "windows": [
+    {
+      "app_name": "mr-crabs",
+      "bounds": {
+        "height": 33.0,
+        "width": 1512.0,
+        "x": 836.0,
+        "y": 1440.0
+      },
+      "current_space_id": null,
+      "is_on_screen": false,
+      "layer": 0,
+      "on_current_space": null,
+      "pid": 42038,
+      "space_ids": null,
+      "title": "",
+      "window_id": 3741,
+      "z_index": 279
+    },
+    {
+      "app_name": "mr-crabs",
+      "bounds": {
+        "height": 33.0,
+        "width": 1512.0,
+        "x": 836.0,
+        "y": 1440.0
+      },
+      "current_space_id": null,
+      "is_on_screen": false,
+      "layer": 0,
+      "on_current_space": null,
+      "pid": 42038,
+      "space_ids": null,
+      "title": "",
+      "window_id": 3740,
+      "z_index": 277
+    },
+    {
+      "app_name": "mr-crabs",
+      "bounds": {
+        "height": 33.0,
+        "width": 1512.0,
+        "x": 836.0,
+        "y": 1440.0
+      },
+      "current_space_id": null,
+      "is_on_screen": false,
+      "layer": 0,
+      "on_current_space": null,
+      "pid": 42038,
+      "space_ids": null,
+      "title": "",
+      "window_id": 3739,
+      "z_index": 275
+    },
+    {
+      "app_name": "mr-crabs",
+      "bounds": {
+        "height": 30.0,
+        "width": 3440.0,
+        "x": 0.0,
+        "y": 0.0
+      },
+      "current_space_id": null,
+      "is_on_screen": false,
+      "layer": 0,
+      "on_current_space": null,
+      "pid": 42038,
+      "space_ids": null,
+      "title": "",
+      "window_id": 3738,
+      "z_index": 274
+    },
+    {
+      "app_name": "mr-crabs",
+      "bounds": {
+        "height": 30.0,
+        "width": 1080.0,
+        "x": 3440.0,
+        "y": 164.0
+      },
+      "current_space_id": null,
+      "is_on_screen": false,
+      "layer": 0,
+      "on_current_space": null,
+      "pid": 42038,
+      "space_ids": null,
+      "title": "",
+      "window_id": 3744,
+      "z_index": 168
+    },
+    {
+      "app_name": "mr-crabs",
+      "bounds": {
+        "height": 33.0,
+        "width": 1512.0,
+        "x": 836.0,
+        "y": 1440.0
+      },
+      "current_space_id": null,
+      "is_on_screen": false,
+      "layer": 0,
+      "on_current_space": null,
+      "pid": 42038,
+      "space_ids": null,
+      "title": "",
+      "window_id": 3742,
+      "z_index": 165
+    },
+    {
+      "app_name": "mr-crabs",
+      "bounds": {
+        "height": 500.0,
+        "width": 500.0,
+        "x": 0.0,
+        "y": 940.0
+      },
+      "current_space_id": null,
+      "is_on_screen": false,
+      "layer": 0,
+      "on_current_space": null,
+      "pid": 42038,
+      "space_ids": null,
+      "title": "",
+      "window_id": 3747,
+      "z_index": 155
+    },
+    {
+      "app_name": "mr-crabs",
+      "bounds": {
+        "height": 30.0,
+        "width": 1080.0,
+        "x": 3440.0,
+        "y": 164.0
+      },
+      "current_space_id": null,
+      "is_on_screen": false,
+      "layer": 0,
+      "on_current_space": null,
+      "pid": 42038,
+      "space_ids": null,
+      "title": "",
+      "window_id": 3746,
+      "z_index": 152
+    },
+    {
+      "app_name": "mr-crabs",
+      "bounds": {
+        "height": 30.0,
+        "width": 1080.0,
+        "x": 3440.0,
+        "y": 164.0
+      },
+      "current_space_id": null,
+      "is_on_screen": false,
+      "layer": 0,
+      "on_current_space": null,
+      "pid": 42038,
+      "space_ids": null,
+      "title": "",
+      "window_id": 3745,
+      "z_index": 149
+    },
+    {
+      "app_name": "mr-crabs",
+      "bounds": {
+        "height": 30.0,
+        "width": 1080.0,
+        "x": 3440.0,
+        "y": 164.0
+      },
+      "current_space_id": null,
+      "is_on_screen": false,
+      "layer": 0,
+      "on_current_space": null,
+      "pid": 42038,
+      "space_ids": null,
+      "title": "",
+      "window_id": 3743,
+      "z_index": 143
+    },
+    {
+      "app_name": "mr-crabs",
+      "bounds": {
+        "height": 30.0,
+        "width": 3440.0,
+        "x": 0.0,
+        "y": 0.0
+      },
+      "current_space_id": null,
+      "is_on_screen": false,
+      "layer": 0,
+      "on_current_space": null,
+      "pid": 42038,
+      "space_ids": null,
+      "title": "",
+      "window_id": 3737,
+      "z_index": 139
+    },
+    {
+      "app_name": "mr-crabs",
+      "bounds": {
+        "height": 30.0,
+        "width": 3440.0,
+        "x": 0.0,
+        "y": 0.0
+      },
+      "current_space_id": null,
+      "is_on_screen": false,
+      "layer": 0,
+      "on_current_space": null,
+      "pid": 42038,
+      "space_ids": null,
+      "title": "",
+      "window_id": 3736,
+      "z_index": 136
+    },
+    {
+      "app_name": "mr-crabs",
+      "bounds": {
+        "height": 30.0,
+        "width": 3440.0,
+        "x": 0.0,
+        "y": 0.0
+      },
+      "current_space_id": null,
+      "is_on_screen": false,
+      "layer": 0,
+      "on_current_space": null,
+      "pid": 42038,
+      "space_ids": null,
+      "title": "",
+      "window_id": 3735,
+      "z_index": 133
+    },
+    {
+      "app_name": "mr-crabs",
+      "bounds": {
+        "height": 1128.0,
+        "width": 1536.0,
+        "x": 977.0,
+        "y": 198.0
+      },
+      "current_space_id": 3,
+      "is_on_screen": true,
+      "layer": 0,
+      "on_current_space": true,
+      "pid": 42038,
+      "space_ids": [
+        3
+      ],
+      "title": "Mr Crabs — shell",
+      "window_id": 3733,
+      "z_index": 129
+    }
+  ]
+}
