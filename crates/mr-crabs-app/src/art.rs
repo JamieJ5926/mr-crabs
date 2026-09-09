@@ -130,6 +130,35 @@ mod tests {
     }
 
     #[test]
+    fn apple_art_is_filled_block_at_cell_size() {
+        let art = builtin("apple").expect("apple");
+        assert_eq!((art.width, art.height), (14, 9));
+        assert!(
+            art.rows.iter().all(|row| row.is_ascii() || row.contains('█')),
+            "rows are cell-grid text"
+        );
+        let longest_run = art.rows.iter().map(|row| {
+            let mut best = 0;
+            let mut run = 0;
+            for ch in row.chars() {
+                if ch == '█' {
+                    run += 1;
+                    best = best.max(run);
+                } else {
+                    run = 0;
+                }
+            }
+            best
+        }).max().unwrap_or(0);
+        assert!(
+            longest_run >= 11,
+            "solid fill run {longest_run}, sparse outline art fails this"
+        );
+        assert_eq!(art.rows[0].trim(), "█", "stem tip");
+        assert!(art.rows[8].contains(' '), "bottom notch stays open");
+    }
+
+    #[test]
     fn missing_custom_path_falls_back() {
         let missing = PathBuf::from("/definitely/missing/mr-crabs-art-does-not-exist.txt");
         assert!(load_custom(&missing).is_none());
