@@ -132,7 +132,7 @@ mod tests {
     #[test]
     fn apple_art_is_filled_block_at_cell_size() {
         let art = builtin("apple").expect("apple");
-        assert_eq!((art.width, art.height), (14, 9));
+        assert_eq!((art.width, art.height), (38, 25));
         assert!(
             art.rows.iter().all(|row| row.is_ascii() || row.contains('█')),
             "rows are cell-grid text"
@@ -141,7 +141,7 @@ mod tests {
             let mut best = 0;
             let mut run = 0;
             for ch in row.chars() {
-                if ch == '█' {
+                if ch != ' ' {
                     run += 1;
                     best = best.max(run);
                 } else {
@@ -151,11 +151,11 @@ mod tests {
             best
         }).max().unwrap_or(0);
         assert!(
-            longest_run >= 11,
+            longest_run >= 30,
             "solid fill run {longest_run}, sparse outline art fails this"
         );
-        assert_eq!(art.rows[0].trim(), "█", "stem tip");
-        assert!(art.rows[8].contains(' '), "bottom notch stays open");
+        assert_eq!(art.rows[0].trim(), ".8", "leaf tip");
+        assert!(art.rows[24].contains(' '), "bottom notch stays open");
     }
 
     #[test]
