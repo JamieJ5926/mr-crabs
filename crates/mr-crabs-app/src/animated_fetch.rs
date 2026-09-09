@@ -82,12 +82,24 @@ fn compose(arrangement: FetchArrangement, selected: &StartupArt) -> FetchLayout 
             let facts: Vec<String> = std::iter::once(info.title)
                 .chain(info.lines.into_iter().map(|(k, v)| format!("{k}: {v}")))
                 .collect();
-            // Order32(b): full Apple body intact, fetch block stacked below.
+            // Order32(b): full Apple body intact, fetch block stacked at the
+            // bottom right. Each fact is left-padded so the block's right
+            // edge aligns with the art width; overlong facts render as-is.
             // Every fact renders; none is ever dropped or spliced into art.
+            let block = width.max(
+                facts
+                    .iter()
+                    .map(|f| f.chars().count())
+                    .max()
+                    .unwrap_or(0),
+            );
             lines.extend(rows_into_logo_lines(art_rows));
-            lines.extend(facts.into_iter().map(|info| FetchLine {
-                logo: String::new(),
-                info,
+            lines.extend(facts.into_iter().map(|fact| {
+                let pad = block.saturating_sub(fact.chars().count());
+                FetchLine {
+                    logo: String::new(),
+                    info: format!("{}{fact}", " ".repeat(pad)),
+                }
             }));
         }
     }
@@ -290,7 +302,7 @@ mod tests {
         );
     }
     #[test]
-    fn below_keeps_art_intact_and_stacks_facts_beneath() {
+    fn below_keeps_art_intact_and_stacks_facts_bottom_right() {
         let art = crate::art::art_for_startup(&StartupArt::Native).expect("apple");
         let info = crate::sysinfo::collect();
         let mut facts = vec![info.title.clone()];
@@ -314,6 +326,24 @@ mod tests {
             .iter()
             .map(|l| l.info.as_str())
             .collect();
-        assert_eq!(stacked, facts, "facts present in order, none lost");
+        let block = art.width.max(
+            facts
+                .iter()
+                .map(|f| f.chars().count())
+                .max()
+                .unwrap_or(0),
+        );
+        assert_eq!(stacked.len(), facts.len(), "no fact lost");
+        for (line, fact) in stacked.iter().zip(facts.iter()) {
+            assert!(
+                line.ends_with(fact.as_str()),
+                "fact text kept at the right edge for {fact}"
+            );
+            assert_eq!(
+                line.chars().count(),
+                block.max(fact.chars().count()),
+                "right edge aligned for {fact}"
+            );
+        }
     }
 }
