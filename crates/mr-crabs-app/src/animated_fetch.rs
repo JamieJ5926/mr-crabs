@@ -36,6 +36,24 @@ pub struct FetchLayout {
     pub logo_width: usize,
 }
 
+/// An info line overlays an art row only with a one-column margin each side.
+fn row_fits(art_row: &str, fact: &str) -> bool {
+    art_row.chars().count() >= fact.chars().count() + 2
+}
+
+/// Centre the fact inside the art row, replacing band glyphs in place.
+fn splice_centered(art_row: &str, fact: &str) -> String {
+    let mut out: Vec<char> = art_row.chars().collect();
+    let glyphs: Vec<char> = fact.chars().collect();
+    let left = out.len().saturating_sub(glyphs.len()) / 2;
+    for (i, ch) in glyphs.iter().enumerate() {
+        if left + i < out.len() {
+            out[left + i] = *ch;
+        }
+    }
+    out.into_iter().collect()
+}
+
 fn compose(arrangement: FetchArrangement, selected: &StartupArt) -> FetchLayout {
     let logo = if matches!(selected, StartupArt::None) {
         None
@@ -67,17 +85,38 @@ fn compose(arrangement: FetchArrangement, selected: &StartupArt) -> FetchLayout 
             }
         }
         FetchArrangement::Below => {
-            lines.extend(art_rows.into_iter().map(|logo| FetchLine {
+            let facts: Vec<String> = std::iter::once(info.title)
+                .chain(info.lines.into_iter().map(|(k, v)| format!("{k}: {v}")))
+                .collect();
+            // Wide art carries the facts inside its body: each fact centres
+            // onto the next art row with a one-column margin, so narrow
+            // leaf/stem rows stay clear. Facts that fit nowhere stack below
+            // as before, so no fact is ever lost on narrow art.
+            let mut rows = art_rows;
+            let mut art_idx = 0;
+            let mut stacked: Vec<String> = Vec::new();
+            for fact in facts {
+                let mut placed = false;
+                while art_idx < rows.len() {
+                    if row_fits(&rows[art_idx], &fact) {
+                        rows[art_idx] = splice_centered(&rows[art_idx], &fact);
+                        art_idx += 1;
+                        placed = true;
+                        break;
+                    }
+                    art_idx += 1;
+                }
+                if !placed {
+                    stacked.push(fact);
+                }
+            }
+            lines.extend(rows.into_iter().map(|logo| FetchLine {
                 logo,
                 info: String::new(),
             }));
-            lines.push(FetchLine {
+            lines.extend(stacked.into_iter().map(|info| FetchLine {
                 logo: String::new(),
-                info: info.title,
-            });
-            lines.extend(info.lines.into_iter().map(|(k, v)| FetchLine {
-                logo: String::new(),
-                info: format!("{k}: {v}"),
+                info,
             }));
         }
     }
@@ -235,8 +274,16 @@ mod tests {
             "hidden shows art only"
         );
         assert!(
-            below.lines.len() > hidden.lines.len(),
-            "below adds info rows beneath the art"
+            below.lines.iter().all(|l| l.info.is_empty())
+                || below.lines.len() > hidden.lines.len(),
+            "below overlays wide art or stacks beneath narrow art"
+        );
+        assert!(
+            below
+                .lines
+                .iter()
+                .any(|l| l.logo.contains('@') || l.info.contains('@')),
+            "below carries the title, overlaid or stacked"
         );
         assert!(
             beside.lines.len() <= below.lines.len(),
@@ -261,11 +308,43 @@ mod tests {
     #[test]
     fn composition_carries_real_system_facts() {
         let layout = compose(FetchArrangement::Below, &StartupArt::Native);
-        let text: String = layout.lines.iter().map(|l| l.info.clone()).collect();
+        let text: String = layout
+            .lines
+            .iter()
+            .map(|l| format!("{}{}", l.logo, l.info))
+            .collect();
         assert!(text.contains('@'), "title row present");
         assert!(
             text.contains("Kernel") || text.contains("CPU"),
             "facts present"
         );
+    }
+    #[test]
+    fn below_overlays_facts_inside_wide_art() {
+        let art = crate::art::art_for_startup(&StartupArt::Native).expect("apple");
+        let info = crate::sysinfo::collect();
+        let mut facts = vec![info.title.clone()];
+        facts.extend(info.lines.iter().map(|(k, v)| format!("{k}: {v}")));
+        let layout = compose(FetchArrangement::Below, &StartupArt::Native);
+        assert!(
+            layout.lines.len() >= art.rows.len()
+                && layout.lines.len() <= art.rows.len() + facts.len(),
+            "art rows kept, leftovers stacked"
+        );
+        for fact in &facts {
+            let row = layout.lines.iter().find(|l| {
+                l.logo.contains(fact.as_str()) || l.info == *fact
+            });
+            let row = row.expect("no fact is ever lost");
+            if !row.logo.contains(fact.as_str()) {
+                continue;
+            }
+            let start = row.logo.find(fact.as_str()).expect("found above");
+            assert!(start > 0, "one-column left margin for {fact}");
+            assert!(
+                start + fact.len() < row.logo.len(),
+                "one-column right margin for {fact}"
+            );
+        }
     }
 }
