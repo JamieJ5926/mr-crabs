@@ -36,6 +36,18 @@ pub struct FetchLayout {
     pub logo_width: usize,
 }
 
+/// Art rows as logo-only lines: the art body stays byte-identical, so the
+/// filled Apple body is never erased by variable-length facts (order32(b):
+/// full art intact, fetch block stacked at the bottom of the centred block).
+fn rows_into_logo_lines(rows: Vec<String>) -> Vec<FetchLine> {
+    rows.into_iter()
+        .map(|logo| FetchLine {
+            logo,
+            info: String::new(),
+        })
+        .collect()
+}
+
 fn compose(arrangement: FetchArrangement, selected: &StartupArt) -> FetchLayout {
     let logo = if matches!(selected, StartupArt::None) {
         None
@@ -67,17 +79,27 @@ fn compose(arrangement: FetchArrangement, selected: &StartupArt) -> FetchLayout 
             }
         }
         FetchArrangement::Below => {
-            lines.extend(art_rows.into_iter().map(|logo| FetchLine {
-                logo,
-                info: String::new(),
-            }));
-            lines.push(FetchLine {
-                logo: String::new(),
-                info: info.title,
-            });
-            lines.extend(info.lines.into_iter().map(|(k, v)| FetchLine {
-                logo: String::new(),
-                info: format!("{k}: {v}"),
+            let facts: Vec<String> = std::iter::once(info.title)
+                .chain(info.lines.into_iter().map(|(k, v)| format!("{k}: {v}")))
+                .collect();
+            // Order32(b): full Apple body intact, fetch block stacked at the
+            // bottom right. Each fact is left-padded so the block's right
+            // edge aligns with the art width; overlong facts render as-is.
+            // Every fact renders; none is ever dropped or spliced into art.
+            let block = width.max(
+                facts
+                    .iter()
+                    .map(|f| f.chars().count())
+                    .max()
+                    .unwrap_or(0),
+            );
+            lines.extend(rows_into_logo_lines(art_rows));
+            lines.extend(facts.into_iter().map(|fact| {
+                let pad = block.saturating_sub(fact.chars().count());
+                FetchLine {
+                    logo: String::new(),
+                    info: format!("{}{fact}", " ".repeat(pad)),
+                }
             }));
         }
     }
@@ -236,7 +258,14 @@ mod tests {
         );
         assert!(
             below.lines.len() > hidden.lines.len(),
-            "below adds info rows beneath the art"
+            "below stacks the fetch block beneath the intact art"
+        );
+        assert!(
+            below
+                .lines
+                .iter()
+                .any(|l| l.logo.is_empty() && l.info.contains('@')),
+            "below carries the title stacked beneath the art"
         );
         assert!(
             beside.lines.len() <= below.lines.len(),
@@ -261,11 +290,60 @@ mod tests {
     #[test]
     fn composition_carries_real_system_facts() {
         let layout = compose(FetchArrangement::Below, &StartupArt::Native);
-        let text: String = layout.lines.iter().map(|l| l.info.clone()).collect();
+        let text: String = layout
+            .lines
+            .iter()
+            .map(|l| format!("{}{}", l.logo, l.info))
+            .collect();
         assert!(text.contains('@'), "title row present");
         assert!(
             text.contains("Kernel") || text.contains("CPU"),
             "facts present"
         );
+    }
+    #[test]
+    fn below_keeps_art_intact_and_stacks_facts_bottom_right() {
+        let art = crate::art::art_for_startup(&StartupArt::Native).expect("apple");
+        let info = crate::sysinfo::collect();
+        let mut facts = vec![info.title.clone()];
+        facts.extend(info.lines.iter().map(|(k, v)| format!("{k}: {v}")));
+        let layout = compose(FetchArrangement::Below, &StartupArt::Native);
+        assert_eq!(
+            layout.lines.len(),
+            art.rows.len() + facts.len(),
+            "every art row kept, every fact stacked beneath"
+        );
+        for (line, row) in layout.lines.iter().zip(art.rows.iter()) {
+            assert_eq!(&line.logo, row, "art body byte-identical");
+            assert!(line.info.is_empty(), "no fact spliced into art");
+        }
+        assert_eq!(layout.lines.first().expect("art").logo.trim(), ".8", "leaf tip kept");
+        assert!(
+            layout.lines[art.rows.len() - 1].logo.contains(' '),
+            "bottom notch stays open"
+        );
+        let stacked: Vec<&str> = layout.lines[art.rows.len()..]
+            .iter()
+            .map(|l| l.info.as_str())
+            .collect();
+        let block = art.width.max(
+            facts
+                .iter()
+                .map(|f| f.chars().count())
+                .max()
+                .unwrap_or(0),
+        );
+        assert_eq!(stacked.len(), facts.len(), "no fact lost");
+        for (line, fact) in stacked.iter().zip(facts.iter()) {
+            assert!(
+                line.ends_with(fact.as_str()),
+                "fact text kept at the right edge for {fact}"
+            );
+            assert_eq!(
+                line.chars().count(),
+                block.max(fact.chars().count()),
+                "right edge aligned for {fact}"
+            );
+        }
     }
 }
