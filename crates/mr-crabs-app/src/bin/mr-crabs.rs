@@ -40,6 +40,49 @@ fn embedded_terminal_fonts() -> Vec<Cow<'static, [u8]>> {
     ]
 }
 
+/// Register the embedded terminal fonts with CoreText for the lifetime of
+/// this process.
+///
+/// `cx.text_system().add_fonts` only stores the font data in font-kit's
+/// in-process `MemSource`, which is enough to resolve a *primary* font
+/// family by name. But the `FontFallbacks` cascade entries GPUI attaches to
+/// the shaped font are `kCTFontFamilyNameAttribute` descriptors, and
+/// CoreText resolves those against the font manager registry, which never
+/// sees `MemSource` fonts. Without this registration the "Symbols Nerd
+/// Font Mono" cascade entry matches nothing and every Nerd PUA codepoint
+/// renders as tofu. Registering the same bytes process-wide makes the
+/// cascade entry resolve while leaving shaping entirely to GPUI.
+#[cfg(target_os = "macos")]
+fn register_embedded_fonts_with_coretext() {
+    use foreign_types::ForeignType as _;
+    for font in embedded_terminal_fonts() {
+        let Cow::Borrowed(bytes) = font else {
+            continue;
+        };
+        // SAFETY: `bytes` is `&'static [u8]` backed by `include_bytes!`, so
+        // the no-copy data provider below can never outlive its storage.
+        // Registration failure is non-fatal: shaping falls back to the
+        // previous behavior (system cascade only).
+        unsafe {
+            let provider = core_graphics::data_provider::CGDataProvider::from_slice(bytes);
+            let Ok(font) = core_graphics::font::CGFont::from_data_provider(provider) else {
+                continue;
+            };
+            let mut error: core_foundation::base::CFTypeRef = std::ptr::null();
+            CTFontManagerRegisterGraphicsFont(font.as_ptr(), std::ptr::addr_of_mut!(error));
+        }
+    }
+}
+
+#[cfg(target_os = "macos")]
+#[link(name = "CoreText", kind = "framework")]
+unsafe extern "C" {
+    fn CTFontManagerRegisterGraphicsFont(
+        font: core_graphics::sys::CGFontRef,
+        error: *mut core_foundation::base::CFTypeRef,
+    ) -> bool;
+}
+
 fn help_text() -> String {
     let version = env!("CARGO_PKG_VERSION");
     let defaults = EffectiveConfig::defaults();
@@ -253,6 +296,8 @@ fn main() {
         cx.text_system()
             .add_fonts(embedded_terminal_fonts())
             .expect("bundled terminal fonts must register");
+        #[cfg(target_os = "macos")]
+        register_embedded_fonts_with_coretext();
 
         let (output_wake, dirty) = ui::new_output_wake();
         let model = cx.new(|_| AppModel::new_with_settings_and_output_wake(settings, output_wake));
