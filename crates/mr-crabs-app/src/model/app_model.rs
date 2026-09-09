@@ -590,6 +590,18 @@ impl AppModel {
     /// Close a window and every session it owns. Sets `quit_requested`
     /// when no windows remain.
     pub fn close_window(&mut self, window_id: WindowId) -> bool {
+        if !self.windows.contains_key(&window_id) {
+            return false;
+        }
+        // Restore persistence seam: a final close snapshots the full layout
+        // before removal (after would persist empty state); an intermediate
+        // close snapshots after removal so the closed window is not
+        // resurrected on next launch. A save failure is reported, never
+        // silent; the close always proceeds.
+        let save_before = self.windows.len() == 1;
+        if save_before {
+            self.persist_shell_state();
+        }
         let Some(mut window) = self.windows.remove(&window_id) else {
             return false;
         };
@@ -605,7 +617,23 @@ impl AppModel {
         if self.windows.is_empty() {
             self.quit_requested = true;
         }
+        if !save_before {
+            self.persist_shell_state();
+        }
         true
+    }
+
+    /// Best-effort shell-state persist for the close path. No-op without a
+    /// configured path; failures are reported to stderr, never silent.
+    fn persist_shell_state(&mut self) {
+        if self.restore.path.is_none() {
+            return;
+        }
+        let mut restore = std::mem::take(&mut self.restore);
+        if let Err(error) = restore.save(self) {
+            eprintln!("Mr Crabs: cannot save shell state: {error}");
+        }
+        self.restore = restore;
     }
 
     /// Close a tab anywhere in the shell, cascading to window close when it

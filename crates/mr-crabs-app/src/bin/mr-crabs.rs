@@ -24,6 +24,7 @@ use gpui_platform::application;
 use mr_crabs_app::action::AppAction;
 use mr_crabs_app::animated_fetch;
 use mr_crabs_app::model::app_model::AppModel;
+use mr_crabs_app::restore::RestoreStore;
 use mr_crabs_app::settings::{
     ANIMATION_OSC_KEY, ANIMATION_PRESETS, AnimationTuiMode, CliOverrides, SettingsError,
     SettingsStore, animation_menu_text, animation_preset, load_effective_from_cli,
@@ -184,6 +185,42 @@ fn startup_settings(args: &[String]) -> Result<SettingsStore, SettingsError> {
     SettingsStore::from_cli(&cli)
 }
 
+/// Restore entry hook: point the model at the default shell-state file and
+/// load the persisted layout (if any) into the fresh model. A missing file
+/// is a first launch, not an error. A corrupt or unsupported file is
+/// reported and ignored so the app still starts fresh; the file is left
+/// untouched for a later run to retry.
+fn restore_shell_state(model: &mut AppModel) {
+    let Some(path) = RestoreStore::default_path() else {
+        return;
+    };
+    model.restore = RestoreStore::at(path.clone());
+    restore_shell_state_from(model, &path);
+}
+
+fn restore_shell_state_from(model: &mut AppModel, path: &std::path::Path) {
+    if !path.exists() {
+        return;
+    }
+    let loaded = model.restore.load(path);
+    match loaded {
+        Ok(state) => {
+            if let Err(error) = model.apply_restore_state(state) {
+                eprintln!(
+                    "Mr Crabs: ignoring shell state at {}: {error}",
+                    path.display()
+                );
+            }
+        }
+        Err(error) => {
+            eprintln!(
+                "Mr Crabs: ignoring shell state at {}: {error}",
+                path.display()
+            );
+        }
+    }
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if animated_fetch::should_run_animated_fetch(&args) {
@@ -256,6 +293,7 @@ fn main() {
 
         let (output_wake, dirty) = ui::new_output_wake();
         let model = cx.new(|_| AppModel::new_with_settings_and_output_wake(settings, output_wake));
+        model.update(cx, |model, _| restore_shell_state(model));
         let shell = cx.new(|_| AppShell::new(model.clone()));
         ui::install_wake(cx, model.clone(), shell.clone(), dirty);
 
@@ -684,5 +722,81 @@ mod tests {
             unknown_animation_message("wiggle"),
             "Mr Crabs: invalid config: unknown animation wiggle; expected one of none, streaming, typewriter, cursor-trail, all"
         );
+    }
+
+    fn restore_temp_path(name: &str) -> std::path::PathBuf {
+        std::env::temp_dir().join(format!(
+            "mr-crabs-restore-bin-{}-{}-{}",
+            name,
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ))
+    }
+
+    #[test]
+    fn restore_entry_applies_supported_layout_from_disk() {
+        let mut original = AppModel::headless();
+        original.dispatch(AppAction::NewSplitRight);
+        original.dispatch(AppAction::NewTab);
+        let dir = restore_temp_path("round-trip");
+        let path = dir.join("shell-state.json");
+        let mut saver = RestoreStore::at(path.clone());
+        saver.save(&original).expect("save");
+
+        let mut fresh = AppModel::headless();
+        fresh.restore = RestoreStore::at(path.clone());
+        restore_shell_state_from(&mut fresh, &path);
+        assert_eq!(fresh.windows.len(), 1);
+        let before = original.active_window().expect("original window");
+        let after = fresh.active_window().expect("restored window");
+        assert_eq!(after.tabs.len(), before.tabs.len());
+        assert_eq!(after.tab_order.len(), before.tab_order.len());
+        for (tab_id, before_tab) in &before.tabs {
+            let after_tab = after.tabs.get(tab_id).expect("tab");
+            assert_eq!(after_tab.tree, before_tab.tree);
+            assert_eq!(after_tab.focused_pane_id(), before_tab.focused_pane_id());
+        }
+        assert_eq!(fresh.restore.restore_count, 1);
+        std::fs::remove_dir_all(&dir).expect("cleanup");
+    }
+
+    #[test]
+    fn restore_entry_starts_fresh_on_invalid_state() {
+        let dir = restore_temp_path("invalid");
+        std::fs::create_dir_all(&dir).expect("mkdir");
+        // Corrupt JSON.
+        let corrupt = dir.join("corrupt.json");
+        std::fs::write(&corrupt, b"{ not json").expect("write");
+        let mut model = AppModel::headless();
+        model.restore = RestoreStore::at(corrupt.clone());
+        restore_shell_state_from(&mut model, &corrupt);
+        assert_eq!(model.windows.len(), 1, "corrupt file keeps fresh model");
+        assert_eq!(model.restore.restore_count, 0);
+        // Unsupported version.
+        let versioned = dir.join("versioned.json");
+        let mut source = AppModel::headless();
+        source.dispatch(AppAction::NewSplitRight);
+        let mut saver = RestoreStore::at(versioned.clone());
+        saver.save(&source).expect("save");
+        let mut raw: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&versioned).expect("read"))
+                .expect("parse");
+        raw["version"] = serde_json::Value::from(999u64);
+        std::fs::write(&versioned, serde_json::to_string(&raw).expect("render"))
+            .expect("write");
+        let mut model = AppModel::headless();
+        model.restore = RestoreStore::at(versioned.clone());
+        restore_shell_state_from(&mut model, &versioned);
+        assert_eq!(model.windows.len(), 1, "versioned file keeps fresh model");
+        assert_eq!(model.restore.restore_count, 0);
+        // Missing file is a first launch.
+        let mut model = AppModel::headless();
+        model.restore = RestoreStore::at(dir.join("absent.json"));
+        restore_shell_state_from(&mut model, &dir.join("absent.json"));
+        assert_eq!(model.windows.len(), 1);
+        std::fs::remove_dir_all(&dir).expect("cleanup");
     }
 }

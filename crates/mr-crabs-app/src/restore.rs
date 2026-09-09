@@ -577,4 +577,88 @@ mod tests {
         let path = RestoreStore::default_path().expect("home set in tests");
         assert!(path.ends_with("shell-state.json"));
     }
+
+    fn close_temp_dir(name: &str) -> std::path::PathBuf {
+        std::env::temp_dir().join(format!(
+            "mr-crabs-restore-close-{}-{}-{}",
+            name,
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ))
+    }
+
+    #[test]
+    fn close_window_persists_full_layout_on_final_close() {
+        let mut model = AppModel::headless();
+        model.dispatch(AppAction::NewSplitRight);
+        model.dispatch(AppAction::NewTab);
+        let dir = close_temp_dir("final");
+        let path = dir.join("shell-state.json");
+        model.restore = RestoreStore::at(path.clone());
+        let window = model.active_window.expect("window");
+
+        assert!(model.close_window(window));
+        assert!(model.windows.is_empty(), "window is really closed");
+        assert_eq!(model.restore.save_count, 1);
+
+        // The file holds the pre-removal layout, not empty state.
+        let loaded = RestoreStore::new().load(&path).expect("load");
+        assert_eq!(loaded.windows.len(), 1);
+        assert_eq!(loaded.windows[0].tabs.len(), 2);
+        let mut revived = AppModel::headless();
+        RestoreStore::new()
+            .apply(&mut revived, loaded)
+            .expect("apply");
+        assert_eq!(revived.windows.len(), 1);
+        assert_eq!(revived.active_window().unwrap().tabs.len(), 2);
+        std::fs::remove_dir_all(&dir).expect("cleanup");
+    }
+
+    #[test]
+    fn close_window_persists_remaining_layout_on_intermediate_close() {
+        let mut model = AppModel::headless();
+        model.dispatch(AppAction::NewSplitRight);
+        let second = model.new_window().expect("second window");
+        let dir = close_temp_dir("intermediate");
+        let path = dir.join("shell-state.json");
+        model.restore = RestoreStore::at(path.clone());
+        let first = model
+            .window_order
+            .iter()
+            .copied()
+            .find(|id| *id != second)
+            .expect("first window");
+
+        assert!(model.close_window(first));
+        assert_eq!(model.windows.len(), 1);
+        assert_eq!(model.restore.save_count, 1);
+        let loaded = RestoreStore::new().load(&path).expect("load");
+        assert_eq!(loaded.windows.len(), 1, "remaining window persisted");
+        assert_eq!(loaded.windows[0].tabs[0].tree.panes_count(), 1);
+
+        assert!(model.close_window(second));
+        assert_eq!(model.restore.save_count, 2);
+        let loaded = RestoreStore::new().load(&path).expect("load");
+        assert_eq!(loaded.windows.len(), 1, "final close kept full layout");
+        assert_eq!(loaded.windows[0].tabs[0].tree.panes_count(), 1);
+        std::fs::remove_dir_all(&dir).expect("cleanup");
+    }
+
+    #[test]
+    fn close_window_survives_save_failure_without_masking() {
+        let mut model = AppModel::headless();
+        let dir = close_temp_dir("failure");
+        std::fs::create_dir_all(&dir).expect("mkdir");
+        // A directory as the state path fails the atomic rename; the close
+        // still proceeds and the failure is reported, not masked.
+        model.restore = RestoreStore::at(dir.clone());
+        let window = model.active_window.expect("window");
+        assert!(model.close_window(window));
+        assert!(model.windows.is_empty());
+        assert_eq!(model.restore.save_count, 0);
+        std::fs::remove_dir_all(&dir).expect("cleanup");
+    }
 }
