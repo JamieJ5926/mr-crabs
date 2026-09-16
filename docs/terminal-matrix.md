@@ -25,19 +25,19 @@ Probe pid 96621 holds slot-2 under prior GRANT, isolated `/tmp/crabs-matrix-live
 | G8 first-prompt / first-exec | not-reproducible-with-evidence | `/tmp/overnight-crabs/PotMatrix/g8/first-prompt.png`, `/tmp/overnight-crabs/PotMatrix/g8/first-prompt.log`, `/tmp/overnight-crabs/PotMatrix/g8/first-exec.png`, `/tmp/overnight-crabs/PotMatrix/g8/first-exec.log` |
 | 24-bit (live Crabs) | fixed | `/tmp/overnight-crabs/PotMatrix/crabs/24bit.png` (601359B, uniq 4005, pixdiff 249897, red 628 bluebg 965; calib `/tmp/overnight-crabs/PotMatrix/crabs/calib.png` 601888B red 452 sha16 de5e7b64d7b410c8) |
 | 256-color (live Crabs) | fixed | `/tmp/overnight-crabs/PotMatrix/crabs/256color.png` (583335B, uniq 3559, pixdiff 257365, red 870 bluebg 1996) |
-| bold/dim/italic/underline/strike (live Crabs) | fixed | `/tmp/overnight-crabs/PotMatrix/crabs/attrs.png` (562371B, uniq 2157, pixdiff 273272; semantics not pixel-separable, see rows.log) |
-| undercurl (live Crabs) | fixed | `/tmp/overnight-crabs/PotMatrix/crabs/undercurl.png` (526047B, uniq 1533, pixdiff 275602; curl-vs-line not pixel-separable) |
-| alt-1049 (live Crabs) | fixed | `/tmp/overnight-crabs/PotMatrix/crabs/alt1049.png` (500562B, uniq 1544, pixdiff 279859) |
-| DECSTBM (live Crabs) | fixed | `/tmp/overnight-crabs/PotMatrix/crabs/decstbm.png` (50878B, uniq 639, pixdiff 251122, dims 1568x984) |
+| bold/dim/italic/underline/strike (live Crabs) | captured-semantics-unverified | `/tmp/overnight-crabs/PotMatrix/crabs/attrs.png` (562371B, uniq 2157, pixdiff 273272; frame changed after paste, but bold vs dim vs italic vs underline vs strike not distinguished — no per-attribute pixel proof) |
+| undercurl (live Crabs) | captured-semantics-unverified | `/tmp/overnight-crabs/PotMatrix/crabs/undercurl.png` (526047B, uniq 1533, pixdiff 275602; frame changed, but wavy undercurl vs straight underline not distinguished) |
+| alt-1049 (live Crabs) | captured-semantics-unverified | `/tmp/overnight-crabs/PotMatrix/crabs/alt1049.png` (500562B, uniq 1544, pixdiff 279859; frame changed, but alt-enter/alt-exit buffer swap not distinguished without content OCR) |
+| DECSTBM (live Crabs) | captured-semantics-unverified | `/tmp/overnight-crabs/PotMatrix/crabs/decstbm.png` (50878B, uniq 639, pixdiff 251122, dims 1568x984; frame changed, but scroll constrained to rows 10-20 never exercised, so the region is unproven) |
 | DECSCUSR (live Crabs) | deferred-with-reason | `/tmp/overnight-crabs/PotMatrix/crabs/decscusr.png` (92772B, uniq 641; cursor shape not measurable from still PNG) |
 | kitty keyboard (live Crabs) | deferred-with-reason | `/tmp/overnight-crabs/PotMatrix/crabs/kittykb.png` (124810B, uniq 642; needs key-event readback the AX surface cannot provide) |
-| bracketed paste (live Crabs) | fixed | `/tmp/overnight-crabs/PotMatrix/crabs/brpaste.png` (180522B, uniq 641, pixdiff 282338) |
+| bracketed paste (live Crabs) | captured-semantics-unverified | `/tmp/overnight-crabs/PotMatrix/crabs/brpaste.png` (180522B, uniq 641, pixdiff 282338; frame changed, but 2004-mode bracketing of the pasted text vs plain echo not distinguished — earlier paste-test.png/paste-test2.png were byte-identical 559234B) |
 | SGR mouse 1006 (live Crabs) | deferred-with-reason | `/tmp/overnight-crabs/PotMatrix/crabs/mouse1006.png` (239298B, uniq 481; needs click-event readback unavailable via AX) |
 | focus 1004 (live Crabs) | deferred-with-reason | `/tmp/overnight-crabs/PotMatrix/crabs/focus1004.png` (270964B, uniq 481; smallest prev-diff 11649, consistent with no visible change) |
 | OSC8 (live Crabs) | deferred-with-reason | `/tmp/overnight-crabs/PotMatrix/crabs/osc8.png` (322847B, uniq 481; hyperlink hover/click path not driven) |
 | OSC52 (live Crabs) | deferred-with-reason | `/tmp/overnight-crabs/PotMatrix/crabs/osc52.png` (347863B, uniq 868; permission-gated, unverifiable from stills) |
-| CJK/emoji wide (live Crabs) | fixed | `/tmp/overnight-crabs/PotMatrix/crabs/cjk.png` (345158B, uniq 844, pixdiff 395355; cell metrics not pixel-separable) |
-| TERM/COLORTERM (live Crabs) | fixed | `/tmp/overnight-crabs/PotMatrix/crabs/term.png` (367339B, uniq 862, pixdiff 401531; env echo not OCR-verified) |
+| CJK/emoji wide (live Crabs) | captured-semantics-unverified | `/tmp/overnight-crabs/PotMatrix/crabs/cjk.png` (345158B, uniq 844, pixdiff 395355; frame changed, but double-width cell metrics and emoji column width not measured) |
+| TERM/COLORTERM (live Crabs) | captured-semantics-unverified | `/tmp/overnight-crabs/PotMatrix/crabs/term.png` (367339B, uniq 862, pixdiff 401531; frame changed, but env echo text never OCR-verified — tesseract unreliable on this surface) |
 | SIGWINCH/resize (live Crabs) | deferred-with-reason | `/tmp/overnight-crabs/PotMatrix/crabs/resize.png` (330798B, uniq 859; set_window_frame not attempted on the shared single-slot probe) |
 | Ghostty 24-bit | SKIP-with-reason | `/tmp/overnight-crabs/PotMatrix/ghostty/24-bit-before.log` |
 | Ghostty 256-color | SKIP-with-reason | `/tmp/overnight-crabs/PotMatrix/ghostty/256-color-before.log` |
