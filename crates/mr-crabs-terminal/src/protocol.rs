@@ -344,6 +344,10 @@ pub struct TerminalProtocol {
     dec1036: bool,
     /// xterm modifyOtherKeys level 2 (`CSI > 4 ; 2 m`).
     modify_other_keys_2: bool,
+    /// DECSET 1047: alternate screen without 1049 save/clear overlay.
+    alt_screen_1047: bool,
+    /// DECSET 1048: cursor save/restore (DECSC/DECRC pair).
+    cursor_save_1048: bool,
     /// Prefix probe for XTWINOPS CSI 16 t, which vte 0.15 does not expose
     /// through its Handler trait. Kept across PTY chunks.
     csi16_probe_len: u8,
@@ -505,6 +509,8 @@ impl TerminalProtocol {
             ignore_keypad_with_numlock: true,
             dec1036: false,
             modify_other_keys_2: false,
+            alt_screen_1047: false,
+            cursor_save_1048: false,
             csi16_probe_len: 0,
             palette: [None; 260],
         })
@@ -561,6 +567,8 @@ impl TerminalProtocol {
             67 => self.decbkm = enabled,
             1035 => self.ignore_keypad_with_numlock = enabled,
             1036 => self.dec1036 = enabled,
+            1047 => self.alt_screen_1047 = enabled,
+            1048 => self.cursor_save_1048 = enabled,
             _ => {}
         }
     }
@@ -574,6 +582,8 @@ impl TerminalProtocol {
         self.ignore_keypad_with_numlock = true;
         self.dec1036 = false;
         self.modify_other_keys_2 = false;
+        self.alt_screen_1047 = false;
+        self.cursor_save_1048 = false;
     }
 
     /// Adapter-side state reset after [`CompactEngine::resize`] (the engine
@@ -1277,6 +1287,20 @@ impl TerminalProtocol {
             1006 => set(TerminalMode::SgrMouse),
             1007 => set(TerminalMode::AlternateScroll),
             1042 => set(TerminalMode::UrgencyHints),
+            1047 => {
+                if self.alt_screen_1047 || self.engine.has_mode(TerminalMode::AltScreen) {
+                    ModeState::Set
+                } else {
+                    ModeState::Reset
+                }
+            }
+            1048 => {
+                if self.cursor_save_1048 {
+                    ModeState::Set
+                } else {
+                    ModeState::Reset
+                }
+            }
             1049 => set(TerminalMode::AltScreen),
             2004 => set(TerminalMode::BracketedPaste),
             12 => {
