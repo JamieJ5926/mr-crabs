@@ -50,7 +50,8 @@ use mr_crabs_protocols::snapshot::{DecodeError, EncodeError, SnapshotPayload};
 use vte::ansi::{
     Attr, CharsetIndex, ClearMode, Color, CursorShape, CursorStyle, Handler, Hyperlink,
     KeyboardModes, KeyboardModesApplyBehavior, LineClearMode, Mode, ModifyOtherKeys, NamedColor,
-    PrivateMode, Processor, Rgb as VteRgb, StandardCharset, TabulationClearMode,
+    NamedPrivateMode, PrivateMode, Processor, Rgb as VteRgb, StandardCharset, TabulationClearMode,
+    Timeout,
 };
 
 use crate::compact::CompactEngine;
@@ -601,7 +602,8 @@ impl TerminalProtocol {
     pub fn feed(&mut self, bytes: &[u8]) {
         const CSI16: &[u8; 5] = b"\x1b[16t";
         const VTE_GROUND: u8 = 0;
-        if self.csi16_probe_len == 0
+        if !self.processor_sync_pending()
+            && self.csi16_probe_len == 0
             && self.vte_prefix_state == VTE_GROUND
             && !self.in_string
             && self.pending_run_len == 0
@@ -610,7 +612,8 @@ impl TerminalProtocol {
         {
             return;
         }
-        if self.csi16_probe_len == 0
+        if !self.processor_sync_pending()
+            && self.csi16_probe_len == 0
             && self.vte_prefix_state == VTE_GROUND
             && !self.in_string
             && self.pending_run_len == 0
@@ -774,7 +777,10 @@ impl TerminalProtocol {
     /// UTF-8 continuation count needed to distinguish C1-valued continuation
     /// bytes from raw string introducers.
     fn try_feed_direct(&mut self, bytes: &[u8]) -> bool {
-        if self.in_string || self.pending_run_len != 0 || self.scanner.state != ScannerState::Ground
+        if self.processor_sync_pending()
+            || self.in_string
+            || self.pending_run_len != 0
+            || self.scanner.state != ScannerState::Ground
         {
             return false;
         }
@@ -934,6 +940,11 @@ impl TerminalProtocol {
         let mut processor = self.processor.take().expect("vte processor present");
         processor.advance(self, bytes);
         self.processor = Some(processor);
+    }
+    fn processor_sync_pending(&self) -> bool {
+        self.processor
+            .as_ref()
+            .is_some_and(|p| p.sync_timeout().pending_timeout())
     }
 
     /// Flush buffered ground-state stream bytes through vte.
@@ -1303,6 +1314,13 @@ impl TerminalProtocol {
             }
             1049 => set(TerminalMode::AltScreen),
             2004 => set(TerminalMode::BracketedPaste),
+            2026 => {
+                if self.processor_sync_pending() {
+                    ModeState::Set
+                } else {
+                    ModeState::Reset
+                }
+            }
             12 => {
                 if self.engine.cursor_style().blinking {
                     ModeState::Set
@@ -1548,12 +1566,23 @@ impl Handler for TerminalProtocol {
 
     fn set_private_mode(&mut self, mode: PrivateMode) {
         self.track_private_mode(mode, true);
-        self.engine.set_private_mode(mode);
+        match mode.raw() {
+            1047 => self
+                .engine
+                .set_private_mode(NamedPrivateMode::SwapScreenAndSetRestoreCursor.into()),
+            1048 => self.save_cursor_position(),
+            _ => self.engine.set_private_mode(mode),
+        }
     }
-
     fn unset_private_mode(&mut self, mode: PrivateMode) {
         self.track_private_mode(mode, false);
-        self.engine.unset_private_mode(mode);
+        match mode.raw() {
+            1047 => self
+                .engine
+                .unset_private_mode(NamedPrivateMode::SwapScreenAndSetRestoreCursor.into()),
+            1048 => self.restore_cursor_position(),
+            _ => self.engine.unset_private_mode(mode),
+        }
     }
 
     fn set_scrolling_region(&mut self, top: usize, bottom: Option<usize>) {
@@ -1766,7 +1795,7 @@ impl TerminalProtocol {
             Attr::CancelStrike => Some(SgrAttr::NoStrikethrough),
             Attr::Foreground(color) => Some(SgrAttr::Foreground(color_spec(*color))),
             Attr::Background(color) => Some(SgrAttr::Background(color_spec(*color))),
-            Attr::UnderlineColor(_) => None,
+            Attr::UnderlineColor(color) => Some(SgrAttr::UnderlineColor(color_spec_opt(color))),
         };
         if let Some(sgr_attr) = sgr_attr {
             self.sgr.apply(sgr_attr);
@@ -1785,6 +1814,10 @@ fn color_spec(color: Color) -> Option<mr_crabs_protocols::sgr::ColorSpec> {
             b: rgb.b,
         })),
     }
+}
+
+fn color_spec_opt(color: &Option<Color>) -> Option<mr_crabs_protocols::sgr::ColorSpec> {
+    color.as_ref().and_then(|c| color_spec(*c))
 }
 
 /// Map an OSC 10-19 dynamic color onto CompactEngine named color slots
