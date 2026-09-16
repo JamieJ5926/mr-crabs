@@ -25,6 +25,18 @@ pub fn char_width(c: char) -> Option<usize> {
 pub fn cluster_width(cluster: &str) -> usize {
     UnicodeWidthStr::width(cluster)
 }
+pub fn is_cluster_trailer(c: char) -> bool {
+    matches!(
+        c,
+        '\u{200D}'
+            | '\u{FE0E}'
+            | '\u{FE0F}'
+            | '\u{1F3FB}'..='\u{1F3FF}'
+            | '\u{1F1E6}'..='\u{1F1FF}'
+            | '\u{E0020}'..='\u{E007F}'
+            | '\u{20E3}'
+    )
+}
 
 #[cfg(test)]
 mod tests {

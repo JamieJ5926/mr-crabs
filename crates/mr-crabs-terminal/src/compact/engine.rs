@@ -23,7 +23,7 @@ use crate::compact::state::{
     COLOR_COUNT, CursorPos, KEYBOARD_STACK_MAX, KittyApply, ModeBits, Pen, SavedCursor,
     TITLE_STACK_MAX, TabStops, clamp_scroll_region, default_cursor_style, map_charset,
 };
-use crate::compact::width::char_width;
+use crate::compact::width::{char_width, cluster_width, is_cluster_trailer};
 use crate::side_tables::{GraphemeTable, HyperlinkTable, StyleRemap, StyleTable};
 use crate::{
     Cell, CombiningMarks, CursorSnapshot, DamageKind, GridSize, HistoryRead, HyperlinkInfo,
@@ -1185,6 +1185,147 @@ impl CompactEngine {
         self.mark_row(row);
     }
 
+    fn cluster_target(&self) -> Option<(u16, u16)> {
+        let mut col = self.screen().cursor.col;
+        if !self.screen().cursor.wrap_pending {
+            col = col.saturating_sub(1);
+        }
+        let row = self.screen().cursor.row;
+        let row_ref = self.screen().active.get(usize::from(row))?;
+        let mut target = col;
+        if let Some(cell) = row_ref.cells.get(usize::from(col)) {
+            if cell.flags & flags::WIDE_CHAR_SPACER != 0 && col > 0 {
+                target = col - 1;
+            }
+        }
+        let cell = row_ref.cells.get(usize::from(target))?;
+        let has_marks = row_ref
+            .extras
+            .as_ref()
+            .map(|extras| extras.combining.contains_key(&target))
+            .unwrap_or(false);
+        if cell.is_default() && !has_marks {
+            return None;
+        }
+        Some((row, target))
+    }
+
+    fn try_extend_cluster(&mut self, c: char) -> bool {
+        if char_width(c).is_none() {
+            return false;
+        }
+        let trailer = is_cluster_trailer(c);
+        let Some((row, col)) = self.cluster_target() else {
+            return false;
+        };
+        let (base_content, marks) = {
+            let row_ref = &self.screen().active[usize::from(row)];
+            let content = row_ref
+                .cells
+                .get(usize::from(col))
+                .map(|cell| cell.content)
+                .unwrap_or(u32::from(' '));
+            let marks = row_ref
+                .extras
+                .as_ref()
+                .and_then(|extras| extras.combining.get(&col).copied())
+                .and_then(|id| self.graphemes.get(id).map(|marks| marks.to_vec()))
+                .unwrap_or_default();
+            (content, marks)
+        };
+        if trailer {
+            if matches!(c, '\u{1F1E6}'..='\u{1F1FF}') {
+                let base_is_ri = char::from_u32(base_content)
+                    .map(|b| matches!(b, '\u{1F1E6}'..='\u{1F1FF}'))
+                    .unwrap_or(false);
+                if !marks.is_empty() || !base_is_ri {
+                    return false;
+                }
+            } else if matches!(
+                c,
+                '\u{1F3FB}'..='\u{1F3FF}' | '\u{E0020}'..='\u{E007F}' | '\u{20E3}'
+            ) {
+                let base_nonascii = char::from_u32(base_content)
+                    .map(|b| b as u32 > 0x7F)
+                    .unwrap_or(false);
+                if marks.is_empty() && !base_nonascii {
+                    return false;
+                }
+            }
+        } else if marks.last().copied() != Some(0x200D) {
+            return false;
+        }
+        let mut text = String::new();
+        if let Some(b) = char::from_u32(base_content) {
+            text.push(b);
+        }
+        for m in &marks {
+            if let Some(ch) = char::from_u32(*m) {
+                text.push(ch);
+            }
+        }
+        text.push(c);
+        let width = cluster_width(&text);
+        if width > 2 || (!trailer && width != 2) {
+            return false;
+        }
+        let mut cluster = marks;
+        cluster.push(u32::from(c));
+        let id = self.graphemes.intern(cluster);
+        let already_wide = self.screen().active[usize::from(row)]
+            .cells
+            .get(usize::from(col))
+            .map(|cell| cell.flags & flags::WIDE_CHAR != 0)
+            .unwrap_or(false);
+        let row_ref = &mut self.screen_mut().active[usize::from(row)];
+        if let Some(cell) = row_ref.cells_mut().get_mut(usize::from(col)) {
+            cell.flags |= flags::COMBINING;
+            if width == 2 {
+                cell.flags |= flags::WIDE_CHAR;
+            }
+        }
+        row_ref.extras_mut().combining.insert(col, id);
+        row_ref.recompute_occupancy();
+        row_ref.bump();
+        self.mark_row(row);
+        if width == 2 && !already_wide {
+            self.place_cluster_spacer(row, col);
+        }
+        true
+    }
+
+    fn place_cluster_spacer(&mut self, row: u16, col: u16) {
+        let cols = usize::from(self.size.cols);
+        let next = usize::from(col) + 1;
+        if next >= cols {
+            return;
+        }
+        self.clear_wide_at(row, next as u16);
+        let style = self.screen().active[usize::from(row)]
+            .cells
+            .get(usize::from(col))
+            .map(|cell| cell.style)
+            .unwrap_or(0);
+        let row_ref = &mut self.screen_mut().active[usize::from(row)];
+        row_ref.clear_extras_at(next as u16);
+        if let Some(cell) = row_ref.cells_mut().get_mut(next) {
+            cell.content = u32::from(' ');
+            cell.style = style;
+            cell.flags = flags::WIDE_CHAR_SPACER;
+        }
+        row_ref.recompute_occupancy();
+        row_ref.bump();
+        self.mark_row(row);
+        if self.screen().cursor.col == col.saturating_add(1) {
+            if usize::from(col) + 2 < cols {
+                self.screen_mut().cursor.col = col.saturating_add(2);
+            } else {
+                self.screen_mut().cursor.col = self.last_col();
+                self.screen_mut().cursor.wrap_pending = true;
+            }
+        }
+    }
+
     fn attach_combining(&mut self, c: char) {
         let mut col = self.screen().cursor.col;
         if !self.screen().cursor.wrap_pending {
@@ -1677,6 +1818,9 @@ impl Handler for CompactEngine {
     }
 
     fn input(&mut self, c: char) {
+        if self.try_extend_cluster(c) {
+            return;
+        }
         let width = match char_width(c) {
             Some(width) => width,
             None => return,
