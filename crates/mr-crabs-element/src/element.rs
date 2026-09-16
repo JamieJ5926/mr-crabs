@@ -1047,12 +1047,26 @@ fn run_paint_style(
     if run.flags & 0x0080 != 0 {
         color.a *= 0.66;
     }
-    let underline = (run.flags & 0x7808 != 0).then(|| UnderlineStyle {
-        thickness: px(1.0),
-        color: style
-            .and_then(|style| style.underline.as_ref())
-            .map(|color| palette::color_to_hsla_with_palette(color, palette)),
-        wavy: run.flags & 0x1000 != 0,
+    let underline = (run.flags & 0x7808 != 0).then(|| {
+        let dashed = run.flags & 0x4000 != 0;
+        let dotted = run.flags & 0x2000 != 0;
+        let double = run.flags & 0x0800 != 0;
+        let wavy = run.flags & 0x1000 != 0;
+        UnderlineStyle {
+            thickness: if dashed {
+                px(2.0)
+            } else if dotted {
+                px(1.5)
+            } else if double {
+                px(3.0)
+            } else {
+                px(1.0)
+            },
+            color: style
+                .and_then(|style| style.underline.as_ref())
+                .map(|color| palette::color_to_hsla_with_palette(color, palette)),
+            wavy,
+        }
     });
     let strikethrough = (run.flags & 0x0200 != 0).then(|| StrikethroughStyle {
         thickness: px(1.0),
@@ -2506,5 +2520,69 @@ mod tests {
         assert_eq!(only.0.size.width, px(2.0));
         assert_eq!(only.1, 0.2);
         assert_eq!(empty.0.size.width, px(0.0));
+    }
+
+    /// Compact flag bits matching `mr_crabs_terminal::compact::flags` and
+    /// Ghostty SGR underline: 4 solid, 4:3 curly, 4:4 dotted, 4:5 dashed.
+    const FLAG_UNDERLINE: u16 = 0x0008;
+    const FLAG_UNDERCURL: u16 = 0x1000;
+    const FLAG_DOTTED_UNDERLINE: u16 = 0x2000;
+    const FLAG_DASHED_UNDERLINE: u16 = 0x4000;
+
+    fn paint_underline_for_flags(flags: u16) -> Option<UnderlineStyle> {
+        let frame = sample_frame();
+        let run = RunBatch {
+            col: 0,
+            len: 1,
+            style: 0,
+            flags,
+            text: SharedString::from("a"),
+            glyph_widths: vec![1],
+            cluster_starts: vec![0],
+        };
+        run_paint_style(&frame, &run, white(), palette::TerminalPalette::default()).1
+    }
+
+    #[test]
+    fn underline_styles_plain_dotted_dashed_wavy_are_distinct() {
+        let plain = paint_underline_for_flags(FLAG_UNDERLINE)
+            .expect("SGR 4 / UNDERLINE paints an underline");
+        let dotted = paint_underline_for_flags(FLAG_DOTTED_UNDERLINE)
+            .expect("SGR 4:4 / DOTTED_UNDERLINE paints an underline");
+        let dashed = paint_underline_for_flags(FLAG_DASHED_UNDERLINE)
+            .expect("SGR 4:5 / DASHED_UNDERLINE paints an underline");
+        let wavy = paint_underline_for_flags(FLAG_UNDERCURL)
+            .expect("SGR 4:3 / UNDERCURL paints an underline");
+
+        assert_eq!(plain.thickness, px(1.0));
+        assert!(!plain.wavy);
+        assert_eq!(dotted.thickness, px(1.5));
+        assert!(!dotted.wavy);
+        assert_eq!(dashed.thickness, px(2.0));
+        assert!(!dashed.wavy);
+        assert_eq!(wavy.thickness, px(1.0));
+        assert!(wavy.wavy);
+
+        assert_ne!(
+            dotted, dashed,
+            "dotted (4:4) must not collapse onto dashed (4:5)"
+        );
+        assert_ne!(
+            dotted, plain,
+            "dotted (4:4) must not collapse onto plain underline (4)"
+        );
+        assert_ne!(
+            dashed, plain,
+            "dashed (4:5) must not collapse onto plain underline (4)"
+        );
+        assert_ne!(wavy, plain, "wavy (4:3) must stay distinct from plain (4)");
+        assert_ne!(
+            wavy, dotted,
+            "wavy (4:3) must stay distinct from dotted (4:4)"
+        );
+        assert_ne!(
+            wavy, dashed,
+            "wavy (4:3) must stay distinct from dashed (4:5)"
+        );
     }
 }
