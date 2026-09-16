@@ -236,6 +236,12 @@ impl CompactRow {
         }
         self.bump();
     }
+
+    /// Columns occupied by a grapheme cluster placed on this row.
+    #[allow(dead_code)]
+    pub fn cell_cluster_cols(cluster: &str) -> usize {
+        crate::compact::width::cluster_width(cluster)
+    }
 }
 
 #[cfg(test)]
@@ -284,4 +290,32 @@ fn occupancy_of(cells: &[Cell]) -> u16 {
         }
     }
     occ
+}
+
+#[cfg(test)]
+mod cluster_width_tests {
+    use super::CompactRow;
+
+    #[test]
+    fn compact_row_cluster_cols_table() {
+        const CASES: &[(&str, usize)] = &[
+            ("A", 1),
+            ("中", 2),
+            ("\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}", 2),
+            ("\u{2764}\u{FE0F}", 2),
+            ("\u{1F44B}\u{1F3FD}", 2),
+            ("\u{1F1FA}\u{1F1F8}", 2),
+            ("\u{E0A0}", 1),
+            ("\u{F8FF}", 1),
+            ("\u{F0000}", 1),
+            ("hello", 5),
+        ];
+        for (cluster, expected) in CASES {
+            assert_eq!(
+                CompactRow::cell_cluster_cols(cluster),
+                *expected,
+                "{cluster:?}"
+            );
+        }
+    }
 }
