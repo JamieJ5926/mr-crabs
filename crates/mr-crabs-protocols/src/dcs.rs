@@ -449,6 +449,56 @@ mod tests {
     }
 
     #[test]
+    fn decrqss_sgr_underline_color_round_trip() {
+        use crate::color::Rgb;
+        use crate::sgr::{ColorSpec, SgrAttr, SgrState};
+
+        struct Ctx(SgrState);
+        impl DecrqssContext for Ctx {
+            fn sgr_attributes(&self, out: &mut Vec<u8>) {
+                self.0.print_attributes(out);
+            }
+            fn cursor_blinking(&self) -> bool {
+                false
+            }
+            fn cursor_shape(&self) -> CursorShapeKind {
+                CursorShapeKind::Block
+            }
+            fn scrolling_region_top(&self) -> usize {
+                0
+            }
+            fn scrolling_region_bottom(&self) -> usize {
+                0
+            }
+            fn left_right_margins_enabled(&self) -> bool {
+                false
+            }
+            fn scrolling_region_left(&self) -> usize {
+                0
+            }
+            fn scrolling_region_right(&self) -> usize {
+                0
+            }
+        }
+
+        let mut s = SgrState::new();
+        s.apply(SgrAttr::UnderlineColor(Some(ColorSpec::Rgb(Rgb {
+            r: 255,
+            g: 0,
+            b: 128,
+        }))));
+        let mut out = Vec::new();
+        DecrqssRequest::Sgr.encode(&Ctx(s), &mut out);
+        assert_eq!(out, b"\x1bP1$r0;58:2::255:0:128m\x1b\\");
+
+        let mut s = SgrState::new();
+        s.apply(SgrAttr::UnderlineColor(Some(ColorSpec::Indexed(196))));
+        let mut out = Vec::new();
+        DecrqssRequest::Sgr.encode(&Ctx(s), &mut out);
+        assert_eq!(out, b"\x1bP1$r0;58:5:196m\x1b\\");
+    }
+
+    #[test]
     fn tmux_enter_and_exit() {
         let mut h = Handler::new();
         let cmd = h
