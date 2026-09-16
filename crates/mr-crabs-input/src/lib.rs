@@ -206,6 +206,7 @@ pub struct KeyboardMode {
     pub alt_esc_prefix: bool,
     pub modify_other_keys_2: bool,
     pub kitty_flags: KittyFlags,
+    pub protocol: KeyboardProtocol,
 }
 
 impl Default for KeyboardMode {
@@ -218,6 +219,7 @@ impl Default for KeyboardMode {
             alt_esc_prefix: false,
             modify_other_keys_2: false,
             kitty_flags: KittyFlags::disabled(),
+            protocol: KeyboardProtocol::Legacy,
         }
     }
 }
@@ -230,6 +232,7 @@ pub struct KeyboardModeOverlay {
     pub ignore_keypad_with_numlock: bool,
     pub modify_other_keys_2: bool,
     pub alt_esc_prefix: bool,
+    pub csi_u: bool,
 }
 
 impl Default for KeyboardModeOverlay {
@@ -239,6 +242,7 @@ impl Default for KeyboardModeOverlay {
             ignore_keypad_with_numlock: true,
             modify_other_keys_2: false,
             alt_esc_prefix: false,
+            csi_u: false,
         }
     }
 }
@@ -270,6 +274,13 @@ impl KeyboardMode {
             alt_esc_prefix: overlay.alt_esc_prefix,
             modify_other_keys_2: overlay.modify_other_keys_2,
             kitty_flags: KittyFlags(kitty),
+            protocol: if kitty != 0 {
+                KeyboardProtocol::Kitty
+            } else if overlay.csi_u {
+                KeyboardProtocol::CsiU
+            } else {
+                KeyboardProtocol::Legacy
+            },
         }
     }
 }
@@ -287,14 +298,16 @@ pub enum KeyboardProtocol {
 /// DECBKM, and alt-escape. Returns number of bytes written.
 pub fn encode_key(event: &KeyEvent, mode: &KeyboardMode, out: &mut Vec<u8>) -> usize {
     let start = out.len();
-    // Legacy and xterm modifyOtherKeys have no key-release wire format.
-    // Kitty may report releases when ReportEventTypes is enabled, so leave
-    // that branch to encode_kitty's flag-aware handling.
-    if event.action == KeyAction::Release && mode.kitty_flags.int() == 0 {
+    if event.action == KeyAction::Release
+        && mode.protocol != KeyboardProtocol::Kitty
+        && mode.kitty_flags.int() == 0
+    {
         return 0;
     }
-    if mode.kitty_flags.int() != 0 {
+    if mode.protocol == KeyboardProtocol::Kitty || mode.kitty_flags.int() != 0 {
         encode_kitty(event, mode, out);
+    } else if mode.protocol == KeyboardProtocol::CsiU {
+        encode_csi_u(event, mode, out);
     } else if mode.modify_other_keys_2 {
         encode_modify_other_keys(event, mode, out);
     } else {
@@ -551,6 +564,22 @@ fn application_keypad_ss3(key: Key) -> Option<&'static [u8]> {
     })
 }
 
+
+fn encode_csi_u(event: &KeyEvent, mode: &KeyboardMode, out: &mut Vec<u8>) {
+    if let Key::Character(ch) = event.key {
+        if event.mods.any() {
+            let code = if event.unshifted_codepoint > 0 {
+                event.unshifted_codepoint
+            } else {
+                ch as u32
+            };
+            let mods = event.mods.csi_param();
+            out.extend_from_slice(format!("\x1b[{code};{mods}u").as_bytes());
+            return;
+        }
+    }
+    encode_legacy(event, mode, out);
+}
 fn encode_modify_other_keys(event: &KeyEvent, mode: &KeyboardMode, out: &mut Vec<u8>) {
     // Xterm modifyOtherKeys level 2: CSI 27 ; modifier ; code ~
     // For simplicity handle Character with ctrl
@@ -833,12 +862,21 @@ pub struct MouseMode {
     pub encoding: MouseEncoding,
 }
 
+/// App/config bits that `TerminalMode` does not carry (Urxvt 1015, SGR-Pixels 1016).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct MouseModeOverlay {
+    pub urxvt: bool,
+    pub sgr_pixels: bool,
+}
+
 impl MouseMode {
-    /// Reporting mode and encoding from the current `TerminalMode` set.
-    ///
     /// Reporting: `MouseMotion` (1003) > `MouseDrag` (1002) > `MouseReportClick` (1000).
-    /// Encoding: `SgrMouse` (1006) > `Utf8Mouse` (1005) > X10.
+    /// Encoding: overlay SGR-Pixels > overlay Urxvt > `SgrMouse` (1006) > `Utf8Mouse` (1005) > X10.
     pub fn from_modes(modes: &[TerminalMode]) -> Self {
+        Self::from_modes_with(modes, MouseModeOverlay::default())
+    }
+
+    pub fn from_modes_with(modes: &[TerminalMode], overlay: MouseModeOverlay) -> Self {
         let report = if modes.contains(&TerminalMode::MouseMotion) {
             MouseReportMode::Any
         } else if modes.contains(&TerminalMode::MouseDrag) {
@@ -848,7 +886,11 @@ impl MouseMode {
         } else {
             MouseReportMode::None
         };
-        let encoding = if modes.contains(&TerminalMode::SgrMouse) {
+        let encoding = if overlay.sgr_pixels {
+            MouseEncoding::SgrPixels
+        } else if overlay.urxvt {
+            MouseEncoding::Urxvt
+        } else if modes.contains(&TerminalMode::SgrMouse) {
             MouseEncoding::Sgr
         } else if modes.contains(&TerminalMode::Utf8Mouse) {
             MouseEncoding::Utf8
@@ -1872,6 +1914,7 @@ mod tests {
                 ignore_keypad_with_numlock: false,
                 modify_other_keys_2: true,
                 alt_esc_prefix: true,
+                csi_u: false,
             },
         );
         assert!(overlay_only.backarrow_key_mode);
@@ -1985,6 +2028,97 @@ mod tests {
         let mut paste = Vec::new();
         encode_paste("hi", true, &mut paste);
         assert_eq!(paste, b"\x1b[200~hi\x1b[201~");
+    }
+
+    fn ctrl_b() -> KeyEvent {
+        KeyEvent::new(Key::Character('b')).with_mods(Modifiers {
+            ctrl: true,
+            ..Modifiers::NONE
+        })
+    }
+
+    #[test]
+    fn ctrl_b_legacy_kitty_modify_other_keys() {
+        let overlay = KeyboardModeOverlay::default();
+        let legacy = KeyboardMode::from_modes_with(&[], overlay);
+        assert_eq!(legacy.protocol, KeyboardProtocol::Legacy);
+        assert_eq!(encode(ctrl_b(), &legacy), b"\x02");
+
+        let csiu = KeyboardMode::from_modes_with(
+            &[],
+            KeyboardModeOverlay {
+                csi_u: true,
+                ..KeyboardModeOverlay::default()
+            },
+        );
+        assert_eq!(csiu.protocol, KeyboardProtocol::CsiU);
+        assert_eq!(encode(ctrl_b(), &csiu), b"\x1b[98;5u");
+
+        let kitty = KeyboardMode::from_modes_with(&[TerminalMode::DisambiguateEscCodes], overlay);
+        assert_eq!(kitty.protocol, KeyboardProtocol::Kitty);
+        assert_eq!(encode(ctrl_b(), &kitty), b"\x1b[98;5u");
+
+        let mok = KeyboardMode::from_modes_with(
+            &[],
+            KeyboardModeOverlay {
+                modify_other_keys_2: true,
+                ..KeyboardModeOverlay::default()
+            },
+        );
+        assert_eq!(mok.protocol, KeyboardProtocol::Legacy);
+        assert_eq!(encode(ctrl_b(), &mok), b"\x1b[27;5;98~");
+    }
+
+    #[test]
+    fn mouse_urxvt_and_sgr_pixels_from_overlay() {
+        let click = [TerminalMode::MouseReportClick];
+        let urxvt = MouseMode::from_modes_with(
+            &click,
+            MouseModeOverlay {
+                urxvt: true,
+                sgr_pixels: false,
+            },
+        );
+        assert_eq!(urxvt.encoding, MouseEncoding::Urxvt);
+        let mut out = Vec::new();
+        encode_mouse(
+            &MouseEvent {
+                button: Some(MouseButton::Left),
+                action: MouseAction::Press,
+                mods: Modifiers::NONE,
+                col: 10,
+                row: 5,
+                x_px: 0,
+                y_px: 0,
+            },
+            &urxvt,
+            &mut out,
+        );
+        assert_eq!(out, b"\x1b[32;11;6M");
+
+        let pixels = MouseMode::from_modes_with(
+            &[TerminalMode::MouseMotion],
+            MouseModeOverlay {
+                urxvt: false,
+                sgr_pixels: true,
+            },
+        );
+        assert_eq!(pixels.encoding, MouseEncoding::SgrPixels);
+        out.clear();
+        encode_mouse(
+            &MouseEvent {
+                button: Some(MouseButton::Left),
+                action: MouseAction::Press,
+                mods: Modifiers::NONE,
+                col: 10,
+                row: 5,
+                x_px: 100,
+                y_px: 200,
+            },
+            &pixels,
+            &mut out,
+        );
+        assert_eq!(out, b"\x1b[<0;100;200M");
     }
 
     mod hex {
