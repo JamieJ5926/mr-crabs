@@ -918,6 +918,8 @@ impl PrivateMode {
             1006 => Self::Named(NamedPrivateMode::SgrMouse),
             1007 => Self::Named(NamedPrivateMode::AlternateScroll),
             1042 => Self::Named(NamedPrivateMode::UrgencyHints),
+            1047 => Self::Named(NamedPrivateMode::SwapScreen),
+            1048 => Self::Named(NamedPrivateMode::SaveCursor),
             1049 => Self::Named(NamedPrivateMode::SwapScreenAndSetRestoreCursor),
             2004 => Self::Named(NamedPrivateMode::BracketedPaste),
             2026 => Self::Named(NamedPrivateMode::SyncUpdate),
@@ -968,6 +970,11 @@ pub enum NamedPrivateMode {
     SgrMouse = 1006,
     AlternateScroll = 1007,
     UrgencyHints = 1042,
+    /// Swap to the alternate screen buffer and clear it, without saving the
+    /// cursor (DECSET 1047).
+    SwapScreen = 1047,
+    /// Save the cursor position as in DECSC (DECSET 1048).
+    SaveCursor = 1048,
     SwapScreenAndSetRestoreCursor = 1049,
     BracketedPaste = 2004,
     /// The mode is handled automatically by [`Processor`].

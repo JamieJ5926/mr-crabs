@@ -74,6 +74,8 @@ pub struct CompactEngine {
     primary: Screen,
     alternate: Screen,
     alt_active: bool,
+    sync_update: bool,
+    sync_hold: Vec<u8>,
     scroll_region: Range<u16>,
     modes: ModeBits,
     pen: Pen,
@@ -128,6 +130,8 @@ impl CompactEngine {
             primary: Screen::new(size, max_history),
             alternate: Screen::new(size, 0),
             alt_active: false,
+            sync_update: false,
+            sync_hold: Vec::new(),
             scroll_region: 0..size.rows,
             modes: ModeBits::default_live(),
             pen: Pen::default(),
@@ -262,6 +266,10 @@ impl CompactEngine {
 
     pub fn has_mode(&self, mode: TerminalMode) -> bool {
         self.modes.has_terminal_mode(mode)
+    }
+
+    pub fn is_sync_update(&self) -> bool {
+        self.sync_update
     }
 
     pub fn cursor(&self) -> CursorSnapshot {
@@ -1341,6 +1349,10 @@ impl CompactEngine {
     }
 
     pub(crate) fn input_plain_ascii(&mut self, bytes: &[u8]) {
+        if self.sync_update {
+            self.sync_hold.extend_from_slice(bytes);
+            return;
+        }
         let mut start = 0usize;
         for (index, byte) in bytes.iter().copied().enumerate() {
             if !matches!(byte, b'\n' | b'\r') {
@@ -2204,6 +2216,12 @@ impl Handler for CompactEngine {
                     self.swap_alt();
                 }
             }
+            NamedPrivateMode::SwapScreen => {
+                if !self.alt_active {
+                    self.swap_alt();
+                }
+            }
+            NamedPrivateMode::SaveCursor => self.save_cursor_position(),
             NamedPrivateMode::ShowCursor => self.modes.insert(ModeBits::show_cursor()),
             NamedPrivateMode::CursorKeys => self.modes.insert(ModeBits::app_cursor()),
             NamedPrivateMode::ReportMouseClicks => {
@@ -2249,7 +2267,7 @@ impl Handler for CompactEngine {
                 style.blinking = true;
                 self.modes.insert(ModeBits::blinking_cursor());
             }
-            NamedPrivateMode::SyncUpdate => {}
+            NamedPrivateMode::SyncUpdate => self.sync_update = true,
         }
     }
 
@@ -2265,6 +2283,12 @@ impl Handler for CompactEngine {
                     self.swap_alt();
                 }
             }
+            NamedPrivateMode::SwapScreen => {
+                if self.alt_active {
+                    self.swap_alt();
+                }
+            }
+            NamedPrivateMode::SaveCursor => self.restore_cursor_position(),
             NamedPrivateMode::ShowCursor => self.modes.remove(ModeBits::show_cursor()),
             NamedPrivateMode::CursorKeys => self.modes.remove(ModeBits::app_cursor()),
             NamedPrivateMode::ReportMouseClicks => {
@@ -2294,7 +2318,13 @@ impl Handler for CompactEngine {
                 style.blinking = false;
                 self.modes.remove(ModeBits::blinking_cursor());
             }
-            NamedPrivateMode::SyncUpdate => {}
+            NamedPrivateMode::SyncUpdate => {
+                self.sync_update = false;
+                if !self.sync_hold.is_empty() {
+                    let held = mem::take(&mut self.sync_hold);
+                    self.input_plain_ascii(&held);
+                }
+            }
         }
     }
 
@@ -2328,10 +2358,13 @@ impl Handler for CompactEngine {
                         self.modes.contains(ModeBits::urgency_hints())
                     }
                     NamedPrivateMode::SwapScreenAndSetRestoreCursor => self.alt_active,
+                    NamedPrivateMode::SwapScreen => self.alt_active,
+                    // 1048 saves a cursor position; it holds no state to report.
+                    NamedPrivateMode::SaveCursor => false,
                     NamedPrivateMode::BracketedPaste => {
                         self.modes.contains(ModeBits::bracketed_paste())
                     }
-                    NamedPrivateMode::SyncUpdate => false,
+                    NamedPrivateMode::SyncUpdate => self.sync_update,
                     NamedPrivateMode::ColumnMode => {
                         self.pending_replies
                             .push(format!("\x1b[?{};0$y", mode.raw()));

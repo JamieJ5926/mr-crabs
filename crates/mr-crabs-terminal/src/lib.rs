@@ -1035,6 +1035,10 @@ impl Terminal {
         self.protocol.engine().has_mode(mode)
     }
 
+    pub fn is_sync_update(&self) -> bool {
+        self.protocol.engine().is_sync_update()
+    }
+
     pub fn backarrow_key_mode(&self) -> bool {
         self.protocol.backarrow_key_mode()
     }
@@ -1104,8 +1108,19 @@ impl Terminal {
         // Preserve engine damage until frame construction: feed does not consume
         // damage. Re-damage the cursor row so an idle rebuild stays Partial
         // (frame_clean_invariant) without allocating.
-        self.protocol.engine_mut().touch_cursor_damage();
-        let damage = self.protocol.engine().damage_kind();
+        //
+        // Inside a `?2026` batching window nothing paints and neither damage nor
+        // replies are drained, so the first build after ESU carries the whole
+        // update as one frame.
+        let sync_update = self.protocol.engine().is_sync_update();
+        if !sync_update {
+            self.protocol.engine_mut().touch_cursor_damage();
+        }
+        let damage = if sync_update {
+            DamageKind::Clean
+        } else {
+            self.protocol.engine().damage_kind()
+        };
 
         let snapshot = self.protocol.engine().snapshot();
         let mut frame = pool.acquire(sequence, size);
@@ -1194,8 +1209,10 @@ impl Terminal {
             }
         }
 
-        let _pending = self.protocol.engine_mut().take_replies();
-        let _ = self.protocol.engine_mut().take_damage();
+        if !sync_update {
+            let _pending = self.protocol.engine_mut().take_replies();
+            let _ = self.protocol.engine_mut().take_damage();
+        }
         frame
     }
 }
