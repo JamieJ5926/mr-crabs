@@ -217,11 +217,21 @@ pub fn should_run_animated_fetch(args: &[String]) -> bool {
     matches!(args.first(), Some(first) if first == "+animated-fetch")
 }
 
+/// Fallback bytes when rustfetch capture is empty (G8 blank-output-first-exec).
+/// Guarantees `+animated-fetch` never exits with zero stdout bytes.
+pub fn empty_capture_fallback() -> &'static [u8] {
+    b"mr-crabs: system info unavailable\n"
+}
+
 pub fn run_animated_fetch_and_exit() -> ! {
     let captured = capture_rustfetch();
     let is_tty = std::io::stdout().is_terminal();
     match captured {
-        None => std::process::exit(0),
+        None => {
+            let _ = std::io::stdout().write_all(empty_capture_fallback());
+            let _ = std::io::stdout().flush();
+            std::process::exit(0);
+        },
         Some(original) => {
             if !is_tty {
                 let _ = std::io::stdout().write_all(original.as_bytes());
@@ -588,5 +598,36 @@ mod tests {
             Some("\"$MR_CRABS_BIN\" +animated-fetch")
         );
         assert!(cfg.env.contains_key("MR_CRABS_BIN"));
+    }
+
+    #[test]
+    fn empty_capture_fallback_never_blank() {
+        let fb = empty_capture_fallback();
+        assert!(!fb.is_empty(), "G8: empty capture must not yield zero bytes");
+        assert!(fb.ends_with(b"\n"), "fallback is a complete line");
+        assert!(
+            std::str::from_utf8(fb).unwrap().contains("mr-crabs"),
+            "fallback carries marker"
+        );
+    }
+
+    #[test]
+    fn non_utf8_capture_falls_back_to_nonblank() {
+        let raw = vec![0xff, 0xfe, b'\n'];
+        let lossy = String::from_utf8_lossy(&raw).into_owned();
+        assert!(
+            parse_fetch_layout(&lossy).is_none(),
+            "non-utf8 lossy text must not parse as layout"
+        );
+        assert!(
+            !lossy.as_bytes().is_empty(),
+            "production writes original bytes, never blank"
+        );
+    }
+
+    #[test]
+    fn layout_empty_uses_fallback() {
+        assert!(parse_fetch_layout("").is_none());
+        assert!(!empty_capture_fallback().is_empty());
     }
 }

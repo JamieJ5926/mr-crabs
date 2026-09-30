@@ -33,6 +33,7 @@ pub struct SgrState {
     pub overline: bool,
     pub foreground: Option<ColorSpec>,
     pub background: Option<ColorSpec>,
+    pub underline_color: Option<ColorSpec>,
 }
 
 /// A foreground/background color as set by SGR.
@@ -58,6 +59,7 @@ impl SgrState {
             overline: false,
             foreground: None,
             background: None,
+            underline_color: None,
         }
     }
 
@@ -91,6 +93,8 @@ impl SgrState {
             SgrAttr::Foreground(None) => self.foreground = None,
             SgrAttr::Background(Some(color)) => self.background = Some(color),
             SgrAttr::Background(None) => self.background = None,
+            SgrAttr::UnderlineColor(Some(color)) => self.underline_color = Some(color),
+            SgrAttr::UnderlineColor(None) => self.underline_color = None,
         }
     }
 
@@ -140,6 +144,10 @@ impl SgrState {
             out.extend_from_slice(b";");
             encode_color(bg, true, out);
         }
+        if let Some(uc) = &self.underline_color {
+            out.extend_from_slice(b";");
+            encode_underline_color(uc, out);
+        }
     }
 }
 
@@ -167,6 +175,18 @@ fn encode_color(color: &ColorSpec, background: bool, out: &mut Vec<u8>) {
         }
     }
 }
+/// Encode an SGR 58 underline color (Ghostty `printAttributes` order: after
+/// bg). Indexed uses `58:5:n`; RGB uses `58:2::r:g:b`.
+fn encode_underline_color(color: &ColorSpec, out: &mut Vec<u8>) {
+    match color {
+        ColorSpec::Indexed(i) => {
+            let _ = write!(out, "58:5:{i}");
+        }
+        ColorSpec::Rgb(rgb) => {
+            let _ = write!(out, "58:2::{}:{}:{}", rgb.r, rgb.g, rgb.b);
+        }
+    }
+}
 
 /// One SGR attribute as observed from the vte `terminal_attribute` hook.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -189,6 +209,7 @@ pub enum SgrAttr {
     NoOverline,
     Foreground(Option<ColorSpec>),
     Background(Option<ColorSpec>),
+    UnderlineColor(Option<ColorSpec>),
 }
 
 impl Default for SgrState {
@@ -269,7 +290,50 @@ mod tests {
         let mut s = SgrState::new();
         s.apply(SgrAttr::Bold);
         s.apply(SgrAttr::Foreground(Some(ColorSpec::Indexed(1))));
+        s.apply(SgrAttr::UnderlineColor(Some(ColorSpec::Indexed(1))));
         s.apply(SgrAttr::Reset);
         assert_eq!(s, SgrState::new());
+    }
+
+    #[test]
+    fn underline_color_indexed_prints_58() {
+        let mut s = SgrState::new();
+        s.apply(SgrAttr::UnderlineColor(Some(ColorSpec::Indexed(196))));
+        let mut out = Vec::new();
+        s.print_attributes(&mut out);
+        assert_eq!(out, b"0;58:5:196");
+    }
+
+    #[test]
+    fn underline_color_rgb_prints_58() {
+        let mut s = SgrState::new();
+        s.apply(SgrAttr::UnderlineColor(Some(ColorSpec::Rgb(Rgb {
+            r: 255,
+            g: 0,
+            b: 0,
+        }))));
+        let mut out = Vec::new();
+        s.print_attributes(&mut out);
+        assert_eq!(out, b"0;58:2::255:0:0");
+    }
+
+    #[test]
+    fn underline_color_prints_after_background() {
+        let mut s = SgrState::new();
+        s.apply(SgrAttr::Background(Some(ColorSpec::Indexed(17))));
+        s.apply(SgrAttr::UnderlineColor(Some(ColorSpec::Indexed(196))));
+        let mut out = Vec::new();
+        s.print_attributes(&mut out);
+        assert_eq!(out, b"0;48:5:17;58:5:196");
+    }
+
+    #[test]
+    fn underline_color_none_clears() {
+        let mut s = SgrState::new();
+        s.apply(SgrAttr::UnderlineColor(Some(ColorSpec::Indexed(1))));
+        s.apply(SgrAttr::UnderlineColor(None));
+        let mut out = Vec::new();
+        s.print_attributes(&mut out);
+        assert_eq!(out, b"0");
     }
 }

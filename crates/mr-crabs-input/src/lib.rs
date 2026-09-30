@@ -833,12 +833,48 @@ pub struct MouseMode {
     pub encoding: MouseEncoding,
 }
 
+/// App/config bits that `TerminalMode` does not carry (DEC 1015 urxvt, DEC 1016 SGR-pixels).
+///
+/// `TerminalMode` models only 1005 (`Utf8Mouse`) and 1006 (`SgrMouse`); protocol
+/// maps only those two plus 1000/1002/1003/1004/2004 (protocol.rs:1263-1268).
+/// DEC 1015 (urxvt) and DEC 1016 (SGR-pixels) have no `TerminalMode` variant, so
+/// they arrive here as explicit config/overlay bits. SGR (1006) remains the
+/// default modern encoding (Ghostty oracle); 1015/1016 are opt-in extensions
+/// selected only via this overlay. `SgrPixels` encodes `x_px`/`y_px`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MouseModeOverlay {
+    pub urxvt_mouse: bool,
+    pub sgr_pixels: bool,
+}
+
+impl Default for MouseModeOverlay {
+    fn default() -> Self {
+        Self {
+            urxvt_mouse: false,
+            sgr_pixels: false,
+        }
+    }
+}
+
 impl MouseMode {
     /// Reporting mode and encoding from the current `TerminalMode` set.
     ///
     /// Reporting: `MouseMotion` (1003) > `MouseDrag` (1002) > `MouseReportClick` (1000).
     /// Encoding: `SgrMouse` (1006) > `Utf8Mouse` (1005) > X10.
+    /// Backward-compat entry point: identical to `from_modes_with` with a
+    /// default overlay (no 1015/1016), so existing callers are unaffected.
     pub fn from_modes(modes: &[TerminalMode]) -> Self {
+        Self::from_modes_with(modes, MouseModeOverlay::default())
+    }
+
+    /// Reporting mode and encoding from `TerminalMode` plus overlay.
+    ///
+    /// Reporting: `MouseMotion` (1003) > `MouseDrag` (1002) > `MouseReportClick` (1000).
+    /// Encoding: overlay `sgr_pixels` (DEC 1016) > overlay `urxvt_mouse`
+    /// (DEC 1015) > `SgrMouse` (1006) > `Utf8Mouse` (1005) > X10.
+    /// SGR-pixels wins over urxvt when both overlay bits are set (pixel
+    /// coordinates subsume cell coordinates).
+    pub fn from_modes_with(modes: &[TerminalMode], overlay: MouseModeOverlay) -> Self {
         let report = if modes.contains(&TerminalMode::MouseMotion) {
             MouseReportMode::Any
         } else if modes.contains(&TerminalMode::MouseDrag) {
@@ -848,7 +884,11 @@ impl MouseMode {
         } else {
             MouseReportMode::None
         };
-        let encoding = if modes.contains(&TerminalMode::SgrMouse) {
+        let encoding = if overlay.sgr_pixels {
+            MouseEncoding::SgrPixels
+        } else if overlay.urxvt_mouse {
+            MouseEncoding::Urxvt
+        } else if modes.contains(&TerminalMode::SgrMouse) {
             MouseEncoding::Sgr
         } else if modes.contains(&TerminalMode::Utf8Mouse) {
             MouseEncoding::Utf8

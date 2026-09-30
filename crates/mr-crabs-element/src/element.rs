@@ -867,13 +867,56 @@ fn run_paint_style(
     if run.flags & 0x0080 != 0 {
         color.a *= 0.66;
     }
-    let underline = (run.flags & 0x7808 != 0).then(|| UnderlineStyle {
-        thickness: px(1.0),
-        color: style
-            .and_then(|style| style.underline.as_ref())
-            .map(|color| palette::color_to_hsla_with_palette(color, palette)),
-        wavy: run.flags & 0x1000 != 0,
-    });
+    // Flag bits mirror `mr_crabs_terminal::compact::flags` (that module is
+    // `pub(crate)`, so the raw masks are repeated here): UNDERLINE 0x0008,
+    // DOUBLE 0x0800, UNDERCURL 0x1000, DOTTED 0x2000, DASHED 0x4000.
+    // Precedence matches `CellAttributes::underline` (Double > Curly >
+    // Dotted > Dashed > Single) so paint agrees with the semantic query.
+    // GPUI `UnderlineStyle` is only `{thickness, color, wavy}` (gpui
+    // style.rs `pub struct UnderlineStyle`): it has no dotted/dashed
+    // pattern. The thickness ladder below keeps every SGR 4:x variant
+    // pairwise struct-distinct (Single 1.0, Double 2.0, Dotted 0.5, Dashed
+    // 1.5, Curly 1.0+wavy; on @2x these snap to 2/4/1/3 device px) so the
+    // collapse is gone, but dotted/dashed still paint as solid strokes.
+    // NEEDS-DECISION (owner pot): true dot/dash patterns need custom
+    // rendering (e.g. `paint_path` with a dash pattern or segmented quads),
+    // not `paint_underline`. Until then this ladder is a placeholder.
+    let underline_color = style
+        .and_then(|style| style.underline.as_ref())
+        .map(|color| palette::color_to_hsla_with_palette(color, palette));
+    let underline = if run.flags & 0x0800 != 0 {
+        Some(UnderlineStyle {
+            thickness: px(2.0),
+            color: underline_color,
+            wavy: false,
+        })
+    } else if run.flags & 0x1000 != 0 {
+        Some(UnderlineStyle {
+            thickness: px(1.0),
+            color: underline_color,
+            wavy: true,
+        })
+    } else if run.flags & 0x2000 != 0 {
+        Some(UnderlineStyle {
+            thickness: px(0.5),
+            color: underline_color,
+            wavy: false,
+        })
+    } else if run.flags & 0x4000 != 0 {
+        Some(UnderlineStyle {
+            thickness: px(1.5),
+            color: underline_color,
+            wavy: false,
+        })
+    } else if run.flags & 0x0008 != 0 {
+        Some(UnderlineStyle {
+            thickness: px(1.0),
+            color: underline_color,
+            wavy: false,
+        })
+    } else {
+        None
+    };
     let strikethrough = (run.flags & 0x0200 != 0).then(|| StrikethroughStyle {
         thickness: px(1.0),
         color: None,
@@ -2203,5 +2246,85 @@ mod tests {
             format!("{path:?}"),
             format!("{:?}", PathBuilder::stroke(px(1.0)).build().unwrap())
         );
+    }
+    // ── run_paint_style underline decode (G1 styling slice a) ──
+
+    fn paint_style_for_flags(
+        flags: u16,
+    ) -> (Hsla, Option<UnderlineStyle>, Option<StrikethroughStyle>) {
+        let mut pool = FramePool::new(1);
+        let mut frame = pool.acquire(1, GridSize::new(4, 2));
+        frame.styles = vec![TermStyle::default()];
+        let run = RunBatch {
+            col: 0,
+            len: 2,
+            style: 0,
+            flags,
+            text: SharedString::new_static("hi"),
+            glyph_widths: vec![1, 1],
+        };
+        run_paint_style(&frame, &run, white(), palette::TerminalPalette::default())
+    }
+
+    #[test]
+    fn run_paint_style_no_underline_is_none() {
+        let (_, underline, _) = paint_style_for_flags(0x0000);
+        assert_eq!(underline, None);
+    }
+
+    #[test]
+    fn run_paint_style_single_underline_is_solid() {
+        let (_, underline, _) = paint_style_for_flags(0x0008);
+        let style = underline.expect("single underline");
+        assert_eq!(style.thickness, px(1.0));
+        assert!(!style.wavy);
+    }
+
+    #[test]
+    fn run_paint_style_double_underline_is_distinct_from_single() {
+        let (_, single, _) = paint_style_for_flags(0x0008);
+        let (_, double, _) = paint_style_for_flags(0x0800);
+        let (single, double) = (single.expect("single"), double.expect("double"));
+        assert!(!double.wavy);
+        assert_ne!(single, double);
+        assert_eq!(double.thickness, px(2.0));
+    }
+
+    #[test]
+    fn run_paint_style_undercurl_underline_is_wavy() {
+        let (_, underline, _) = paint_style_for_flags(0x1000);
+        let style = underline.expect("undercurl");
+        assert!(style.wavy);
+    }
+
+    #[test]
+    fn run_paint_style_dotted_vs_dashed_underline_distinct() {
+        let (_, dotted, _) = paint_style_for_flags(0x2000);
+        let (_, dashed, _) = paint_style_for_flags(0x4000);
+        let (dotted, dashed) = (dotted.expect("dotted"), dashed.expect("dashed"));
+        assert!(!dotted.wavy);
+        assert!(!dashed.wavy);
+        assert_ne!(dotted, dashed);
+    }
+
+    #[test]
+    fn run_paint_style_all_underline_kinds_pairwise_distinct() {
+        let kinds = [0x0008, 0x0800, 0x1000, 0x2000, 0x4000];
+        let styles: Vec<UnderlineStyle> = kinds
+            .iter()
+            .map(|&flags| paint_style_for_flags(flags).1.expect("underline"))
+            .collect();
+        for (i, a) in styles.iter().enumerate() {
+            for b in &styles[i + 1..] {
+                assert_ne!(a, b);
+            }
+        }
+    }
+
+    #[test]
+    fn run_paint_style_underline_precedence_double_first() {
+        // Matches `CellAttributes::underline`: Double > Curly > Dotted > Dashed > Single.
+        let (_, underline, _) = paint_style_for_flags(0x0800 | 0x2000);
+        assert_eq!(underline.expect("double wins").thickness, px(2.0));
     }
 }
